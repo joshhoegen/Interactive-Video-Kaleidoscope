@@ -1,0 +1,270 @@
+jQuery(document).ready(function () {
+  init();
+});
+
+function init(){
+  var move = function(x, y){
+    $('canvas.kaleidoscope').each(function(index){
+      var offset = $(this).offset();
+      //Ref: drawKaleidoscope(ctx, img, imgX, imgY, mask)
+      drawKaleidoscope(jQuery.kScope[index]['ctx'], jQuery.kScope[index]['img'][0], x, y, $(this).width());
+    });
+  }
+  
+  var autoMove = function(){
+    var rev = false;
+    var i = 1;
+    setTimeout(function(){
+      move(i, i);
+      if(!rev) {
+        i++; 
+        rev = i == 498 ? true : false;
+      } else {
+        i--;
+        rev = i == 1 ? false : true;
+      }
+    }, 30);
+  }
+  
+  var wac = new AudioContext();
+  var scURL = $('input[name=urlSoundCloud]').val();
+  var audioURL = false;
+  var audioCurrentTime = 0;
+  var audioDuration = 0;
+  
+  $('button[name=sc-pause]').on('click', function(e){
+    if(typeof wac !== 'undefined' && audioURL){
+      wac.pause();
+      audioCurrentTime = wac.currentTime();
+      console.log(audioCurrentTime);
+    }
+  });
+  
+  $('input[name=sc-submit]').on('click', function(e){
+    if(audioURL){
+      wac.play();
+      console.log('alreadyLoaded - '+audioCurrentTime+' - '+audioURL);
+      return true;
+    }
+    var val = $('input[name=urlSoundCloud]').val();
+    SC.initialize({
+      client_id: 'b2d19575a677c201c6d23c39e408927a'
+    });
+    SC.get('/resolve', { url: val }, function(track) {
+      audioURL = track.stream_url+'?client_id=b2d19575a677c201c6d23c39e408927a';
+      audioDuration = track.duration/1000;
+      $('#body-kscope-wrapper > .body-kscope').attr('src', track.artwork_url.replace('large','t500x500')+'?client_id=b2d19575a677c201c6d23c39e408927a');
+      $('#body-kscope-wrapper').append('<div class="track-info"><h3>'+
+        track.user.username+'</h3><p><strong>'+track.title+'</strong> | '+
+        track.description+' | <a href="'+track.permalink_url+'">Open on SoundCloud</a></p></div>');
+      console.log(track);
+      e.preventDefault();
+      if(jQuery.kScope){
+        jQuery('canvas.kaleidoscope').show('fast');
+      } else {
+        loadNewKaleidoscope();
+        // when the javascript node is called
+        // we use information from the analyzer node
+        // to draw the volume
+        // get the average for the first channel
+        // (channel 2 = analyser2)
+        wac.load(audioURL);
+        console.log(wac);
+        wac.javascriptNode.onaudioprocess = function() {
+          var array =  new Uint8Array(wac.ch.analyser.frequencyBinCount);
+          wac.ch.analyser.getByteFrequencyData(array);
+          var average = wac.getAverageVolume(array);
+          var x = Math.round(average > 65 ? (average * 2) : (average > 90 ? (average * 3.4) : average));
+          var y = Math.round(average > 50 ? (average * 1.8) : (average > 70 ? (average * 5) : average*1.2));
+          move(x, y);// x5 so wecan normalize 100 to 500
+        }
+      }
+    });
+  });
+  //https://www.google.com/search?q=js+imultiple+canvas+or+one+large+canvas&aq=f&oq=js+imultiple+canvas+or+one+large+canvas&aqs=chrome.0.57j0.13276j0&sourceid=chrome&ie=UTF-8
+  //http://stackoverflow.com/questions/4020910/html5-multiple-canvas-on-a-single-page
+  jQuery('body').append(function(){
+    var width = jQuery(this).width();
+    var max = 8;//Math.round(width/500);
+    var html = '<div id="body-kscope-wrapper">';
+    for(i=0;i<max;i++){
+       html += '<img class="body-kscope img_'+i+'" height="250" width="250" alt="kaleidoscope" src="'+jQuery('body').css('background-image').replace('url(','').replace(')','')+'" style="position: absolute; left: -9999px; margin: 0px; padding: 0px" />';
+    }
+    html += '</div>';
+    return html;
+  });
+  
+  
+}
+/* ---------------------------------------------
+ Loads a new kaleidoscope
+ ------------------------------------------------*/
+function loadNewKaleidoscope() {
+	//var bg = jQuery('body').css('background-image').replace('url(','').replace(')','');
+	var success = false;
+	var height, width;
+	jQuery.kScope = [];
+	jQuery('img[alt=kaleidoscope]').each(function(i){
+		img = jQuery(this);
+		height = 250//img.height()*2;
+		width = 250//img.width()*2;
+		kScopeObj = {
+				img: img,
+				height: height,
+				width: width,
+				canvas: jQuery('<canvas id="kaleidoscope_'+i+'" class="kaleidoscope" width="'+height+'" height="'+height+'"></canvas>'),
+				ctx: false,
+				imgLoaded: true
+		}
+		kScopeObj.img.after(kScopeObj.canvas[0]).hide();
+		kScopeObj.ctx = kScopeObj.canvas[0].getContext('2d');
+		jQuery.kScope.push(kScopeObj);
+		drawKaleidoscope(kScopeObj.ctx, kScopeObj.img[0], 100, 100, kScopeObj.height);
+
+	});
+	if(jQuery.kScope.length){
+		success = true;
+	}
+	return success;
+}
+
+
+/* ---------------------------------------------
+ Draws a kaleidoscope
+ ------------------------------------------------*/
+function drawKaleidoscope(ctx, img, imgX, imgY, mask) {
+    try { 
+        var maskSide = !mask ? 300 : mask;
+        var sqSide = maskSide/2;
+        var sqDiag = Math.sqrt(2 * sqSide * sqSide);
+        var c = maskSide/2;
+        var centerSide = 0;
+        if (img.height < img.width) {
+            maskSide = Math.abs(img.height - sqDiag);
+        } else {
+            maskSide = Math.abs(img.width - sqDiag);
+        }
+        /*var processCanvas = function(){
+          var count = 0;
+          var sc.a = 1;
+          var sc.b = 1;
+          while(count < 8){
+            ctx.save();
+            if(count < 4){
+              ctx.translate(c, c);
+              ctx.rotate(-90 * (Math.PI / 180));
+            } else {
+              ctx.save();
+              ctx.moveTo(c, c);
+              ctx.lineTo(c - sqSide, c);
+              ctx.lineTo(c - sqSide, c - sqSide);
+              ctx.lineTo(c, c);
+              ctx.clip();
+              ctx.translate(c, c);
+            }
+            ctx.scale(sc.a, sc.b);
+            ctx.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
+            ctx.restore();
+            count++;
+            processCanvas();
+          }
+         
+        }*/
+        ctx.clearRect(0, 0, maskSide, maskSide);
+        //7 (1) 1
+        ctx.save();
+        ctx.translate(c, c);
+        ctx.rotate(-90 * (Math.PI / 180));
+        ctx.scale(-1, -1);
+        ctx.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
+        ctx.restore();
+        //2 (4) 2
+        ctx.save();
+        ctx.translate(c, c);
+        ctx.rotate(-90 * (Math.PI / 180));
+        ctx.scale(1, -1);
+        ctx.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
+        ctx.restore();
+        //3 (5) 3
+        ctx.save();
+        ctx.translate(c, c);
+        ctx.rotate(-90 * (Math.PI / 180));
+        ctx.scale(1, 1);
+        ctx.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
+        ctx.restore();
+        //8 4
+        ctx.save();
+        ctx.translate(c, c);
+        ctx.rotate(-90 * (Math.PI / 180));
+        ctx.scale(-1, 1);
+        ctx.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
+        ctx.restore();
+        //1 5
+        ctx.save();
+        ctx.moveTo(c, c);
+        ctx.lineTo(c - sqSide, c);
+        ctx.lineTo(c - sqSide, c - sqSide);
+        ctx.lineTo(c, c);
+        ctx.clip();
+        ctx.translate(c, c);
+        ctx.scale(-1, -1);
+        ctx.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
+        ctx.restore();
+        //4 6
+        ctx.save();
+        ctx.moveTo(c, c);
+        ctx.lineTo(c + sqSide, c - sqSide);
+        ctx.lineTo(c + sqSide, c);
+        ctx.lineTo(c, c);
+        ctx.clip();
+        ctx.translate(c, c);
+        ctx.scale(1, -1);
+        ctx.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
+        ctx.restore();
+        //5 7
+        ctx.save();
+        ctx.moveTo(c, c);
+        ctx.lineTo(c + sqSide, c);
+        ctx.lineTo(c + sqSide, c + sqSide);
+        ctx.lineTo(c, c);
+        ctx.clip();
+        ctx.translate(c, c);
+        ctx.scale(1, 1);
+        ctx.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
+        ctx.restore();
+        //8 8
+        ctx.save();
+        ctx.moveTo(c, c);
+        ctx.lineTo(c - sqSide, c + sqSide);
+        ctx.lineTo(c - sqSide, c);
+        ctx.lineTo(c, c);
+        ctx.clip();
+        ctx.translate(c, c);
+        ctx.scale(-1, 1);
+        ctx.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
+        ctx.restore();
+    } catch(err) {
+        jQuery('#currentImage').remove();
+        img = '';
+        setLoadingMessage('drawingError');
+        jQuery('#loadingContainer').show();
+        ctx.clearRect(0, 0, 300, 300);
+    }
+}
+
+
+/* ---------------------------------------------
+ Manage loading messages
+ ------------------------------------------------*/
+
+function setLoadingMessage(message) {
+    if (message == 'default') {
+        jQuery('#loadingContainer .loading').html('Loading...<br/><img src="loader.gif" width="32" height="32" alt="loading"/>');
+    } else if (message == 'loadingError') {
+        jQuery('#loadingContainer .loading').html('Sorry. That particular image is unavailable for some reason. <a href="#" class="openPhotoChooser">Please choose another one.</a>');
+    } else if (message == 'drawingError') {
+        jQuery('#loadingContainer .loading').html('Sorry. There has been a problem loading that image. You could try <a href="#" class="refreshPage">refreshing the page</a> or maybe just <a href="#" class="openPhotoChooser">choose a different photo.</a>');
+    } else {
+        jQuery('#loadingContainer .loading').html(message);
+    }
+}
