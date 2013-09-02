@@ -43,18 +43,26 @@ var init = function () {
       }
     },
     addNewImages = function (src) {
-      jQuery('#body-kscope-wrapper').remove();
+      jQuery('#sckscope').remove();
       //https://www.google.com/search?q=js+imultiple+canvas+or+one+large+canvas&aq=f&oq=js+imultiple+canvas+or+one+large+canvas&aqs=chrome.0.57j0.13276j0&sourceid=chrome&ie=UTF-8
       //http://stackoverflow.com/questions/4020910/html5-multiple-canvas-on-a-single-page
-      jQuery('body').append(function () {
+      jQuery('body .wrapper').append(function () {
           var max = 8; //Math.round(width/500);
-          var html = '<div id="body-kscope-wrapper">';
+          var html = '<div id="sckscope">';
           for (i = 0; i < max; i++) {
             html += '<img class="body-kscope img_' + i + '" height="250" width="250" alt="kaleidoscope" src="' + src + '" style="position: absolute; left: -9999px; margin: 0px; padding: 0px" />';
           }
           html += '</div>';
           return html;
         });
+      jQuery('body').css({
+          background: 'url('+src+')',
+          animation: 'none',
+          '-ms-animation': 'none',
+          '-moz-animation': 'none',
+          '-webkit-animation': 'none',
+          
+      })
       loadNewKaleidoscope();
     }
 
@@ -70,6 +78,7 @@ var init = function () {
 
     jQuery('input[name=sc-submit]').on('click', function (e) {
       var val = jQuery('input[name=urlSoundCloud]').val();
+      console.log(val);
       // AudioCache[val] = {'url': val};
       // Only make the SC.get happen once-ish
       // See audio.js:88 for future implementation of start from (pause effect)
@@ -101,11 +110,11 @@ var init = function () {
                 jQuery.KSC.AudioCache[val] = {'stream': track.stream_url + '?client_id=b2d19575a677c201c6d23c39e408927a', 'url':val, 'image':track.artwork_url.replace('large', 't500x500') + '?client_id=b2d19575a677c201c6d23c39e408927a'};
                 // AudioDuration = track.duration;
                 audioDuration = track.duration / 1000;
-                // jQuery('#body-kscope-wrapper > .body-kscope').attr('src', track.artwork_url.replace('large','t500x500')+'?client_id=b2d19575a677c201c6d23c39e408927a');
+                // jQuery('#sckscope > .body-kscope').attr('src', track.artwork_url.replace('large','t500x500')+'?client_id=b2d19575a677c201c6d23c39e408927a');
                 addNewImages(jQuery.KSC.AudioCache[val].image);
-                jQuery('#body-kscope-wrapper').append('<div class="track-info"><h3>' +
+                jQuery('#sckscope').append('<div class="track-info"><h3>' +
                   track.user.username + '</h3><p><strong>' + track.title + '</strong> | ' +
-                  track.description + ' | <a href="' + track.permalink_url + '">Open on SoundCloud</a></p></div>');
+                  track.description + ' | <a href="' + track.permalink_url + '" target="_blank">Open on SoundCloud</a></p></div>');
                 vac.playSound(0, jQuery.KSC.AudioCache[val].stream, audioDuration);
                 visualizeAudio();
               } else {
@@ -266,7 +275,7 @@ drawKaleidoscope = function (ctx, img, imgX, imgY, mask) {
 },
 setLoadingMessage = function (message) {
   var loadingHtml = jQuery('<div class="kMessages">'+message+'</div>');
-  jQuery('#body-kscope-wrapper').append(loadingHtml);
+  jQuery('#sckscope').append(loadingHtml);
   setTimeout(function(){
     loadingHtml.fadeOut('slow').remove(); 
   }, 5000);
@@ -274,5 +283,17 @@ setLoadingMessage = function (message) {
 
 jQuery.KSC = {AudioCache: {}, Loaded: ''};
 jQuery(document).ready(function () {
+  var defaultUrl = function(name){
+          var results = new RegExp('[\\?&]' + name + '=([^&#]*)').exec(window.location.href);
+          return results ? results[1] : 0;
+      },
+      scUrl = defaultUrl('scUrl');
+      
+  if (scUrl !== 0) {
+    jQuery('input[name=urlSoundCloud]').val(scUrl).change(function(){
+      jQuery(this).parents('form').find('input[name=sc-submit]').click()  
+    });
+    
+  }
   init();
 });

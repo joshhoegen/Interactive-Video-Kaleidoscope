@@ -1,0 +1,100 @@
+body {
+    padding: 0;
+    margin: auto;
+    width: auto;
+    font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;
+    background: url("../image/bg.jpg") #000;
+    color: #fff;
+    text-shadow: 2px 1px 6px #000;
+    animation: animatedBackground 400s linear infinite;
+    -ms-animation: animatedBackground 400s linear infinite;
+    -moz-animation: animatedBackground 400s linear infinite;
+    -webkit-animation: animatedBackground 400s linear infinite;
+}
+@keyframes animatedBackground {
+    from { background-position: 0 0; }
+    to { background-position: 100% 0; }
+}
+@-webkit-keyframes animatedBackground {
+    from { background-position: 0 0; }
+    to { background-position: 100% 0; }
+}
+@-ms-keyframes animatedBackground {
+    from { background-position: 0 0; }
+    to { background-position: 100% 0; }
+}
+@-moz-keyframes animatedBackground {
+    from { background-position: 0 0; }
+    to { background-position: 100% 0; }
+}
+.wrapper {
+    width: 1000px;
+    margin: 0 auto;
+}
+h1 {
+    margin: 0 0 10px 0;    
+}
+h3 {
+  margin: 0px 0px;
+}
+a {
+  color: #00b7ff;
+}
+#main {
+  clear: both;
+}
+.floatLeft {
+  float: left;
+}
+#sckscope {
+  position: relative;
+  text-align: center;
+  max-width: 1000px;
+  box-shadow: 0px 0px 100px #000;
+}
+#sckscope canvas {
+  margin-bottom: -3px;
+}
+.track-info {
+    background: #000;
+    background: rgba(0, 0, 0, .6);
+    padding: 20px;
+}
+.kMessages {
+  width: 300px;
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  margin-left: -150px;
+  background: #fff;
+  color: #333;
+  border: 1px solid #333;
+  border-radius: 4px;
+  opacity: 0.9;
+  padding: 10px;
+}
+form {
+  margin: 0px;
+  background: #000;
+  background: rgba(0, 0, 0, .6);
+  padding: 10px;
+}
+form input[type=text] {
+    margin: 0px;
+    width: 400px;
+}
+input[type=submit],
+input[type=button] {
+  background: #fff;
+  color: #09f;
+  border: 1px solid #00b7ff;
+  border-radius: 4px;
+  padding: 4px 10px;
+}
+input[type=submit]:hover,
+input[type=button]:hover {
+  background: #fff;
+  color: #333;
+  border: 1px solid #333;
+  opacity: 0.9;
+}
