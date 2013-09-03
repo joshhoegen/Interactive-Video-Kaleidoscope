@@ -290,10 +290,10 @@ jQuery(document).ready(function () {
       scUrl = defaultUrl('scUrl');
       
   if (scUrl !== 0) {
-    jQuery('input[name=urlSoundCloud]').val(scUrl).change(function(){
-      jQuery(this).parents('form').find('input[name=sc-submit]').click()  
-    });
-    
+    jQuery('input[name=urlSoundCloud]').val(scUrl);
+    setTimeout(function(){
+      jQuery('input[name=sc-submit]').click();
+    }, 2000);
   }
   init();
 });
