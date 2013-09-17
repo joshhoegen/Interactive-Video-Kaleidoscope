@@ -1,33 +1,36 @@
 // create the audio context (chrome only for now)
 // The name of this file is ambiguous until there's a standard audio context.
 // Original code from: http://www.smartjava.org/content/exploring-html5-web-audio-visualizing-sound
-if ( ! window.console ) console = { log: function(){} };
-VisualAudioContext = function (context){
-  var audioBuffer,
-    sourceNode = {
-      buffer: 0
-    },
-    cache = new Array(),
-    splitter, analyser, analyser2, javascriptNode, channels, note,
-    setupAudioNodes = function (context) {
-      // let's try to cache this.
-      // setup a javascript node.
-      javascriptNode = context.createJavaScriptNode(2048, 1, 1);
+VisualAudioContext = function (context, url){
+  var vac = this,
+    cache = {},
+    loaded = false,
+    connected = false,
+    bufferActive,
+    javascriptNode,
+    sourceNode,
+    splitter,
+    analyser,
+    analyser2,
+    channels,
+    setupAudioNodes = function (callback) {
       // connect to destination, else it isn't called
+      javascriptNode = context.createJavaScriptNode(2048, 1, 1),
+      sourceNode = context.createBufferSource(),
+      splitter = context.createChannelSplitter(),
+      analyser = context.createAnalyser(),
+      analyser2 = context.createAnalyser(),
+      channels = {
+        analyser: analyser,
+        analyser2: analyser2
+      }
+    
       javascriptNode.connect(context.destination);
 
-      // setup an analyzer
-      analyser = context.createAnalyser();
       analyser.smoothingTimeConstant = 0.3;
       analyser.fftSize = 1024;
-
-      analyser2 = context.createAnalyser();
       analyser2.smoothingTimeConstant = 0.0;
       analyser2.fftSize = 1024;
-
-      // create a buffer source node
-      sourceNode = context.createBufferSource();
-      splitter = context.createChannelSplitter();
 
       // connect the source to the analyser and the splitter
       sourceNode.connect(splitter);
@@ -46,18 +49,24 @@ VisualAudioContext = function (context){
       // splitter.connect(context.destination,0,1);
       // and connect to destination
       sourceNode.connect(context.destination);
-      channels = {
-        analyser: analyser,
-        analyser2: analyser2
+      
+      if (bufferActive) {
+        sourceNode.buffer = bufferActive;
       }
-      return true;
+      
+      connected = true;
+      vac.javascriptNode = javascriptNode;
+      vac.ch = channels;
+      
+      if (typeof callback == 'function'){
+        callback();
+      }
     },
-    loadSound = function (start, url, dur) {
-      var cacheUpdate;
-      if($.inArray(url, cacheUpdate)){
+    loadSound = function (url, dur) {
         var request = new XMLHttpRequest();
         request.open('GET', url, true);
         request.responseType = 'arraybuffer';
+        loaded = true;
         // When loaded decode the data
         request.onload = function () {
           // decode the data
@@ -65,40 +74,43 @@ VisualAudioContext = function (context){
               // when the audio is decoded play the sound
               // playSound(buffer, 0);
               sourceNode.buffer = buffer;
-              sourceNode.start(0, start, dur - start);
+              bufferActive = buffer;
+              playSound(url, 0, dur);
             }, onError);
         }
-        cacheUpdate = cachedTracks(url);
-        console.log(cacheUpdate);
         request.send();
+    },
+    playSound = function (url, start, dur) {
+      start = start || 0;
+      if (connected) {
+        if (loaded) {
+          sourceNode.start(0, start, dur - start);
+          console.log(sourceNode.buffer);
+        } else{
+          loadSound(url, dur);
+        } 
       } else {
-        sourceNode.start(0, start, dur - start);
-        console.log('fromCache');
+        setupAudioNodes(function(){
+          playSound(url, start, dur);
+        });
       }
     },
-    playSound = function (start, url, dur) {
-      if(!audioSet){
-        audioSet = setupAudioNodes(context);
-      }
-      loadSound(start, url, dur);
-    },
-    stopSound = function () {
-      sourceNode.stop(0);
+    stopSound = function (url) {
       this.currentTime = context.currentTime;
-      javascriptNode.disconnect();
+      sourceNode.stop(0);
       sourceNode.disconnect();
-      audioSet = false;
+      javascriptNode.disconnect();
+      analyser.disconnect();
+      analyser2.disconnect();
+      splitter.disconnect();
+      connected = false;
     },
     onError = function (e) {
       console.log(e);
-    },
-    cachedTracks = function(track){
-      console.log(cache);
-      return cache.push(track);
     }
-    audioSet = setupAudioNodes(context);
-  
-  if (audioSet) {
+    
+    setupAudioNodes();
+      
     this.getAverageVolume = function (array) {
       var values = 0,
         length = array.length,
@@ -113,18 +125,12 @@ VisualAudioContext = function (context){
     this.currentTime = function () {
       return context.currentTime;
     }
-    this.javascriptNode = javascriptNode;
-    this.loadSound = function (start, url, dur) {
-      loadSound(start, url, dur);
-    }
     this.stopSound = function (current) {
       stopSound();
     }
-    this.playSound = function (start, url, dur) {
-      playSound(start, url, dur);
+    this.playSound = function (url, start, dur) {
+      playSound(url, start, dur);
     }
     this.ch = channels;
-  } else {
-    //error!!!! this.message
-  }
+    this.javascriptNode = javascriptNode;
 }
