@@ -17,6 +17,7 @@ VisualAudioContext = function (context, url){
       // connect to destination, else it isn't called
       javascriptNode = context.createJavaScriptNode(2048, 1, 1),
       sourceNode = context.createBufferSource(),
+      gainNode = context.createGain(),
       splitter = context.createChannelSplitter(),
       analyser = context.createAnalyser(),
       analyser2 = context.createAnalyser(),
@@ -24,7 +25,7 @@ VisualAudioContext = function (context, url){
         analyser: analyser,
         analyser2: analyser2
       }
-    
+
       javascriptNode.connect(context.destination);
 
       analyser.smoothingTimeConstant = 0.3;
@@ -44,12 +45,15 @@ VisualAudioContext = function (context, url){
       // we use the javascript node to draw at a
       // specific interval.
       analyser.connect(javascriptNode);
+      
+      // Volume
+      sourceNode.connect(gainNode);
 
       // splitter.connect(context.destination,0,0);
       // splitter.connect(context.destination,0,1);
       // and connect to destination
       sourceNode.connect(context.destination);
-      
+
       if (bufferActive) {
         sourceNode.buffer = bufferActive;
       }
@@ -62,7 +66,7 @@ VisualAudioContext = function (context, url){
         callback();
       }
     },
-    loadSound = function (url, dur) {
+    loadSound = function (url, start, dur) {
         var request = new XMLHttpRequest();
         request.open('GET', url, true);
         request.responseType = 'arraybuffer';
@@ -75,7 +79,7 @@ VisualAudioContext = function (context, url){
               // playSound(buffer, 0);
               sourceNode.buffer = buffer;
               bufferActive = buffer;
-              playSound(url, 0, dur);
+              playSound(url, start, dur);
             }, onError);
         }
         request.send();
@@ -95,15 +99,31 @@ VisualAudioContext = function (context, url){
         });
       }
     },
-    stopSound = function (url) {
+    stopSound = function (fade) {
       this.currentTime = context.currentTime;
-      sourceNode.stop(0);
-      sourceNode.disconnect();
-      javascriptNode.disconnect();
-      analyser.disconnect();
-      analyser2.disconnect();
-      splitter.disconnect();
-      connected = false;
+      if (!fade) {
+        sourceNode.stop(0);
+        sourceNode.disconnect();
+        javascriptNode.disconnect();
+        analyser.disconnect();
+        analyser2.disconnect();
+        splitter.disconnect();
+        connected = false;
+      } else {
+        fadeSound(fade);
+      }
+    },
+    fadeSound = function(direction, dur){
+      var fraction = direction/10;
+      dur = dur || 100;
+      setTimeout(function(){
+        if (sourceNode.gain.value <= 0){
+            stopSound();
+        } else {
+          sourceNode.gain.value = sourceNode.gain.value - fraction;
+          fadeSound(direction, dur);
+        }
+      }, dur)
     },
     onError = function (e) {
       console.log(e);
@@ -125,8 +145,8 @@ VisualAudioContext = function (context, url){
     this.currentTime = function () {
       return context.currentTime;
     }
-    this.stopSound = function (current) {
-      stopSound();
+    this.stopSound = function (fade) {
+      stopSound(fade);
     }
     this.playSound = function (url, start, dur) {
       playSound(url, start, dur);
