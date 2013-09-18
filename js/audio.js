@@ -84,12 +84,12 @@ VisualAudioContext = function (context, url){
         }
         request.send();
     },
-    playSound = function (url, start, dur) {
-      start = start || 0;
+    playSound = function (url, start, dur, when) {
+      start = start || 0,
+      when = when || 0;
       if (connected) {
         if (loaded) {
-          sourceNode.start(0, start, dur - start);
-          console.log(sourceNode.buffer);
+          sourceNode.start(when, start, dur - start);
         } else{
           loadSound(url, dur);
         } 
@@ -99,10 +99,11 @@ VisualAudioContext = function (context, url){
         });
       }
     },
-    stopSound = function (fade) {
+    stopSound = function (dur, fade) {
+      dur = dur || 0;
       this.currentTime = context.currentTime;
       if (!fade) {
-        sourceNode.stop(0);
+        sourceNode.stop(dur);
         sourceNode.disconnect();
         javascriptNode.disconnect();
         analyser.disconnect();
@@ -145,8 +146,8 @@ VisualAudioContext = function (context, url){
     this.currentTime = function () {
       return context.currentTime;
     }
-    this.stopSound = function (fade) {
-      stopSound(fade);
+    this.stopSound = function (dur, fade) {
+      stopSound(dur, fade);
     }
     this.playSound = function (url, start, dur) {
       playSound(url, start, dur);
