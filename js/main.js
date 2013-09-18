@@ -7,7 +7,6 @@ jQuery(document).ready(function () {
         audioDuration = 0,
         playlistActive = false,
         playlist = {},
-	timerActive,
         move = function (x, y) {
             jQuery('canvas.kaleidoscope').each(function (index) {
                 var offset = jQuery(this).offset();
@@ -15,34 +14,13 @@ jQuery(document).ready(function () {
                 drawKaleidoscope(jQuery.kScope[index]['ctx'], jQuery.kScope[index]['img'][0], x, y, jQuery(this).width());
             });
         },
-        // Deprecated. Potentially useful.
-        autoMove = function () {
-            var rev = false;
-            var i = 1;
-            setTimeout(function () {
-                move(i, i);
-                if (!rev) {
-                    i++;
-                    rev = i == 498 ? true : false;
-                } else {
-                    i--;
-                    rev = i == 1 ? false : true;
-                }
-            }, 30);
-        },
         visualizeAudio = function (audioActive) {
-            // when the javascript node is called
-            // we use information from the analyzer node
-            // to draw the volume
-            // get the average for the first channel
-            // (channel 2 = analyser2)
-            // Let's push something up the stack!
             vac[audioActive].javascriptNode.onaudioprocess = function () {
                 var array = new Uint8Array(vac[audioActive].ch.analyser.frequencyBinCount);
                 vac[audioActive].ch.analyser.getByteFrequencyData(array);
                 var average = vac[audioActive].getAverageVolume(array);
-                var x = Math.round(average > 65 ? (average * 1) : (average > 90 ? (average * 3.4) : average));
-                var y = Math.round(average > 50 ? (average * 1.8) : (average > 70 ? (average * 5) : average));
+                var x = Math.round(average > 65 ? (average * 1) : (average > 90 ? (average * 4.4) : average));
+                var y = Math.round(average > 30 ? (average * 1.2) : (average > 70 ? (average * 4.5) : average));
                 move(x, y); // x5 so wecan normalize 100 to 500
             }
         },
@@ -69,38 +47,37 @@ jQuery(document).ready(function () {
             })
             loadNewKaleidoscope();
         },
-	Timer = function (callback, delay) {
-	    var timerId, start, remaining = delay;
-	
-	    this.pause = function() {
-		window.clearTimeout(timerId);
-		remaining -= new Date() - start;
-		console.log('paused');
-	    };
-	
-	    this.resume = function() {
-		start = new Date();
-		timerId = window.setTimeout(callback, remaining);
-	    };
-	
-	    this.resume();
-	},
+        Timer = function (callback, delay) {
+            var timerId, start, remaining = delay;
+            this.pause = function () {
+                window.clearTimeout(timerId);
+                remaining -= new Date() - start;
+                console.log('paused');
+            };
+            this.resume = function () {
+                start = new Date();
+                timerId = window.setTimeout(callback, remaining);
+            };
+            this.resume();
+        },
         playTrack = function (tracks) {
-            /*if (typeof vac[url] != 'undefined' && vac[url].javascriptNode.onaudioprocess) {
-                vac[url].stopSound(1);
-            }*/
-	    playTimeout = 0;
+	    var playTimeout = 0;
             jQuery.each(tracks, function (url, track) {
-                timerActive = new Timer(function () {
+                audioCache[url].timer = new Timer(function () {
+		    if (audioActive != url && typeof vac[audioActive] != 'undefined') {
+			vac[audioActive].stopSound(1);
+			console.log('stopped');
+		    }
                     vac[url] = new VisualAudioContext(context, audioCache[url].stream);
-		    audioActive = url;
-		    audioDuration = track.duration / 1000;
-		    addNewImages(audioCache[url].image);
-		    jQuery('#sckscope').append('<div class="track-info"><h3>' +
-			track.user.username + '</h3><p><strong>' + track.title + '</strong> | ' +
-			track.description + ' | <a href="' + track.permalink_url + '" target="_blank">Open on SoundCloud</a></p></div>');
-		    vac[url].playSound(audioCache[url].stream, 0, audioDuration);
-		    visualizeAudio(audioActive);
+                    audioActive = url;
+                    audioDuration = track.duration / 1000;
+                    addNewImages(audioCache[url].image);
+                    jQuery('#sckscope').append('<div class="track-info"><h3>' +
+                        track.user.username + '</h3><p><strong>' + track.title + '</strong> | ' +
+                        track.description + ' | <a href="' + track.permalink_url + '" target="_blank">Open on SoundCloud</a></p></div>');
+                    vac[url].playSound(audioCache[url].stream, 0, audioDuration);
+		    //vac[url].stopSound(audioDuration, 1);
+                    visualizeAudio(audioActive);
                 }, playTimeout);
                 playTimeout += track.duration;
             });
@@ -113,7 +90,7 @@ jQuery(document).ready(function () {
             //vac = new VisualAudioContext(context);
             jQuery(this).hide();
             jQuery('input[name=sc-submit]').show();
-	    timerActive.pause();
+            audioCache[audioActive].timer.pause();
         }
     }).hide();
 
@@ -123,7 +100,7 @@ jQuery(document).ready(function () {
         jQuery('input[name=sc-pause]').show();
         // val has to go. see playlists
         if (playlistActive == val || audioActive == val) {
-	    timerActive.resume;
+            audioCache[audioActive].timer.resume;
             vac[audioActive].playSound(audioCache[audioActive].stream, audioCurrentTime, audioDuration);
             visualizeAudio(audioActive);
         } else {
@@ -144,10 +121,10 @@ jQuery(document).ready(function () {
                         audioCache[val] = {
                             'stream': track.stream_url + '?client_id=b2d19575a677c201c6d23c39e408927a',
                             'url': val,
-                            'image': track.artwork_url.replace('large', 't500x500') + '?client_id=b2d19575a677c201c6d23c39e408927a'
+                            'image': track.artwork_url.replace('large', 't500x500') + '?client_id=b2d19575a677c201c6d23c39e408927a',
                         };
                         playlist[val] = track;
-			playTrack(playlist);
+                        playTrack(playlist);
                         // AudioDuration = track.duration;
                     } else if (track.kind == 'playlist') {
                         playlistActive = val;
@@ -160,7 +137,7 @@ jQuery(document).ready(function () {
                             };
                             playlist[track.permalink_url] = track;
                         });
-			playTrack(playlist);
+                        playTrack(playlist);
                     } else {
                         setLoadingMessage('Please select a single track from SoundCloud. Try this: http://soundcloud.com/byutifu/nina-simone-dont-let-me-be');
                     }
