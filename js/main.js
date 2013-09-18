@@ -3,10 +3,10 @@ jQuery(document).ready(function () {
         vac = {},
         audioCache = {},
         audioActive,
+	audioOnDeck,
         audioCurrentTime = 0,
-        audioDuration = 0,
+	playTimeout,
         playlistActive = false,
-        playlist = {},
         move = function (x, y) {
             jQuery('canvas.kaleidoscope').each(function (index) {
                 var offset = jQuery(this).offset();
@@ -52,33 +52,39 @@ jQuery(document).ready(function () {
             this.pause = function () {
                 window.clearTimeout(timerId);
                 remaining -= new Date() - start;
-                console.log('paused');
             };
-            this.resume = function () {
+            this.resume = function (time) {
+		time = time || remaining;
                 start = new Date();
                 timerId = window.setTimeout(callback, remaining);
             };
             this.resume();
         },
-        playTrack = function (tracks) {
-	    var playTimeout = 0;
+	playTrack = function (url, track) {
+	    if (audioActive != url && typeof vac[audioActive] != 'undefined') {
+		vac[audioActive].stopSound(1);
+	    }
+	    audioActive = url;
+	    addNewImages(audioCache[url].image);
+	    vac[url].playSound(audioCache[url].stream, 0, audioCache[url].audioDuration);
+	    visualizeAudio(audioActive);
+	    jQuery('#sckscope').append('<div class="track-info"><h3>' +
+		track.user.username + '</h3><p><strong>' + track.title + '</strong> | ' +
+		track.description + ' | <a href="' + track.permalink_url + '" target="_blank">Open on SoundCloud</a></p></div>');
+	},
+        playList = function (tracks) {
+	    playTimeout = 0;
+	    jQuery.each(audioCache, function(){
+		if (jQuery(this).timer) {
+		    jQuery(this).timer.pause().remove();
+		}
+	    });	
             jQuery.each(tracks, function (url, track) {
+		vac[url] = new VisualAudioContext(context, audioCache[url].stream);
+		audioCache[url].audioDuration = track.duration / 1000;
                 audioCache[url].timer = new Timer(function () {
-		    if (audioActive != url && typeof vac[audioActive] != 'undefined') {
-			vac[audioActive].stopSound(1);
-			console.log('stopped');
-		    }
-                    vac[url] = new VisualAudioContext(context, audioCache[url].stream);
-                    audioActive = url;
-                    audioDuration = track.duration / 1000;
-                    addNewImages(audioCache[url].image);
-                    jQuery('#sckscope').append('<div class="track-info"><h3>' +
-                        track.user.username + '</h3><p><strong>' + track.title + '</strong> | ' +
-                        track.description + ' | <a href="' + track.permalink_url + '" target="_blank">Open on SoundCloud</a></p></div>');
-                    vac[url].playSound(audioCache[url].stream, 0, audioDuration);
-		    //vac[url].stopSound(audioDuration, 1);
-                    visualizeAudio(audioActive);
-                }, playTimeout);
+		    playTrack(url, track);
+		}, playTimeout);
                 playTimeout += track.duration;
             });
         }
@@ -101,12 +107,12 @@ jQuery(document).ready(function () {
         // val has to go. see playlists
         if (playlistActive == val || audioActive == val) {
             audioCache[audioActive].timer.resume;
-            vac[audioActive].playSound(audioCache[audioActive].stream, audioCurrentTime, audioDuration);
+            vac[audioActive].playSound(audioCache[audioActive].stream, audioCurrentTime, audioCache[audioActive].audioDuration);
             visualizeAudio(audioActive);
         } else {
             if (typeof audioCache[val] != 'undefined') {
                 addNewImages(audioCache[val].image);
-                vac[val].playSound(audioCache[val].stream, 0, audioDuration);
+                vac[val].playSound(audioCache[val].stream, 0, audioCache[val].audioDuration);
                 visualizeAudio(audioActive);
             } else {
                 // Uses SoundCloud API/SDK 
@@ -116,6 +122,7 @@ jQuery(document).ready(function () {
                 SC.get('/resolve', {
                     url: val
                 }, function (track) {
+		    var playlist = {};
                     playlistActive = false;
                     if (track.kind == 'track') {
                         audioCache[val] = {
@@ -124,7 +131,7 @@ jQuery(document).ready(function () {
                             'image': track.artwork_url.replace('large', 't500x500') + '?client_id=b2d19575a677c201c6d23c39e408927a',
                         };
                         playlist[val] = track;
-                        playTrack(playlist);
+                        playList(playlist);
                         // AudioDuration = track.duration;
                     } else if (track.kind == 'playlist') {
                         playlistActive = val;
@@ -137,7 +144,7 @@ jQuery(document).ready(function () {
                             };
                             playlist[track.permalink_url] = track;
                         });
-                        playTrack(playlist);
+                        playList(playlist);
                     } else {
                         setLoadingMessage('Please select a single track from SoundCloud. Try this: http://soundcloud.com/byutifu/nina-simone-dont-let-me-be');
                     }
