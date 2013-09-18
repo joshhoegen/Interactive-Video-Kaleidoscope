@@ -1,10 +1,13 @@
 jQuery(document).ready(function () {
     var context = new webkitAudioContext(),
-	vac = {},
-	audioCache = {},
-	audioActive,
+        vac = {},
+        audioCache = {},
+        audioActive,
         audioCurrentTime = 0,
         audioDuration = 0,
+        playlistActive = false,
+        playlist = {},
+	timerActive,
         move = function (x, y) {
             jQuery('canvas.kaleidoscope').each(function (index) {
                 var offset = jQuery(this).offset();
@@ -38,8 +41,8 @@ jQuery(document).ready(function () {
                 var array = new Uint8Array(vac[audioActive].ch.analyser.frequencyBinCount);
                 vac[audioActive].ch.analyser.getByteFrequencyData(array);
                 var average = vac[audioActive].getAverageVolume(array);
-                var x = Math.round(average > 65 ? (average * 2) : (average > 90 ? (average * 3.4) : average));
-                var y = Math.round(average > 50 ? (average * 1.8) : (average > 70 ? (average * 5) : average * 1.2));
+                var x = Math.round(average > 65 ? (average * 1) : (average > 90 ? (average * 3.4) : average));
+                var y = Math.round(average > 50 ? (average * 1.8) : (average > 70 ? (average * 5) : average));
                 move(x, y); // x5 so wecan normalize 100 to 500
             }
         },
@@ -65,32 +68,65 @@ jQuery(document).ready(function () {
 
             })
             loadNewKaleidoscope();
+        },
+	Timer = function (callback, delay) {
+	    var timerId, start, remaining = delay;
+	
+	    this.pause = function() {
+		window.clearTimeout(timerId);
+		remaining -= new Date() - start;
+		console.log('paused');
+	    };
+	
+	    this.resume = function() {
+		start = new Date();
+		timerId = window.setTimeout(callback, remaining);
+	    };
+	
+	    this.resume();
+	},
+        playTrack = function (tracks) {
+            /*if (typeof vac[url] != 'undefined' && vac[url].javascriptNode.onaudioprocess) {
+                vac[url].stopSound(1);
+            }*/
+	    playTimeout = 0;
+            jQuery.each(tracks, function (url, track) {
+                timerActive = new Timer(function () {
+                    vac[url] = new VisualAudioContext(context, audioCache[url].stream);
+		    audioActive = url;
+		    audioDuration = track.duration / 1000;
+		    addNewImages(audioCache[url].image);
+		    jQuery('#sckscope').append('<div class="track-info"><h3>' +
+			track.user.username + '</h3><p><strong>' + track.title + '</strong> | ' +
+			track.description + ' | <a href="' + track.permalink_url + '" target="_blank">Open on SoundCloud</a></p></div>');
+		    vac[url].playSound(audioCache[url].stream, 0, audioDuration);
+		    visualizeAudio(audioActive);
+                }, playTimeout);
+                playTimeout += track.duration;
+            });
         }
 
     jQuery('input[name=sc-pause]').on('click', function (e) {
         if (typeof vac !== 'undefined' && audioCache) {
-            vac[audioActive].stopSound(audioCurrentTime);
+            vac[audioActive].stopSound();
             audioCurrentTime = vac[audioActive].currentTime();
             //vac = new VisualAudioContext(context);
             jQuery(this).hide();
             jQuery('input[name=sc-submit]').show();
+	    timerActive.pause();
         }
     }).hide();
 
     jQuery('input[name=sc-submit]').on('click', function (e) {
         var val = jQuery('input[name=urlSoundCloud]').val();
-        // AudioCache[val] = {'url': val};
-        // Only make the SC.get happen once-ish
-        // See audio.js:88 for future implementation of start from (pause effect)
         jQuery(this).hide();
         jQuery('input[name=sc-pause]').show();
-        if (typeof audioCache[val] != 'undefined' && audioActive == val) {
-            vac[val].playSound(audioCache[val].stream, audioCurrentTime, audioDuration);
+        // val has to go. see playlists
+        if (playlistActive == val || audioActive == val) {
+	    timerActive.resume;
+            vac[audioActive].playSound(audioCache[audioActive].stream, audioCurrentTime, audioDuration);
             visualizeAudio(audioActive);
         } else {
-            if (typeof vac[audioActive] != 'undefined') {
-                vac[audioActive].stopSound();
-            }
             if (typeof audioCache[val] != 'undefined') {
                 addNewImages(audioCache[val].image);
                 vac[val].playSound(audioCache[val].stream, 0, audioDuration);
@@ -103,37 +139,32 @@ jQuery(document).ready(function () {
                 SC.get('/resolve', {
                     url: val
                 }, function (track) {
-                    //console.log(track);
+                    playlistActive = false;
                     if (track.kind == 'track') {
                         audioCache[val] = {
                             'stream': track.stream_url + '?client_id=b2d19575a677c201c6d23c39e408927a',
                             'url': val,
                             'image': track.artwork_url.replace('large', 't500x500') + '?client_id=b2d19575a677c201c6d23c39e408927a'
                         };
+                        playlist[val] = track;
+			playTrack(playlist);
                         // AudioDuration = track.duration;
                     } else if (track.kind == 'playlist') {
+                        playlistActive = val;
                         $.each(track.tracks, function (i) {
                             var track = this;
-                            audioCache[val] = {
+                            audioCache[track.permalink_url] = {
                                 'stream': track.stream_url + '?client_id=b2d19575a677c201c6d23c39e408927a',
-                                'url': val,
+                                'url': track.permalink_url,
                                 'image': track.artwork_url.replace('large', 't500x500') + '?client_id=b2d19575a677c201c6d23c39e408927a'
                             };
+                            playlist[track.permalink_url] = track;
                         });
-                        track = track.tracks[0];
+			playTrack(playlist);
                     } else {
                         setLoadingMessage('Please select a single track from SoundCloud. Try this: http://soundcloud.com/byutifu/nina-simone-dont-let-me-be');
                     }
-		    vac[val] = new VisualAudioContext(context, audioCache[val].stream);
-		    audioActive = val;
-                    audioDuration = track.duration / 1000;
-                    // jQuery('#sckscope > .body-kscope').attr('src', track.artwork_url.replace('large','t500x500')+'?client_id=b2d19575a677c201c6d23c39e408927a');
-                    addNewImages(audioCache[val].image);
-                    jQuery('#sckscope').append('<div class="track-info"><h3>' +
-                        track.user.username + '</h3><p><strong>' + track.title + '</strong> | ' +
-                        track.description + ' | <a href="' + track.permalink_url + '" target="_blank">Open on SoundCloud</a></p></div>');
-                    vac[val].playSound(audioCache[val].stream, 0, audioDuration);
-                    visualizeAudio(audioActive);
+
                 });
             }
         }
