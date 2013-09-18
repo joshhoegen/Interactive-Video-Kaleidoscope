@@ -1,5 +1,9 @@
 jQuery(document).ready(function () {
-    var context = new webkitAudioContext(),
+    var context = typeof AudioContext == 'function' ?
+	    new AudioContext() :
+	    typeof webkitAudioContext == 'function' ?
+	    new webkitAudioContext() :
+	    window.location = 'https://github.com/joshhoegen/sckscope',
         vac = {},
         audioCache = {},
         audioActive,
@@ -19,7 +23,7 @@ jQuery(document).ready(function () {
                 var array = new Uint8Array(vac[audioActive].ch.analyser.frequencyBinCount);
                 vac[audioActive].ch.analyser.getByteFrequencyData(array);
                 var average = vac[audioActive].getAverageVolume(array);
-                var x = Math.round(average > 65 ? (average * 1) : (average > 90 ? (average * 4.4) : average));
+                var x = Math.round(average > 65 ? (average * 2) : (average > 80 ? (average * 4.9) : average));
                 var y = Math.round(average > 30 ? (average * 1.2) : (average > 70 ? (average * 4.5) : average));
                 move(x, y); // x5 so wecan normalize 100 to 500
             }
