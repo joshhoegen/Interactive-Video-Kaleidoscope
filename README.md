@@ -1,8 +1,7 @@
-sc-kscope
+SCkscope
 =========
 
 SoundCloud kaleidoscope
 
-WARNING! This is an early version of this project. I seemed to have lost the most current version when switching development machines. I should have an update by 9/1/2013.
-
--jh
+- Requires a browser that supports AudioContext/webkitAudioContext.
+- Get a soundcloud track or set url, paste, hit play!
