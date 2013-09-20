@@ -185,7 +185,7 @@ jQuery(document).ready(function () {
 		    var playlist = {};
                     playlistActive = false;
                     if (track.kind == 'track') {
-                        playlist = track;
+                        playlist[0] = track;
                     } else if (track.kind == 'playlist') {
                         playlistActive = val;
                         playlist = track.tracks;
