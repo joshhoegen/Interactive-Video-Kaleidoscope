@@ -29,7 +29,6 @@ jQuery(document).ready(function () {
                 x = average + (average + (average/2));
 		y = x; // Split channels, use analyser2
                 move(x, y);
-		console.log()
             }
         },
         addNewImages = function (src, size, max) {
@@ -92,7 +91,6 @@ jQuery(document).ready(function () {
 		}
 	    });
             jQuery.each(tracks, function (i, track) {
-		console.log(track);
 		var url = track.permalink_url.replace('http://', 'https://'),
 		    image = track.artwork_url ? track.artwork_url : track.user.avatar_url;
 		if (track.duration < 999999) {
