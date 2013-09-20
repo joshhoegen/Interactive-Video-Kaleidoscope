@@ -85,12 +85,18 @@ jQuery(document).ready(function () {
 		    delete audioCache[url].timer;
 		}
 	    });	
-            jQuery.each(tracks, function (url, track) {
-		vac[url] = new VisualAudioContext(context, audioCache[url].stream);
-		audioCache[url].audioDuration = track.duration / 1000;
-                audioCache[url].timer = new Timer(function () {
+            jQuery.each(tracks, function (i, track) {
+		var url = track.permalink_url;
+		audioCache[url] = {
+		    'stream': track.stream_url + '?client_id=b2d19575a677c201c6d23c39e408927a',
+		    'url': track.permalinkUrl,
+		    'image': track.artwork_url.replace('large', 't500x500') + '?client_id=b2d19575a677c201c6d23c39e408927a',
+		    'audioDuration': track.duration / 1000
+		};
+		audioCache[url].timer = new Timer(function () {
 		    playTrack(url, track);
 		}, playTimeout);
+		vac[url] = new VisualAudioContext(context, track.stream); 
                 playTimeout += track.duration;
             });
         }
@@ -139,30 +145,14 @@ jQuery(document).ready(function () {
 		    var playlist = {};
                     playlistActive = false;
                     if (track.kind == 'track') {
-                        audioCache[val] = {
-                            'stream': track.stream_url + '?client_id=b2d19575a677c201c6d23c39e408927a',
-                            'url': val,
-                            'image': track.artwork_url.replace('large', 't500x500') + '?client_id=b2d19575a677c201c6d23c39e408927a',
-                        };
-                        playlist[val] = track;
-                        playList(playlist);
-                        // AudioDuration = track.duration;
+                        playlist = track;
                     } else if (track.kind == 'playlist') {
                         playlistActive = val;
-                        $.each(track.tracks, function (i) {
-                            var track = this;
-                            audioCache[track.permalink_url] = {
-                                'stream': track.stream_url + '?client_id=b2d19575a677c201c6d23c39e408927a',
-                                'url': track.permalink_url,
-                                'image': track.artwork_url.replace('large', 't500x500') + '?client_id=b2d19575a677c201c6d23c39e408927a'
-                            };
-                            playlist[track.permalink_url] = track;
-                        });
-                        playList(playlist);
+                        playlist = track.tracks;
                     } else {
                         setLoadingMessage('Please select a single track from SoundCloud. Try this: http://soundcloud.com/byutifu/nina-simone-dont-let-me-be');
-                    }
-
+		    }
+                    playList(playlist);
                 });
             }
         }
