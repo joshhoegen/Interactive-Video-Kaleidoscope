@@ -23,9 +23,10 @@ jQuery(document).ready(function () {
                 var array = new Uint8Array(vac[audioActive].ch.analyser.frequencyBinCount);
                 vac[audioActive].ch.analyser.getByteFrequencyData(array);
                 var average = vac[audioActive].getAverageVolume(array);
-                var x = Math.round(average > 65 ? (average * 2) : (average > 80 ? (average * 4.9) : average));
-                var y = Math.round(average > 30 ? (average * 1.2) : (average > 70 ? (average * 4.5) : average));
+                var x = Math.round(average > 60 ? (average * 2.5) : (average > 80 ? (average * 5) : average));
+                var y = Math.round(average > 60 ? (average * 2.5) : (average > 80 ? (average * 5) : average));
                 move(x, y); // x5 so wecan normalize 100 to 500
+		
             }
         },
         addNewImages = function (src) {
@@ -78,9 +79,10 @@ jQuery(document).ready(function () {
 	},
         playList = function (tracks) {
 	    playTimeout = 0;
-	    jQuery.each(audioCache, function(){
-		if (jQuery(this).timer) {
-		    jQuery(this).timer.pause().remove();
+	    jQuery.each(audioCache, function(url, track){
+		if (audioCache[url].timer) {
+		    audioCache[url].timer.pause();
+		    delete audioCache[url].timer;
 		}
 	    });	
             jQuery.each(tracks, function (url, track) {
@@ -100,7 +102,11 @@ jQuery(document).ready(function () {
             //vac = new VisualAudioContext(context);
             jQuery(this).hide();
             jQuery('input[name=sc-submit]').show();
-            audioCache[audioActive].timer.pause();
+            jQuery.each(audioCache, function(url, track){
+		if(audioCache[url].timer){
+		    audioCache[url].timer.pause();   
+		}
+	    });
         }
     }).hide();
 
@@ -110,7 +116,11 @@ jQuery(document).ready(function () {
         jQuery('input[name=sc-pause]').show();
         // val has to go. see playlists
         if (playlistActive == val || audioActive == val) {
-            audioCache[audioActive].timer.resume;
+	    jQuery.each(audioCache, function(url, track){
+		if(audioCache[url].timer){
+		    audioCache[url].timer.resume();   
+		}	
+	    });
             vac[audioActive].playSound(audioCache[audioActive].stream, audioCurrentTime, audioCache[audioActive].audioDuration);
             visualizeAudio(audioActive);
         } else {
