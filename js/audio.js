@@ -45,6 +45,7 @@ VisualAudioContext = function (context, url){
       // we use the javascript node to draw at a
       // specific interval.
       analyser.connect(javascriptNode);
+      analyser2.connect(javascriptNode);
       
       // Volume
       sourceNode.connect(gainNode);
