@@ -89,7 +89,7 @@ jQuery(document).ready(function () {
 		}
 	    });	
             jQuery.each(tracks, function (i, track) {
-		var url = track.permalink_url;
+		var url = track.permalink_url.replace('http://', 'https://');
 		audioCache[url] = {
 		    'stream': track.stream_url + '?client_id=b2d19575a677c201c6d23c39e408927a',
 		    'url': track.permalinkUrl,
@@ -157,10 +157,9 @@ jQuery(document).ready(function () {
     }).data({on: false}).hide();
 
     jQuery('input[name=sc-submit]').on('click', function (e) {
-        var val = jQuery('input[name=urlSoundCloud]').val();
+        var val = jQuery('input[name=urlSoundCloud]').val().replace("http://", "https://");
 	jQuery(this).hide();
         jQuery('input[name=sc-pause], input[name=sc-fullscreen]').show();
-        // val has to go. see playlists
         if (playlistActive == val || audioActive == val) {
 	    jQuery.each(audioCache, function(url, track){
 		if(audioCache[url].timer){
