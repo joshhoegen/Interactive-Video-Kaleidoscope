@@ -12,26 +12,29 @@ jQuery(document).ready(function () {
 	canvasActive = 8,
 	playTimeout,
         playlistActive = false,
+	scopeSize = 250,
         move = function (x, y) {
-            jQuery('canvas.kaleidoscope').each(function (index) {
-                var offset = jQuery(this).offset();
+            jQuery.each(jQuery.kScope, function (i, kscope) {
                 //Ref: drawKaleidoscope(ctx, img, imgX, imgY, mask)
-                drawKaleidoscope(jQuery.kScope[index]['ctx'], jQuery.kScope[index]['img'][0], x, y, jQuery(this).width());
+                drawKaleidoscope(kscope['ctx'], kscope['img'][0], x, y, scopeSize);
             });
         },
         visualizeAudio = function (audioActive) {
+	    var ch = new Uint8Array(vac[audioActive].ch.analyser.frequencyBinCount),
+		average, x, y;
             vac[audioActive].javascriptNode.onaudioprocess = function () {
-                var array = new Uint8Array(vac[audioActive].ch.analyser.frequencyBinCount);
-                vac[audioActive].ch.analyser.getByteFrequencyData(array);
-                var average = vac[audioActive].getAverageVolume(array);
-                var x = Math.round(average > 60 ? (average * 2.5) : (average > 80 ? (average * 5) : average));
-                var y = Math.round(average > 60 ? (average * 2.5) : (average > 80 ? (average * 5) : average));
-                move(x, y); // x5 so wecan normalize 100 to 500
-		
+                vac[audioActive].ch.analyser.getByteFrequencyData(ch);
+                average = vac[audioActive].getAverageVolume(ch);
+                //x = Math.round(average > 60 ? (average * 2.5) : (average > 80 ? (average * 5) : average));
+                x = average + (average + (average/2));
+		y = x; // Split channels, use analyser2
+                move(x, y);
+		console.log()
             }
         },
         addNewImages = function (src, size, max) {
-	    size = size || 250;
+	    var timer;
+	    size = size || scopeSize;
 	    max = max || 8; 
             jQuery('#sckscope').remove();
             //https://www.google.com/search?q=js+imultiple+canvas+or+one+large+canvas&aq=f&oq=js+imultiple+canvas+or+one+large+canvas&aqs=chrome.0.57j0.13276j0&sourceid=chrome&ie=UTF-8
@@ -45,14 +48,14 @@ jQuery(document).ready(function () {
                 return html;
             });
             jQuery('body').css({
-                background: 'url(' + src + ')',
-                animation: 'none',
-                '-ms-animation': 'none',
-                '-moz-animation': 'none',
-                '-webkit-animation': 'none',
-
-            })
-            loadNewKaleidoscope();
+                background: 'url(' + src + ')'
+	    });
+	    loadNewKaleidoscope();
+	    if(audioCache[audioActive].audioDuration > 20){
+		setTimeout(function(){
+		    addNewImages(audioCache[audioActive].image, scopeSize, canvasActive);
+		},parseInt(audioCache[audioActive].audioDuration/10)*1000)
+	    }
         },
         Timer = function (callback, delay) {
             var timerId, start, remaining = delay;
@@ -72,7 +75,7 @@ jQuery(document).ready(function () {
 		vac[audioActive].stopSound(1);
 	    }
 	    audioActive = url;
-	    addNewImages(audioCache[url].image, 250, canvasActive);
+	    addNewImages(audioCache[url].image, scopeSize, canvasActive);
 	    vac[url].playSound(audioCache[url].stream, 0, audioCache[url].audioDuration);
 	    visualizeAudio(audioActive);
 	    setLoadingMessage('Loading track from SoundCloud...');
@@ -87,38 +90,42 @@ jQuery(document).ready(function () {
 		    audioCache[url].timer.pause();
 		    delete audioCache[url].timer;
 		}
-	    });	
+	    });
             jQuery.each(tracks, function (i, track) {
-		var url = track.permalink_url;
-		audioCache[url] = {
-		    'stream': track.stream_url + '?client_id=b2d19575a677c201c6d23c39e408927a',
-		    'url': track.permalinkUrl,
-		    'image': track.artwork_url.replace('large', 't500x500') + '?client_id=b2d19575a677c201c6d23c39e408927a',
-		    'audioDuration': track.duration / 1000
-		};
-		audioCache[url].timer = new Timer(function () {
-		    playTrack(url, track);
-		}, playTimeout);
-		vac[url] = new VisualAudioContext(context, track.stream); 
-                playTimeout += track.duration;
+		console.log(track);
+		var url = track.permalink_url.replace('http://', 'https://'),
+		    image = track.artwork_url ? track.artwork_url : track.user.avatar_url;
+		if (track.duration < 999999) {
+		    audioCache[url] = {
+			'stream': track.stream_url + '?client_id=b2d19575a677c201c6d23c39e408927a',
+			'url': track.permalink_url,
+			'image': image.replace('large', 't500x500') + '?client_id=b2d19575a677c201c6d23c39e408927a',
+			'audioDuration': track.duration / 1000
+		    };
+		    audioCache[url].timer = new Timer(function () {
+			playTrack(url, track);
+		    }, playTimeout);
+		    vac[url] = new VisualAudioContext(context, track.stream); 
+		    playTimeout += track.duration;	
+		}
             });
         },
 	fullscreen = function(full){
 	    var on = full || jQuery('sc-fullscreen').data('on'),
-		width = (jQuery(document).width()+250),
-		height = (jQuery(document).height()+250),
+		width = (jQuery(document).width()+scopeSize),
+		height = (jQuery(document).height()+scopeSize),
 		total = 8;
 	    if (!on) {
 		total = (height/125)+(width/125);
 		jQuery('body').addClass('fullscreen').find('.wrapper').css({
 		    width: (width) ,
-		    height: (height-250)
+		    height: (height-scopeSize)
 		});
-		addNewImages(audioCache[audioActive].image, 250, total);
+		addNewImages(audioCache[audioActive].image, scopeSize, total);
 		jQuery('input[name=sc-fullscreen]').data({on: true});
 	    } else {
 		jQuery('body').removeClass('fullscreen').find('.wrapper').attr('style', '');
-		addNewImages(audioCache[audioActive].image, 250, total);
+		addNewImages(audioCache[audioActive].image, scopeSize, total);
 		jQuery('input[name=sc-fullscreen]').data({on: false});
 	    }
 	    canvasActive = total;
@@ -157,10 +164,9 @@ jQuery(document).ready(function () {
     }).data({on: false}).hide();
 
     jQuery('input[name=sc-submit]').on('click', function (e) {
-        var val = jQuery('input[name=urlSoundCloud]').val();
+        var val = jQuery('input[name=urlSoundCloud]').val().replace("http://", "https://");
 	jQuery(this).hide();
         jQuery('input[name=sc-pause], input[name=sc-fullscreen]').show();
-        // val has to go. see playlists
         if (playlistActive == val || audioActive == val) {
 	    jQuery.each(audioCache, function(url, track){
 		if(audioCache[url].timer){
@@ -171,7 +177,7 @@ jQuery(document).ready(function () {
             visualizeAudio(audioActive);
         } else {
             if (typeof audioCache[val] != 'undefined') {
-                addNewImages(audioCache[val].image, 250, canvasActive);
+                addNewImages(audioCache[val].image, scopeSize, canvasActive);
                 vac[val].playSound(audioCache[val].stream, 0, audioCache[val].audioDuration);
                 visualizeAudio(audioActive);
             } else {
