@@ -2,8 +2,8 @@ jQuery(document).ready(function () {
     var context = typeof AudioContext == 'function' ?
 	    new AudioContext() :
 	    typeof webkitAudioContext == 'function' ?
-	    new webkitAudioContext() :
-	    window.location = 'https://github.com/joshhoegen/sckscope',
+	    new webkitAudioContext() : jQuery('.no-support').show().parents('body').find('#scForm').hide(),
+	    //window.location = 'https://github.com/joshhoegen/sckscope',
         vac = {},
         audioCache = {},
         audioActive,
