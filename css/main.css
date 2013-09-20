@@ -75,7 +75,7 @@ a {
   margin-bottom: -3px;
 }
 .track-info {
-    display: block;
+    display: none;
     background: #000;
     background: rgba(0, 0, 0, .6);
     padding: 20px;
