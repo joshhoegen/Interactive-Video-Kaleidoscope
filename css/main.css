@@ -119,3 +119,8 @@ input[type=button]:hover {
   border: 1px solid #333;
   opacity: 0.9;
 }
+.no-support {
+    display: none;
+    margin: 20px auto;
+    width: 1000px;
+}
