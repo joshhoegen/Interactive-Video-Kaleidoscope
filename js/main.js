@@ -29,7 +29,6 @@ jQuery(document).ready(function () {
                 x = average + (average + (average/2));
 		y = x; // Split channels, use analyser2
                 move(x, y);
-		console.log()
             }
         },
         addNewImages = function (src, size, max) {
@@ -92,7 +91,6 @@ jQuery(document).ready(function () {
 		}
 	    });
             jQuery.each(tracks, function (i, track) {
-		console.log(track);
 		var url = track.permalink_url.replace('http://', 'https://'),
 		    image = track.artwork_url ? track.artwork_url : track.user.avatar_url;
 		if (track.duration < 999999) {
@@ -110,23 +108,51 @@ jQuery(document).ready(function () {
 		}
             });
         },
+	requestFullScreen = function (element, callback) {
+	    // Supports most browsers and their versions.
+	    var requestMethod = element.requestFullScreen || element.webkitRequestFullScreen || element.mozRequestFullScreen || element.msRequestFullScreen;
+	
+	    if (requestMethod) { // Native full screen.
+		requestMethod.call(element);
+	    } else if (typeof window.ActiveXObject !== "undefined") { // Older IE.
+		var wscript = new ActiveXObject("WScript.Shell");
+		if (wscript !== null) {
+		    wscript.SendKeys("{F11}");
+		}
+	    }
+	    if (typeof callback != 'undefined') {
+		callback();
+	    }
+	},
 	fullscreen = function(full){
 	    var on = full || jQuery('sc-fullscreen').data('on'),
-		width = (jQuery(document).width()+scopeSize),
-		height = (jQuery(document).height()+scopeSize),
+		width, height,
 		total = 8;
 	    if (!on) {
-		total = (height/125)+(width/125);
-		jQuery('body').addClass('fullscreen').find('.wrapper').css({
-		    width: (width) ,
-		    height: (height-scopeSize)
+		jQuery('.track-info').hide();
+		requestFullScreen(document.body, function(){
+		    width = (jQuery('body').width()+(scopeSize)),
+		    height = (jQuery('body').height()+(scopeSize*5)),
+		    total = (height/125)+(width/125);
+		    jQuery('body').addClass('fullscreen').find('.wrapper').css({
+			width: (width) ,
+			height: (height-scopeSize)
+		    });
+		    addNewImages(audioCache[audioActive].image, scopeSize, total);
+		    jQuery('input[name=sc-fullscreen]').data({on: true});    
 		});
-		addNewImages(audioCache[audioActive].image, scopeSize, total);
-		jQuery('input[name=sc-fullscreen]').data({on: true});
 	    } else {
+		if (document.cancelFullScreen) {
+		    document.cancelFullScreen();
+		} else if (document.mozCancelFullScreen) {
+		    document.mozCancelFullScreen();
+		} else if (document.webkitCancelFullScreen) {
+		    document.webkitCancelFullScreen();
+		}
 		jQuery('body').removeClass('fullscreen').find('.wrapper').attr('style', '');
 		addNewImages(audioCache[audioActive].image, scopeSize, total);
 		jQuery('input[name=sc-fullscreen]').data({on: false});
+		jQuery('.track-info').slideDown();
 	    }
 	    canvasActive = total;
 	},
