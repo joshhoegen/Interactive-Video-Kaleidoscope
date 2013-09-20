@@ -4,7 +4,6 @@ loadNewKaleidoscope = function () {
   var success = false;
   var height, width;
   jQuery.kScope = [];
-  setLoadingMessage('Loading track from SoundCloud...');
   jQuery('img[alt=kaleidoscope]').each(function (i) {
       img = jQuery(this);
       height = 250 //img.height()*2;
@@ -142,17 +141,9 @@ drawKaleidoscope = function (ctx, img, imgX, imgY, mask) {
   } catch (err) {
     jQuery('#currentImage').remove();
     img = '';
-    setLoadingMessage('Drawing Error');
     jQuery('#loadingContainer').show();
     ctx.clearRect(0, 0, 300, 300);
   }
-},
-setLoadingMessage = function (message) {
-  var loadingHtml = jQuery('<div class="kMessages">'+message+'</div>');
-  jQuery('#sckscope').append(loadingHtml);
-  setTimeout(function(){
-    loadingHtml.fadeOut('slow').remove(); 
-  }, 5000);
 }
 
 jQuery.KSC = {AudioCache: {}, Loaded: ''};

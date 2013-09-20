@@ -31,6 +31,25 @@ body {
     width: 1000px;
     margin: 0 auto;
 }
+body.fullscreen {
+    overflow: hidden;
+}
+.fullscreen .wrapper {
+    width: auto;
+    max-width: none;
+    overflow: hidden;
+}
+.fullscreen form {
+
+}
+.fullscreen #sckscope {
+    width: auto;
+    max-width: none;
+    text-align: left;
+}
+.fullscreen .track-info {
+    display: none;
+}
 h1 {
     margin: 0 0 10px 0;    
 }
@@ -56,6 +75,7 @@ a {
   margin-bottom: -3px;
 }
 .track-info {
+    display: block;
     background: #000;
     background: rgba(0, 0, 0, .6);
     padding: 20px;
@@ -74,6 +94,7 @@ a {
   padding: 10px;
 }
 form {
+  display: block;
   margin: 0px;
   background: #000;
   background: rgba(0, 0, 0, .6);
