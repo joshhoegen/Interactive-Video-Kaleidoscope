@@ -104,9 +104,9 @@ jQuery(document).ready(function () {
             });
         },
 	fullscreen = function(full){
-	    var on = full || $('sc-fullscreen').data('on'),
-		width = ($(document).width()+250),
-		height = ($(document).height()+250),
+	    var on = full || jQuery('sc-fullscreen').data('on'),
+		width = (jQuery(document).width()+250),
+		height = (jQuery(document).height()+250),
 		total = 8;
 	    if (!on) {
 		total = (height/125)+(width/125);
@@ -115,11 +115,11 @@ jQuery(document).ready(function () {
 		    height: (height-250)
 		});
 		addNewImages(audioCache[audioActive].image, 250, total);
-		$('input[name=sc-fullscreen]').data({on: true});
+		jQuery('input[name=sc-fullscreen]').data({on: true});
 	    } else {
 		jQuery('body').removeClass('fullscreen').find('.wrapper').attr('style', '');
 		addNewImages(audioCache[audioActive].image, 250, total);
-		$('input[name=sc-fullscreen]').data({on: false});
+		jQuery('input[name=sc-fullscreen]').data({on: false});
 	    }
 	    canvasActive = total;
 	},
@@ -192,6 +192,7 @@ jQuery(document).ready(function () {
                     } else {
                         setLoadingMessage('Please select a single track from SoundCloud. Try this: http://soundcloud.com/byutifu/nina-simone-dont-let-me-be');
 		    }
+		    jQuery('.track-info').slideDown();
                     playList(playlist);
                 });
             }
