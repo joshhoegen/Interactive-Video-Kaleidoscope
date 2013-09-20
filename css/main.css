@@ -6,10 +6,21 @@ body {
     background: url("../image/bg.jpg") #000;
     color: #fff;
     text-shadow: 2px 1px 6px #000;
-    animation: animatedBackground 400s linear infinite;
+    background-color: #333;
+    background: gradient(radial, center center, 0, center center, 460, from(#999), to(#333));
+    background: -webkit-gradient(radial, center center, 0, center center, 460, from(#999), to(#333));    
+    /* Safari 5.1+, Chrome 10+ */
+    background: -webkit-radial-gradient(circle, #999, #333);
+    
+    /* Firefox 3.6+ */
+    background: -moz-radial-gradient(circle, #999, #333);
+    
+    /* IE 10 */
+    background: -ms-radial-gradient(circle, #999, #333);
+    /*animation: animatedBackground 400s linear infinite;
     -ms-animation: animatedBackground 400s linear infinite;
     -moz-animation: animatedBackground 400s linear infinite;
-    -webkit-animation: animatedBackground 400s linear infinite;
+    -webkit-animation: animatedBackground 400s linear infinite;*/
 }
 @keyframes animatedBackground {
     from { background-position: 0 0; }
