@@ -129,9 +129,10 @@ jQuery(document).ready(function () {
 		width, height,
 		total = 8;
 	    if (!on) {
+		jQuery('.track-info').hide();
 		requestFullScreen(document.body, function(){
-		    width = (jQuery(document).width()+scopeSize),
-		    height = (jQuery(document).height()+scopeSize),
+		    width = (jQuery('body').width()+(scopeSize)),
+		    height = (jQuery('body').height()+(scopeSize*5)),
 		    total = (height/125)+(width/125);
 		    jQuery('body').addClass('fullscreen').find('.wrapper').css({
 			width: (width) ,
@@ -151,6 +152,7 @@ jQuery(document).ready(function () {
 		jQuery('body').removeClass('fullscreen').find('.wrapper').attr('style', '');
 		addNewImages(audioCache[audioActive].image, scopeSize, total);
 		jQuery('input[name=sc-fullscreen]').data({on: false});
+		jQuery('.track-info').slideDown();
 	    }
 	    canvasActive = total;
 	},
