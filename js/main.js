@@ -3,13 +3,16 @@ jQuery(document).ready(function () {
 	    new AudioContext() :
 	    typeof webkitAudioContext == 'function' ?
 	    new webkitAudioContext() : jQuery('.no-support').show().parents('body').find('#scForm').hide(),
-	    //window.location = 'https://github.com/joshhoegen/sckscope',
         vac = {},
         audioCache = {},
         audioActive,
 	audioOnDeck,
         audioCurrentTime = 0,
+	buttonPlay = jQuery('input[name=play]'),
+	buttonPause = jQuery('input[name=pause]'),
+	buttonFullscreen = jQuery('input[name=fullscreen]'),
 	canvasActive = 8,
+	kscope,
 	playTimeout,
         playlistActive = false,
 	scopeSize = 250,
@@ -18,10 +21,10 @@ jQuery(document).ready(function () {
 	    return results ? results[1] : 0;
 	},
         move = function (x, y) {
-            jQuery.each(jQuery.kScope, function (i, kscope) {
-                //Ref: drawKaleidoscope(ctx, img, imgX, imgY, mask)
+	    for (var i = 0, len = jQuery.kScope.length; i < len; i++) {
+		kscope = jQuery.kScope[i];
                 drawKaleidoscope(kscope['ctx'], kscope['img'][0], x, y, scopeSize);
-            });
+	    }
         },
         visualizeAudio = function (audioActive) {
 	    var ch = new Uint8Array(vac[audioActive].ch.analyser.frequencyBinCount),
@@ -91,6 +94,7 @@ jQuery(document).ready(function () {
 		track.description + ' | <a href="' + track.permalink_url + '" target="_blank">Open on SoundCloud</a></p>');
 	},
         playList = function (tracks) {
+	    var trackCount = tracks;
 	    playTimeout = 0;
 	    jQuery.each(audioCache, function(url, track){
 		if (audioCache[url].timer) {
@@ -102,6 +106,7 @@ jQuery(document).ready(function () {
 		var url = track.permalink_url.replace('http://', 'https://'),
 		    image = track.artwork_url ? track.artwork_url : track.user.avatar_url;
 		if (track.duration < 999999) {
+		    vac[url] = new VisualAudioContext(context, track.stream);
 		    audioCache[url] = {
 			'stream': track.stream_url + '?client_id=b2d19575a677c201c6d23c39e408927a',
 			'url': track.permalink_url,
@@ -111,15 +116,18 @@ jQuery(document).ready(function () {
 		    audioCache[url].timer = new timer(function () {
 			playTrack(url, track);
 		    }, playTimeout);
-		    vac[url] = new VisualAudioContext(context, track.stream); 
-		    playTimeout += track.duration;	
+		    playTimeout += track.duration;
 		}
             });
+	    setTimeout(function(){
+		buttonPause.hide();
+		buttonPlay.show();
+		audioActive = false;
+	    }, playTimeout);
         },
 	requestFullScreen = function (element, callback) {
 	    // Supports most browsers and their versions.
 	    var requestMethod = element.requestFullScreen || element.webkitRequestFullScreen || element.mozRequestFullScreen || element.msRequestFullScreen;
-	
 	    if (requestMethod) { // Native full screen.
 		requestMethod.call(element);
 	    } else if (typeof window.ActiveXObject !== "undefined") { // Older IE.
@@ -133,7 +141,7 @@ jQuery(document).ready(function () {
 	    }
 	},
 	fullscreen = function(full){
-	    var on = full || jQuery('sc-fullscreen').data('on'),
+	    var on = full || false,
 		width, height,
 		total = 8;
 	    if (!on) {
@@ -147,7 +155,7 @@ jQuery(document).ready(function () {
 			height: (height-scopeSize)
 		    });
 		    addNewImages(audioCache[audioActive].image, scopeSize, total);
-		    jQuery('input[name=sc-fullscreen]').data({on: true});    
+		    buttonFullscreen.data({on: true});    
 		});
 	    } else {
 		if (document.cancelFullScreen) {
@@ -159,7 +167,7 @@ jQuery(document).ready(function () {
 		}
 		jQuery('body').removeClass('fullscreen').find('.wrapper').attr('style', '');
 		addNewImages(audioCache[audioActive].image, scopeSize, total);
-		jQuery('input[name=sc-fullscreen]').data({on: false});
+		buttonFullscreen.data({on: false});
 		jQuery('.track-info').slideDown();
 	    }
 	    canvasActive = total;
@@ -171,13 +179,6 @@ jQuery(document).ready(function () {
 	    loadingHtml.fadeOut('slow').remove(); 
 	  }, 5000);
 	}
-      
-    if (defaultUrl !== 0) {
-      jQuery('input[name=urlSoundCloud]').val(defaultUrl);
-      setTimeout(function(){
-	jQuery('input[name=sc-submit]').click();
-      }, 2000);
-    }
 
     jQuery(window).resize(function () {
 	if ($('body.fullscreen').length) {
@@ -185,13 +186,13 @@ jQuery(document).ready(function () {
 	}
     });
     
-    jQuery('input[name=sc-pause]').on('click', function (e) {
+    buttonPause.on('click', function (e) {
         if (typeof vac !== 'undefined' && audioCache) {
             vac[audioActive].stopSound();
             audioCurrentTime = vac[audioActive].currentTime();
             //vac = new VisualAudioContext(context);
             jQuery(this).hide();
-            jQuery('input[name=sc-submit]').show();
+            buttonPlay.show();
             jQuery.each(audioCache, function(url, track){
 		if(audioCache[url].timer){
 		    audioCache[url].timer.pause();   
@@ -200,14 +201,15 @@ jQuery(document).ready(function () {
         }
     }).hide();
     
-    jQuery('input[name=sc-fullscreen]').on('click', function (e) {
+    buttonFullscreen.on('click', function (e) {
 	fullscreen($(this).data('on'));
     }).data({on: false}).hide();
 
-    jQuery('input[name=sc-submit]').on('click', function (e) {
-        var val = jQuery('input[name=urlSoundCloud]').val().replace("http://", "https://");
-	jQuery(this).hide();
-        jQuery('input[name=sc-pause], input[name=sc-fullscreen]').show();
+    buttonPlay.on('click', function (e) {
+        var val = jQuery('input[name=scUrl]').val().replace("http://", "https://");
+	buttonPlay.hide();
+        buttonPause.show();
+	buttonFullscreen.show();
         if (playlistActive == val || audioActive == val) {
 	    jQuery.each(audioCache, function(url, track){
 		if(audioCache[url].timer){
