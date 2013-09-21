@@ -47,13 +47,17 @@ jQuery(document).ready(function () {
                 return html;
             });
             jQuery('body').css({
-                background: 'url(' + src + ')'
+                background: 'url(' + src + ')',
+		animation: 'none',
+                '-ms-animation': 'none',
+                '-moz-animation': 'none',
+                '-webkit-animation': 'none'
 	    });
 	    loadNewKaleidoscope();
 	    if(audioCache[audioActive].audioDuration > 20){
 		setTimeout(function(){
 		    addNewImages(audioCache[audioActive].image, scopeSize, canvasActive);
-		},parseInt(audioCache[audioActive].audioDuration/10)*1000)
+		},parseInt(audioCache[audioActive].audioDuration/20)*1000)
 	    }
         },
         Timer = function (callback, delay) {
