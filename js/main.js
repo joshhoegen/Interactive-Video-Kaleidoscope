@@ -13,6 +13,10 @@ jQuery(document).ready(function () {
 	playTimeout,
         playlistActive = false,
 	scopeSize = 250,
+	defaultUrl = function(){
+	    var results = new RegExp('[\\?&]scUrl=([^&#]*)').exec(window.location.href);
+	    return results ? results[1] : 0;
+	},
         move = function (x, y) {
             jQuery.each(jQuery.kScope, function (i, kscope) {
                 //Ref: drawKaleidoscope(ctx, img, imgX, imgY, mask)
@@ -60,7 +64,7 @@ jQuery(document).ready(function () {
 		},parseInt(audioCache[audioActive].audioDuration/20)*1000)
 	    }
         },
-        Timer = function (callback, delay) {
+        timer = function (callback, delay) {
             var timerId, start, remaining = delay;
             this.pause = function () {
                 window.clearTimeout(timerId);
@@ -104,7 +108,7 @@ jQuery(document).ready(function () {
 			'image': image.replace('large', 't500x500') + '?client_id=b2d19575a677c201c6d23c39e408927a',
 			'audioDuration': track.duration / 1000
 		    };
-		    audioCache[url].timer = new Timer(function () {
+		    audioCache[url].timer = new timer(function () {
 			playTrack(url, track);
 		    }, playTimeout);
 		    vac[url] = new VisualAudioContext(context, track.stream); 
@@ -167,6 +171,13 @@ jQuery(document).ready(function () {
 	    loadingHtml.fadeOut('slow').remove(); 
 	  }, 5000);
 	}
+      
+    if (defaultUrl !== 0) {
+      jQuery('input[name=urlSoundCloud]').val(defaultUrl);
+      setTimeout(function(){
+	jQuery('input[name=sc-submit]').click();
+      }, 2000);
+    }
 
     jQuery(window).resize(function () {
 	if ($('body.fullscreen').length) {
