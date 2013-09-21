@@ -7,20 +7,16 @@ body {
     color: #fff;
     text-shadow: 2px 1px 6px #000;
     background-color: #333;
-    background: gradient(radial, center center, 0, center center, 460, from(#999), to(#333));
-    background: -webkit-gradient(radial, center center, 0, center center, 460, from(#999), to(#333));    
-    /* Safari 5.1+, Chrome 10+ */
-    background: -webkit-radial-gradient(circle, #999, #333);
-    
-    /* Firefox 3.6+ */
-    background: -moz-radial-gradient(circle, #999, #333);
-    
-    /* IE 10 */
-    background: -ms-radial-gradient(circle, #999, #333);
-    /*animation: animatedBackground 400s linear infinite;
+    background-image: url("../image/bg.jpg"), -webkit-gradient(linear, left top, left bottom, from(#333), to(#666)); /* Saf4+, Chrome */
+    background-image: url("../image/bg.jpg"), -webkit-linear-gradient(top, #333, #666); /* Chrome 10+, Saf5.1+ */
+    background-image: url("../image/bg.jpg"),    -moz-linear-gradient(top, #333, #666); /* FF3.6+ */
+    background-image: url("../image/bg.jpg"),     -ms-linear-gradient(top, #333, #666); /* IE10 */
+    background-image: url("../image/bg.jpg"),      -o-linear-gradient(top, #333, #666); /* Opera 11.10+ */
+    background-image: url("../image/bg.jpg"),         linear-gradient(top, #333, #666); /* W3C */
+    animation: animatedBackground 400s linear infinite;
     -ms-animation: animatedBackground 400s linear infinite;
     -moz-animation: animatedBackground 400s linear infinite;
-    -webkit-animation: animatedBackground 400s linear infinite;*/
+    -webkit-animation: animatedBackground 400s linear infinite;
 }
 @keyframes animatedBackground {
     from { background-position: 0 0; }
