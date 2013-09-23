@@ -12,6 +12,7 @@ jQuery(document).ready(function () {
 	buttonPause = jQuery('input[name=pause]'),
 	buttonFullscreen = jQuery('input[name=fullscreen]'),
 	canvasActive = 8,
+	imageRefresh,
 	kscope,
 	playTimeout,
         playlistActive = false,
@@ -20,6 +21,19 @@ jQuery(document).ready(function () {
 	    var results = new RegExp('[\\?&]scUrl=([^&#]*)').exec(window.location.href);
 	    return results ? results[1] : 0;
 	},
+	Timer = function (callback, delay) {
+            var timerId, start, remaining = delay;
+            this.pause = function () {
+                window.clearTimeout(timerId);
+                remaining -= new Date() - start;
+            };
+            this.resume = function (time) {
+		time = time || remaining;
+                start = new Date();
+                timerId = window.setTimeout(callback, remaining);
+            };
+            this.resume();
+        },
         move = function (x, y) {
 	    for (var i = 0, len = jQuery.kScope.length; i < len; i++) {
 		kscope = jQuery.kScope[i];
@@ -62,23 +76,10 @@ jQuery(document).ready(function () {
 	    });
 	    loadNewKaleidoscope();
 	    if(audioCache[audioActive].audioDuration > 20){
-		setTimeout(function(){
+		imageRefresh = new Timer(function () {
 		    addNewImages(audioCache[audioActive].image, scopeSize, canvasActive);
-		},parseInt(audioCache[audioActive].audioDuration/20)*1000)
+		}, parseInt(audioCache[audioActive].audioDuration/20)*1000);
 	    }
-        },
-        timer = function (callback, delay) {
-            var timerId, start, remaining = delay;
-            this.pause = function () {
-                window.clearTimeout(timerId);
-                remaining -= new Date() - start;
-            };
-            this.resume = function (time) {
-		time = time || remaining;
-                start = new Date();
-                timerId = window.setTimeout(callback, remaining);
-            };
-            this.resume();
         },
 	playTrack = function (url, track) {
 	    if (audioActive != url && typeof vac[audioActive] != 'undefined') {
@@ -113,7 +114,7 @@ jQuery(document).ready(function () {
 			'image': image.replace('large', 't500x500') + '?client_id=b2d19575a677c201c6d23c39e408927a',
 			'audioDuration': track.duration / 1000
 		    };
-		    audioCache[url].timer = new timer(function () {
+		    audioCache[url].timer = new Timer(function () {
 			playTrack(url, track);
 		    }, playTimeout);
 		    playTimeout += track.duration;
@@ -122,6 +123,8 @@ jQuery(document).ready(function () {
 	    setTimeout(function(){
 		buttonPause.hide();
 		buttonPlay.show();
+		buttonFullscreen.hide();
+		imageRefresh.pause();
 		audioActive = false;
 	    }, playTimeout);
         },
