@@ -1,31 +1,25 @@
 if ( ! window.console ) console = { log: function(){} };
-loadNewKaleidoscope = function () {
-  //var bg = jQuery('body').css('background-image').replace('url(','').replace(')','');
-  var success = false;
-  var height, width;
-  jQuery.kScope = [];
-  jQuery('img[alt=kaleidoscope]').each(function (i) {
-      img = jQuery(this);
-      height = 250 //img.height()*2;
-      width = 250 //img.width()*2;
-      kScopeObj = {
+$.kScope = [];
+loadNewKaleidoscope = function (size) {
+  //var bg = $('body').css('background-image').replace('url(','').replace(')','');
+  var cSize = size || 250;
+  $('img[alt=kaleidoscope]').each(function (i) {
+      var img = $(this),
+      canvas = $('<canvas id="kaleidoscope_' + i + '" class="kaleidoscope" width="' + size + '" height="' + size + '"></canvas>');
+      $.kScope[i] = {
         img: img,
-        height: height,
-        width: width,
-        canvas: jQuery('<canvas id="kaleidoscope_' + i + '" class="kaleidoscope" width="' + height + '" height="' + height + '"></canvas>'),
-        ctx: false,
+        height: size,
+        width: size,
+        canvas: canvas,
+        ctx: canvas[0].getContext('2d'),
         imgLoaded: true
       }
-      kScopeObj.img.after(kScopeObj.canvas[0]).hide();
-      kScopeObj.ctx = kScopeObj.canvas[0].getContext('2d');
-      jQuery.kScope.push(kScopeObj);
-      drawKaleidoscope(kScopeObj.ctx, kScopeObj.img[0], 100, 100, kScopeObj.height);
-
-    });
-  if (jQuery.kScope.length) {
-    success = true;
-  }
-  return success;
+      //console.log(canvas);
+      img.after(canvas);
+      //$.kScope[i].ctx = canvas[0].getContext('2d');
+      //$.kScope.push(kScopeObj);
+      drawKaleidoscope($.kScope[i].ctx, $.kScope[i].img[0], 100, 100, size);
+  });
 },
 drawKaleidoscope = function (ctx, img, imgX, imgY, mask) {
   try {
@@ -139,15 +133,15 @@ drawKaleidoscope = function (ctx, img, imgX, imgY, mask) {
     ctx.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
     ctx.restore();
   } catch (err) {
-    jQuery('#currentImage').remove();
+    $('#currentImage').remove();
     img = '';
-    jQuery('#loadingContainer').show();
+    $('#loadingContainer').show();
     ctx.clearRect(0, 0, 300, 300);
   }
 }
 
-jQuery.KSC = {AudioCache: {}, Loaded: ''};
-jQuery(document).ready(function () {
+$.KSC = {AudioCache: {}, Loaded: ''};
+$(document).ready(function () {
   var defaultUrl = function(name){
           var results = new RegExp('[\\?&]' + name + '=([^&#]*)').exec(window.location.href);
           return results ? results[1] : 0;
@@ -155,9 +149,9 @@ jQuery(document).ready(function () {
       scUrl = defaultUrl('scUrl');
       
   if (scUrl !== 0) {
-    jQuery('input[name=urlSoundCloud]').val(scUrl);
+    $('input[name=urlSoundCloud]').val(scUrl);
     setTimeout(function(){
-      jQuery('input[name=sc-submit]').click();
+      $('input[name=sc-submit]').click();
     }, 2000);
   }
 });

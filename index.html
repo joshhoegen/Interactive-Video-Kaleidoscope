@@ -14,11 +14,13 @@
 <body>
     <div class="wrapper">
         <h1>A Byutifu SCkscope!</h1>
-        <form id="scForm">Paste a <a href="http://soundcloud.com" target="_blank">SoundCloud</a> track or set/playlist URL
-            <input type="text" name="scUrl" value="https://soundcloud.com/byutifu/sets/psychedelic-dub-n-roll"/>
+        <!--https://soundcloud.com/feedme/love-is-all-i-got-->
+        <form id="scForm">Paste a <a href="http://soundcloud.com/byutifu" target="_blank">SoundCloud</a> track URL
+            <input type="text" name="scUrl" value="https://soundcloud.com/trapmusic/thump-by-drezo-subset-remix"/>
             <input type="button" name="play" value="play" />
             <input type="button" name="pause" value="pause"/>
-            <input type="button" name="fullscreen" value="fullscreen"/>
+            <input type="button" name="fullscreen" value="fullscreen"/> | 
+            <a href="/live.html">TRY uScope!</a>
         </form>
         <div id="sckscope"></div>
         <div class="track-info"></div>
@@ -26,5 +28,19 @@
             It looks like your browser doesn't support <a href="https://www.google.com/search?q=audiocontext">AudioContext</a>. Try <a href="https://www.google.com/chrome">Google Chrome</a> or view the project on <a href="https://github.com/joshhoegen/sckscope">Github</a>.
         </div>
     </div>
-</body>
+    <script type="text/javascript">
+    
+      var _gaq = _gaq || [];
+      _gaq.push(['_setAccount', 'UA-45544224-2']);
+      _gaq.push(['_setDomainName', 'byutifu.com']);
+      _gaq.push(['_trackPageview']);
+    
+      (function() {
+        var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+        ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+        var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+      })();
+    
+    </script>
+    </body>
 </html>
