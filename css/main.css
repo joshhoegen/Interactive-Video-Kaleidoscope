@@ -13,10 +13,10 @@ body {
     background-image: url("../image/bg.jpg"),     -ms-linear-gradient(top, #333, #666); /* IE10 */
     background-image: url("../image/bg.jpg"),      -o-linear-gradient(top, #333, #666); /* Opera 11.10+ */
     background-image: url("../image/bg.jpg"),         linear-gradient(top, #333, #666); /* W3C */
-    animation: animatedBackground 400s linear infinite;
+/*    animation: animatedBackground 400s linear infinite;
     -ms-animation: animatedBackground 400s linear infinite;
     -moz-animation: animatedBackground 400s linear infinite;
-    -webkit-animation: animatedBackground 400s linear infinite;
+    -webkit-animation: animatedBackground 400s linear infinite;*/
 }
 @keyframes animatedBackground {
     from { background-position: 0 0; }
@@ -58,7 +58,7 @@ body.fullscreen {
     display: none;
 }
 h1 {
-    margin: 0 0 10px 0;    
+    margin: 10px 0 10px 0;    
 }
 h3 {
   margin: 0px 0px;
@@ -130,4 +130,7 @@ input[type=button]:hover {
     display: none;
     margin: 20px auto;
     width: 1000px;
+}
+.vid-img {
+    
 }

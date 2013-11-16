@@ -1,22 +1,29 @@
-jQuery(document).ready(function () {
+$(document).ready(function () {
     var context = typeof AudioContext == 'function' ?
 	    new AudioContext() :
 	    typeof webkitAudioContext == 'function' ?
-	    new webkitAudioContext() : jQuery('.no-support').show().parents('body').find('#scForm').hide(),
+	    new webkitAudioContext() : $('.no-support').show().parents('body').find('#scForm').hide(),
+	ctx,
         vac = {},
         audioCache = {},
         audioActive,
 	audioOnDeck,
         audioCurrentTime = 0,
-	buttonPlay = jQuery('input[name=play]'),
-	buttonPause = jQuery('input[name=pause]'),
-	buttonFullscreen = jQuery('input[name=fullscreen]'),
+	buttonPlay = $('input[name=play]'),
+	buttonPause = $('input[name=pause]'),
+	buttonFullscreen = $('input[name=fullscreen]'),
 	canvasActive = 8,
+	container = $('#sckscope'),
 	imageRefresh,
+	images = $('#sckscope img'),
+	canvases = $('#sckscope canvas'),
 	kscope,
+	limit = 250,
+	mediaStream,
 	playTimeout,
         playlistActive = false,
 	scopeSize = 250,
+	video = $('video'),
 	defaultUrl = function(){
 	    var results = new RegExp('[\\?&]scUrl=([^&#]*)').exec(window.location.href);
 	    return results ? results[1] : 0;
@@ -35,51 +42,46 @@ jQuery(document).ready(function () {
             this.resume();
         },
         move = function (x, y) {
-	    for (var i = 0, len = jQuery.kScope.length; i < len; i++) {
-		kscope = jQuery.kScope[i];
-                drawKaleidoscope(kscope['ctx'], kscope['img'][0], x, y, scopeSize);
-	    }
+	    $.each($.kScope, function(i){
+		kscope = $.kScope[i];
+                drawKaleidoscope(kscope['ctx'], images[0], x, y, scopeSize);
+	    });
         },
         visualizeAudio = function (audioActive) {
 	    var ch = new Uint8Array(vac[audioActive].ch.analyser.frequencyBinCount),
-		average, x, y;
-            vac[audioActive].javascriptNode.onaudioprocess = function () {
+		average, x, y, count = 0;
+	    
+            vac[audioActive].javascriptNode.onaudioprocess = function (e) {
+		count++;
+		
                 vac[audioActive].ch.analyser.getByteFrequencyData(ch);
+		
                 average = vac[audioActive].getAverageVolume(ch);
-                //x = Math.round(average > 60 ? (average * 2.5) : (average > 80 ? (average * 5) : average));
-                x = average + (average + (average/2));
+                x = average + (average + (average/1.5));
+		x = x < scopeSize * 2 ? x : scopeSize;
 		y = x; // Split channels, use analyser2
+		//console.log(x);
                 move(x, y);
             }
         },
         addNewImages = function (src, size, max) {
 	    var timer;
 	    size = size || scopeSize;
-	    max = max || 8; 
-            jQuery('#sckscope').remove();
+	    max = max || 8,
             //https://www.google.com/search?q=js+imultiple+canvas+or+one+large+canvas&aq=f&oq=js+imultiple+canvas+or+one+large+canvas&aqs=chrome.0.57j0.13276j0&sourceid=chrome&ie=UTF-8
             //http://stackoverflow.com/questions/4020910/html5-multiple-canvas-on-a-single-page
-            jQuery('body .wrapper form').after(function () {
-                var html = '<div id="sckscope">';
-                for (i = 0; i < max; i++) {
-                    html += '<img class="body-kscope img_' + i + '" height="'+size+'" width="'+size+'" alt="kaleidoscope" src="' + src + '" style="position: absolute; left: -9999px; margin: 0px; padding: 0px" />';
-                }
-                html += '</div>';
-                return html;
-            });
-            jQuery('body').css({
-                background: 'url(' + src + ')',
-		animation: 'none',
-                '-ms-animation': 'none',
-                '-moz-animation': 'none',
-                '-webkit-animation': 'none'
-	    });
-	    loadNewKaleidoscope();
-	    if(audioCache[audioActive].audioDuration > 20){
-		imageRefresh = new Timer(function () {
-		    addNewImages(audioCache[audioActive].image, scopeSize, canvasActive);
-		}, parseInt(audioCache[audioActive].audioDuration/20)*1000);
+            images.attr('src', src);
+	    //loadNewKaleidoscope(scopeSize);
+	    if(audioActive.indexOf('blob:http') === -1 && typeof audioCache[audioActive] == 'object' && audioCache[audioActive].audioDuration > 20){
+                imageRefresh = new Timer(function () {
+                    prepPage(src);
+		    addNewImages(src, size, max);
+		    console.log('y');
+                }, parseInt(audioCache[audioActive].audioDuration/20)*1000);
+            } else {
+		prepPage(src);
 	    }
+	  
         },
 	playTrack = function (url, track) {
 	    if (audioActive != url && typeof vac[audioActive] != 'undefined') {
@@ -90,24 +92,24 @@ jQuery(document).ready(function () {
 	    vac[url].playSound(audioCache[url].stream, 0, audioCache[url].audioDuration);
 	    visualizeAudio(audioActive);
 	    setLoadingMessage('Loading track from SoundCloud...');
-	    jQuery('.track-info').html('<h3>' +
+	    $('.track-info').html('<h3>' +
 		track.user.username + '</h3><p><strong>' + track.title + '</strong> | ' +
 		track.description + ' | <a href="' + track.permalink_url + '" target="_blank">Open on SoundCloud</a></p>');
 	},
         playList = function (tracks) {
 	    var trackCount = tracks;
 	    playTimeout = 0;
-	    jQuery.each(audioCache, function(url, track){
+	    $.each(audioCache, function(url, track){
 		if (audioCache[url].timer) {
 		    audioCache[url].timer.pause();
 		    delete audioCache[url].timer;
 		}
 	    });
-            jQuery.each(tracks, function (i, track) {
+            $.each(tracks, function (i, track) {
 		var url = track.permalink_url.replace('http://', 'https://'),
 		    image = track.artwork_url ? track.artwork_url : track.user.avatar_url;
 		if (track.duration < 999999) {
-		    vac[url] = new VisualAudioContext(context, track.stream);
+		    vac[url] = new VisualAudioContext(context, track.stream, false);
 		    audioCache[url] = {
 			'stream': track.stream_url + '?client_id=b2d19575a677c201c6d23c39e408927a',
 			'url': track.permalink_url,
@@ -148,12 +150,16 @@ jQuery(document).ready(function () {
 		width, height,
 		total = 8;
 	    if (!on) {
-		jQuery('.track-info').hide();
+		$('.track-info').hide();
+		if (mediaStream) {
+		    scopeSize = 400;
+		    limit = 400;
+		}
 		requestFullScreen(document.body, function(){
-		    width = (jQuery('body').width()+(scopeSize)),
-		    height = (jQuery('body').height()+(scopeSize*5)),
+		    width = ($('body').width()+(scopeSize)),
+		    height = ($('body').height()+(scopeSize*5)),
 		    total = (height/125)+(width/125);
-		    jQuery('body').addClass('fullscreen').find('.wrapper').css({
+		    $('body').addClass('fullscreen').find('.wrapper').css({
 			width: (width) ,
 			height: (height-scopeSize)
 		    });
@@ -161,6 +167,8 @@ jQuery(document).ready(function () {
 		    buttonFullscreen.data({on: true});    
 		});
 	    } else {
+		scopeSize = 250;
+		limit = 250;
 		if (document.cancelFullScreen) {
 		    document.cancelFullScreen();
 		} else if (document.mozCancelFullScreen) {
@@ -168,22 +176,121 @@ jQuery(document).ready(function () {
 		} else if (document.webkitCancelFullScreen) {
 		    document.webkitCancelFullScreen();
 		}
-		jQuery('body').removeClass('fullscreen').find('.wrapper').attr('style', '');
+		$('body').removeClass('fullscreen').find('.wrapper').attr('style', '');
 		addNewImages(audioCache[audioActive].image, scopeSize, total);
 		buttonFullscreen.data({on: false});
-		jQuery('.track-info').slideDown();
+		$('.track-info').slideDown();
 	    }
 	    canvasActive = total;
+	    prepPage(audioCache[audioActive].image);
 	},
 	setLoadingMessage = function (message) {
-	  var loadingHtml = jQuery('<div class="kMessages">'+message+'</div>');
-	  jQuery('#sckscope').append(loadingHtml);
+	  var loadingHtml = $('<div class="kMessages">'+message+'</div>');
+	  $('#sckscope').append(loadingHtml);
 	  setTimeout(function(){
 	    loadingHtml.fadeOut('slow').remove(); 
 	  }, 5000);
+	},
+	prepVideo = function (){
+	    window.URL = window.URL || window.webkitURL;
+	    navigator.getUserMedia  = navigator.getUserMedia || navigator.webkitGetUserMedia ||
+				      navigator.mozGetUserMedia || navigator.msGetUserMedia;
+	    var preImage = $('<img class="vid-img" src="/image/kaleidoscope.jpg" height="400" width="400" />'),
+		preCanvas = $('<canvas class="vid-canvas" height="400" width="400"></canvas>');
+		ctx = preCanvas[0].getContext('2d'),
+		fail = function(){
+		    console.log('Failed');
+		}
+	    //$('video')[0].volume = 0;
+	    if (navigator.getUserMedia) {
+		navigator.getUserMedia({video: true, audio: true}, function(localMediaStream) {
+		    var video = document.querySelector('video');
+		    
+		    mediaStream = localMediaStream;
+		    
+		    video.src = window.URL.createObjectURL(mediaStream);
+		    audioActive = video.src;
+		    addNewImages(preImage.attr('src'), scopeSize, canvasActive);
+		    audioCache[audioActive] = {
+			image: preImage.attr('src')
+		    }
+		    if (navigator.userAgent.toLowerCase().indexOf('firefox') > -1) {
+			snapshotFf(video, preCanvas[0], ctx, mediaStream);
+		    } else {
+			snapshot(video, preCanvas[0], ctx, mediaStream);
+		    }
+		    
+		    vac[audioActive] = new VisualAudioContext(context, audioActive, mediaStream);
+		    visualizeAudio(audioActive);
+		    //vac[audioActive].sourceNode.gain.value = 0;
+		    $('input[name=fullscreen]').show();
+		    // Note: onloadedmetadata doesn't fire in Chrome when using it with getUserMedia.
+		    // See crbug.com/110938.
+		    video.onloadedmetadata = function(e) {
+			// Ready to go. Do some stuff.
+			console.log('videLoaded');
+		    };
+		}, fail);
+	    } else {
+	      console.log('failed getUserMedia(). :( ');
+	      //video.src = 'somevideo.webm'; // fallback.
+	    }
+	    
+	},
+	snapshot = function (video, preCanvas, ctx, stream) {
+	    var img = preCanvas.toDataURL('image/webp');
+	    ctx.drawImage(video, 0, 0, scopeSize, scopeSize);
+	    // "image/webp" works in Chrome 18. In other browsers, this will fall back to image/png.
+	    //$('img').src = canvas.toDataURL('image/webp');
+	    addNewImages(img, scopeSize, canvasActive);
+	    setTimeout(function(){
+		//prepPage(img);
+		snapshot(video, preCanvas, ctx, stream)
+	    }, 10);
+	    
+	},
+	snapshotFf = function (video, preCanvas, ctx, stream) {
+	    try {
+		ctx.drawImage(video, 0, 0, scopeSize, scopeSize);
+		addNewImages(preCanvas.toDataURL('image/png'), scopeSize, canvasActive);
+		// "image/webp" works in Chrome 18. In other browsers, this will fall back to image/png.
+		//$('img').src = canvas.toDataURL('image/webp');
+		setTimeout(function(){
+		    snapshotFf(video, preCanvas, ctx, stream)
+		}, 20);
+	    } catch(e){
+		console.log(e);
+		setTimeout(function(){
+		    snapshotFf(video, preCanvas, ctx, stream)
+		}, 10);
+	    }
+	    
+	},
+	prepPage = function (src) {
+	    src = src || '';
+	    var canvas, image;
+	    //container.html('');
+	    image = '<img class="body-kscope img" height="'+scopeSize+'" width="'+scopeSize+'" alt="kaleidoscope" src="'+src+'" style="position: absolute; left: -9999px; margin: 0px; padding: 0px" />';
+	    container.html(image);
+	    for (i = 0; i < canvasActive; i++) {
+		canvas = '<canvas id="kaleidoscope_'+i+'" class="kaleidoscope" width="'+scopeSize+'" height="'+scopeSize+'"></canvas>';
+		container.append(canvas);
+		$.kScope[i] = {
+		    img: $(image),
+		    height: scopeSize,
+		    width: scopeSize,
+		    canvas: $('#sckscope canvas').eq(i),
+		    ctx: $('#sckscope canvas').eq(i)[0].getContext('2d'),
+		    imgLoaded: true
+		}
+	    }
+	    if (!canvases.length || !images.length) {
+		canvases = $('#sckscope canvas');
+		images = $('#sckscope img');
+	    }
 	}
 
-    jQuery(window).resize(function () {
+    $(window).resize(function () {
 	if ($('body.fullscreen').length) {
 	    fullscreen();
 	}
@@ -194,9 +301,9 @@ jQuery(document).ready(function () {
             vac[audioActive].stopSound();
             audioCurrentTime = vac[audioActive].currentTime();
             //vac = new VisualAudioContext(context);
-            jQuery(this).hide();
+            $(this).hide();
             buttonPlay.show();
-            jQuery.each(audioCache, function(url, track){
+            $.each(audioCache, function(url, track){
 		if(audioCache[url].timer){
 		    audioCache[url].timer.pause();   
 		}
@@ -207,14 +314,19 @@ jQuery(document).ready(function () {
     buttonFullscreen.on('click', function (e) {
 	fullscreen($(this).data('on'));
     }).data({on: false}).hide();
-
+        
+    $('#scForm').on('submit', function(e){
+	e.preventDefault();
+	buttonPlay.click();
+    });
     buttonPlay.on('click', function (e) {
-        var val = jQuery('input[name=scUrl]').val().replace("http://", "https://");
+        var val = $('input[name=scUrl]').val().replace("http://", "https://");
+	// toggle. make 1 button.
 	buttonPlay.hide();
         buttonPause.show();
 	buttonFullscreen.show();
         if (playlistActive == val || audioActive == val) {
-	    jQuery.each(audioCache, function(url, track){
+	    $.each(audioCache, function(url, track){
 		if(audioCache[url].timer){
 		    audioCache[url].timer.resume();   
 		}	
@@ -244,10 +356,15 @@ jQuery(document).ready(function () {
                     } else {
                         setLoadingMessage('Please select a single track from SoundCloud. Try this: http://soundcloud.com/byutifu/nina-simone-dont-let-me-be');
 		    }
-		    jQuery('.track-info').slideDown();
+		    $('.track-info').slideDown();
                     playList(playlist);
                 });
             }
         }
     });
+    
+    if (video.length) {
+	prepVideo();
+    }
+    prepPage();
 });

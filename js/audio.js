@@ -1,7 +1,7 @@
 // create the audio context (chrome only for now)
 // The name of this file is ambiguous until there's a standard audio context.
 // Original code from: http://www.smartjava.org/content/exploring-html5-web-audio-visualizing-sound
-VisualAudioContext = function (context, url){
+VisualAudioContext = function (context, url, mediaStream){
   var vac = this,
     cache = {},
     loaded = false,
@@ -13,9 +13,64 @@ VisualAudioContext = function (context, url){
     analyser,
     analyser2,
     channels,
+    mediaStreamSource,
+    streamRecorder,
+    setupMicNodes = function (){
+      mediaStreamNode = context.createMediaStreamSource(mediaStream);
+      //javascriptNode = context.createJavaScriptNode(2048, 1, 1)
+      javascriptNode = context.createScriptProcessor(2048, 1, 1)
+      sourceNode = mediaStreamNode,
+      gainNode = context.createGain(),
+      splitter = context.createChannelSplitter(),
+      analyser = context.createAnalyser(),
+      analyser2 = context.createAnalyser(),
+      channels = {
+        analyser: analyser,
+        analyser2: analyser2
+      }
+
+      javascriptNode.connect(context.destination);
+
+      analyser.smoothingTimeConstant = 0.3;
+      analyser.fftSize = 1024;
+      analyser2.smoothingTimeConstant = 0.0;
+      analyser2.fftSize = 1024;
+
+      // connect the source to the analyser and the splitter
+      sourceNode.connect(splitter);
+
+      // connect one of the outputs from the splitter to
+      // the analyser
+      splitter.connect(analyser, 0, 0);
+      splitter.connect(analyser2, 1, 0);
+
+      // connect the splitter to the javascriptnode
+      // we use the javascript node to draw at a
+      // specific interval.
+      // Volume
+      sourceNode.connect(gainNode);
+
+      // splitter.connect(context.destination,0,0);
+      // splitter.connect(context.destination,0,1);
+      // and connect to destination
+      sourceNode.connect(context.destination);
+      if (bufferActive) {
+        sourceNode.buffer = bufferActive;
+      }
+      
+      connected = true;
+      vac.javascriptNode = javascriptNode;
+      vac.ch = channels;
+      
+      if (typeof callback == 'function'){
+        callback();
+      }
+      this.sourceNode = sourceNode; 
+    },
     setupAudioNodes = function (callback) {
       // connect to destination, else it isn't called
-      javascriptNode = context.createJavaScriptNode(2048, 1, 1),
+      //javascriptNode = context.createJavaScriptNode(2048, 1, 1)
+      javascriptNode = context.createScriptProcessor(2048, 1, 1)
       sourceNode = context.createBufferSource(),
       gainNode = context.createGain(),
       splitter = context.createChannelSplitter(),
@@ -66,6 +121,7 @@ VisualAudioContext = function (context, url){
       if (typeof callback == 'function'){
         callback();
       }
+      this.sourceNode = sourceNode;
     },
     loadSound = function (url, start, dur) {
         var request = new XMLHttpRequest();
@@ -131,8 +187,12 @@ VisualAudioContext = function (context, url){
       console.log(e);
     }
     
-    setupAudioNodes();
-      
+    if(!mediaStream){
+      setupAudioNodes();
+    } else {
+      setupMicNodes();
+    }
+    
     this.getAverageVolume = function (array) {
       var values = 0,
         length = array.length,
@@ -155,4 +215,5 @@ VisualAudioContext = function (context, url){
     }
     this.ch = channels;
     this.javascriptNode = javascriptNode;
+    this.sourceNode = sourceNode;
 }
