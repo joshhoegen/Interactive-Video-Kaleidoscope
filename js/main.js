@@ -67,11 +67,11 @@ $(document).ready(function () {
         addNewImages = function (src, size, max) {
 	    var timer;
 	    size = size || scopeSize;
-	    max = max || 8,
+	    max = max || 8;
             //https://www.google.com/search?q=js+imultiple+canvas+or+one+large+canvas&aq=f&oq=js+imultiple+canvas+or+one+large+canvas&aqs=chrome.0.57j0.13276j0&sourceid=chrome&ie=UTF-8
             //http://stackoverflow.com/questions/4020910/html5-multiple-canvas-on-a-single-page
-            images.attr('src', src);
 	    //loadNewKaleidoscope(scopeSize);
+	    images.attr('src', src);
 	    if(audioActive.indexOf('blob:http') === -1 && typeof audioCache[audioActive] == 'object' && audioCache[audioActive].audioDuration > 20){
                 imageRefresh = new Timer(function () {
                     prepPage(src);
@@ -210,7 +210,7 @@ $(document).ready(function () {
 		    
 		    video.src = window.URL.createObjectURL(mediaStream);
 		    audioActive = video.src;
-		    addNewImages(preImage.attr('src'), scopeSize, canvasActive);
+		    //addNewImages(preImage.attr('src'), scopeSize, canvasActive);
 		    audioCache[audioActive] = {
 			image: preImage.attr('src')
 		    }
@@ -245,7 +245,7 @@ $(document).ready(function () {
 	    addNewImages(img, scopeSize, canvasActive);
 	    setTimeout(function(){
 		//prepPage(img);
-		snapshot(video, preCanvas, ctx, stream)
+		snapshot(video, preCanvas, ctx, stream);
 	    }, 10);
 	    
 	},
@@ -253,37 +253,35 @@ $(document).ready(function () {
 	    try {
 		ctx.drawImage(video, 0, 0, scopeSize, scopeSize);
 		addNewImages(preCanvas.toDataURL('image/png'), scopeSize, canvasActive);
-		// "image/webp" works in Chrome 18. In other browsers, this will fall back to image/png.
-		//$('img').src = canvas.toDataURL('image/webp');
 		setTimeout(function(){
-		    snapshotFf(video, preCanvas, ctx, stream)
-		}, 20);
+		    snapshotFf(video, preCanvas, ctx, stream);
+		}, 230);
 	    } catch(e){
 		console.log(e);
 		setTimeout(function(){
-		    snapshotFf(video, preCanvas, ctx, stream)
+		    snapshotFf(video, preCanvas, ctx, stream);
 		}, 10);
 	    }
 	    
 	},
 	prepPage = function (src) {
 	    src = src || '';
-	    var canvas, image;
-	    //container.html('');
-	    image = '<img class="body-kscope img" height="'+scopeSize+'" width="'+scopeSize+'" alt="kaleidoscope" src="'+src+'" style="position: absolute; left: -9999px; margin: 0px; padding: 0px" />';
-	    container.html(image);
+	    var canvas, canvasAll = $(), canvasString, image;
+	    image = $('<img class="body-kscope img" height="'+scopeSize+'" width="'+scopeSize+'" alt="kaleidoscope" src="'+src+'" style="position: absolute; left: -9999px; margin: 0px; padding: 0px" />');
+	    canvasAll = canvasAll.add(image);
 	    for (i = 0; i < canvasActive; i++) {
-		canvas = '<canvas id="kaleidoscope_'+i+'" class="kaleidoscope" width="'+scopeSize+'" height="'+scopeSize+'"></canvas>';
-		container.append(canvas);
+		canvasString = $('<canvas id="kaleidoscope_'+i+'" class="kaleidoscope" width="'+scopeSize+'" height="'+scopeSize+'"></canvas>');
+		canvasAll = canvasAll.add(canvasString);
 		$.kScope[i] = {
-		    img: $(image),
+		    img: image,
 		    height: scopeSize,
 		    width: scopeSize,
-		    canvas: $('#sckscope canvas').eq(i),
-		    ctx: $('#sckscope canvas').eq(i)[0].getContext('2d'),
+		    canvas: canvasString,
+		    ctx: canvasString[0].getContext('2d'),
 		    imgLoaded: true
 		}
 	    }
+	    container.html(canvasAll);
 	    if (!canvases.length || !images.length) {
 		canvases = $('#sckscope canvas');
 		images = $('#sckscope img');

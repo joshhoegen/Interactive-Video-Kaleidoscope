@@ -1,27 +1,5 @@
 if ( ! window.console ) console = { log: function(){} };
 $.kScope = [];
-loadNewKaleidoscope = function (size) {
-  //var bg = $('body').css('background-image').replace('url(','').replace(')','');
-  var cSize = size || 250;
-  $('img[alt=kaleidoscope]').each(function (i) {
-      var img = $(this),
-        canvas = $('canvas.kaleidoscope').eq(i);
-      $.kScope[i] = {
-        img: img,
-        height: size,
-        width: size,
-        canvas: canvas,
-        ctx: canvas[0].getContext('2d'),
-        imgLoaded: true
-      }
-      //console.log(canvas);
-      //img.after(canvas);
-      //$.kScope[i].ctx = canvas[0].getContext('2d');
-      //$.kScope.push(kScopeObj);
-      // 0, 0 = 100, 100
-      drawKaleidoscope($.kScope[i].ctx, $.kScope[i].img[0], 0, 0, size);
-  });
-},
 drawKaleidoscope = function (ctx, img, imgX, imgY, mask) {
   try {
     var maskSide = !mask ? 300 : mask;
