@@ -15,6 +15,8 @@ $(document).ready(function () {
 	canvasActive = 8,
 	container = $('#sckscope'),
 	imageRefresh,
+	images = $('#sckscope img'),
+	canvases = $('#sckscope canvas'),
 	kscope,
 	limit = 250,
 	mediaStream,
@@ -40,10 +42,10 @@ $(document).ready(function () {
             this.resume();
         },
         move = function (x, y) {
-	    for (var i = 0, len = $.kScope.length; i < len; i++) {
+	    $.each($.kScope, function(i){
 		kscope = $.kScope[i];
-                drawKaleidoscope(kscope['ctx'], kscope['img'][0], x, y, scopeSize);
-	    }
+                drawKaleidoscope(kscope['ctx'], images[0], x, y, scopeSize);
+	    });
         },
         visualizeAudio = function (audioActive) {
 	    var ch = new Uint8Array(vac[audioActive].ch.analyser.frequencyBinCount),
@@ -66,23 +68,20 @@ $(document).ready(function () {
 	    var timer;
 	    size = size || scopeSize;
 	    max = max || 8,
-	    html = function () {
-                var html = '';
-                for (i = 0; i < max; i++) {
-                    html += '<img class="body-kscope img_' + i + '" height="'+size+'" width="'+size+'" alt="kaleidoscope" src="' + src + '" style="position: absolute; left: -9999px; margin: 0px; padding: 0px" />';
-                }
-                return html;
-            };
             //https://www.google.com/search?q=js+imultiple+canvas+or+one+large+canvas&aq=f&oq=js+imultiple+canvas+or+one+large+canvas&aqs=chrome.0.57j0.13276j0&sourceid=chrome&ie=UTF-8
             //http://stackoverflow.com/questions/4020910/html5-multiple-canvas-on-a-single-page
-            container.html(html);
-            
-	    loadNewKaleidoscope(scopeSize);
+            images.attr('src', src);
+	    //loadNewKaleidoscope(scopeSize);
 	    if(audioActive.indexOf('blob:http') === -1 && typeof audioCache[audioActive] == 'object' && audioCache[audioActive].audioDuration > 20){
-		imageRefresh = new Timer(function () {
-		    addNewImages(audioCache[audioActive].image, scopeSize, canvasActive);
-		}, parseInt(audioCache[audioActive].audioDuration/20)*1000);
+                imageRefresh = new Timer(function () {
+                    prepPage(src);
+		    addNewImages(src, size, max);
+		    console.log('y');
+                }, parseInt(audioCache[audioActive].audioDuration/20)*1000);
+            } else {
+		prepPage(src);
 	    }
+	  
         },
 	playTrack = function (url, track) {
 	    if (audioActive != url && typeof vac[audioActive] != 'undefined') {
@@ -183,6 +182,7 @@ $(document).ready(function () {
 		$('.track-info').slideDown();
 	    }
 	    canvasActive = total;
+	    prepPage(audioCache[audioActive].image);
 	},
 	setLoadingMessage = function (message) {
 	  var loadingHtml = $('<div class="kMessages">'+message+'</div>');
@@ -238,25 +238,26 @@ $(document).ready(function () {
 	    
 	},
 	snapshot = function (video, preCanvas, ctx, stream) {
+	    var img = preCanvas.toDataURL('image/webp');
 	    ctx.drawImage(video, 0, 0, scopeSize, scopeSize);
 	    // "image/webp" works in Chrome 18. In other browsers, this will fall back to image/png.
 	    //$('img').src = canvas.toDataURL('image/webp');
-	    addNewImages(preCanvas.toDataURL('image/webp'), scopeSize, canvasActive);
+	    addNewImages(img, scopeSize, canvasActive);
 	    setTimeout(function(){
+		//prepPage(img);
 		snapshot(video, preCanvas, ctx, stream)
 	    }, 10);
 	    
 	},
 	snapshotFf = function (video, preCanvas, ctx, stream) {
 	    try {
-		
-		addNewImages(preCanvas.toDataURL('image/png'), scopeSize, canvasActive);
 		ctx.drawImage(video, 0, 0, scopeSize, scopeSize);
+		addNewImages(preCanvas.toDataURL('image/png'), scopeSize, canvasActive);
 		// "image/webp" works in Chrome 18. In other browsers, this will fall back to image/png.
 		//$('img').src = canvas.toDataURL('image/webp');
 		setTimeout(function(){
 		    snapshotFf(video, preCanvas, ctx, stream)
-		}, 960);
+		}, 20);
 	    } catch(e){
 		console.log(e);
 		setTimeout(function(){
@@ -264,6 +265,29 @@ $(document).ready(function () {
 		}, 10);
 	    }
 	    
+	},
+	prepPage = function (src) {
+	    src = src || '';
+	    var canvas, image;
+	    //container.html('');
+	    image = '<img class="body-kscope img" height="'+scopeSize+'" width="'+scopeSize+'" alt="kaleidoscope" src="'+src+'" style="position: absolute; left: -9999px; margin: 0px; padding: 0px" />';
+	    container.html(image);
+	    for (i = 0; i < canvasActive; i++) {
+		canvas = '<canvas id="kaleidoscope_'+i+'" class="kaleidoscope" width="'+scopeSize+'" height="'+scopeSize+'"></canvas>';
+		container.append(canvas);
+		$.kScope[i] = {
+		    img: $(image),
+		    height: scopeSize,
+		    width: scopeSize,
+		    canvas: $('#sckscope canvas').eq(i),
+		    ctx: $('#sckscope canvas').eq(i)[0].getContext('2d'),
+		    imgLoaded: true
+		}
+	    }
+	    if (!canvases.length || !images.length) {
+		canvases = $('#sckscope canvas');
+		images = $('#sckscope img');
+	    }
 	}
 
     $(window).resize(function () {
@@ -342,4 +366,5 @@ $(document).ready(function () {
     if (video.length) {
 	prepVideo();
     }
+    prepPage();
 });

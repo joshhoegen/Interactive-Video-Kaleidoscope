@@ -5,7 +5,7 @@ loadNewKaleidoscope = function (size) {
   var cSize = size || 250;
   $('img[alt=kaleidoscope]').each(function (i) {
       var img = $(this),
-      canvas = $('<canvas id="kaleidoscope_' + i + '" class="kaleidoscope" width="' + size + '" height="' + size + '"></canvas>');
+        canvas = $('canvas.kaleidoscope').eq(i);
       $.kScope[i] = {
         img: img,
         height: size,
@@ -15,10 +15,11 @@ loadNewKaleidoscope = function (size) {
         imgLoaded: true
       }
       //console.log(canvas);
-      img.after(canvas);
+      //img.after(canvas);
       //$.kScope[i].ctx = canvas[0].getContext('2d');
       //$.kScope.push(kScopeObj);
-      drawKaleidoscope($.kScope[i].ctx, $.kScope[i].img[0], 100, 100, size);
+      // 0, 0 = 100, 100
+      drawKaleidoscope($.kScope[i].ctx, $.kScope[i].img[0], 0, 0, size);
   });
 },
 drawKaleidoscope = function (ctx, img, imgX, imgY, mask) {
