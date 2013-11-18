@@ -20,33 +20,7 @@ drawKaleidoscope = function (ctx, img, imgX, imgY, mask) {
     } else {
       maskSide = Math.abs(img.width - sqDiag);
     }
-    
-    /*var processCanvas = function(){
-        var count = 0;
-        var sc.a = 1;
-        var sc.b = 1;
-        while(count < 8){
-          bufferContext.save();
-          if(count < 4){
-            bufferContext.translate(c, c);
-            bufferContext.rotate(-90 * (Math.PI / 180));
-          } else {
-            bufferContext.save();
-            bufferContext.moveTo(c, c);
-            bufferContext.lineTo(c - sqSide, c);
-            bufferContext.lineTo(c - sqSide, c - sqSide);
-            bufferContext.lineTo(c, c);
-            bufferContext.clip();
-            bufferContext.translate(c, c);
-          }
-          bufferContext.scale(sc.a, sc.b);
-          bufferContext.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
-          bufferContext.restore();
-          count++;
-          processCanvas();
-        }
-       
-      }*/
+
     //bufferContext.clearRect(0, 0, maskSide, maskSide);
     //7 (1) 1
     bufferContext.save();
