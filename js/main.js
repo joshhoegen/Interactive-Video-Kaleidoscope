@@ -79,7 +79,7 @@ $(document).ready(function () {
 		    console.log('y');
                 }, parseInt(audioCache[audioActive].audioDuration/20)*1000);
             } else {
-		prepPage(src);
+		//prepPage(src);
 	    }
 	  
         },
@@ -255,7 +255,7 @@ $(document).ready(function () {
 		addNewImages(preCanvas.toDataURL('image/png'), scopeSize, canvasActive);
 		setTimeout(function(){
 		    snapshotFf(video, preCanvas, ctx, stream);
-		}, 230);
+		}, 30);
 	    } catch(e){
 		console.log(e);
 		setTimeout(function(){
@@ -268,9 +268,13 @@ $(document).ready(function () {
 	    src = src || '';
 	    var canvas, canvasAll = $(), canvasString, image;
 	    image = $('<img class="body-kscope img" height="'+scopeSize+'" width="'+scopeSize+'" alt="kaleidoscope" src="'+src+'" style="position: absolute; left: -9999px; margin: 0px; padding: 0px" />');
-	    canvasAll = canvasAll.add(image);
+	    if (src == '') {
+		canvasAll = canvasAll.add(image);
+	    } else {
+		image.attr('src', src);
+	    }
 	    for (i = 0; i < canvasActive; i++) {
-		canvasString = $('<canvas id="kaleidoscope_'+i+'" class="kaleidoscope" width="'+scopeSize+'" height="'+scopeSize+'"></canvas>');
+		canvasString = $('<canvas class="kaleidoscope" width="'+scopeSize+'" height="'+scopeSize+'"></canvas>');
 		canvasAll = canvasAll.add(canvasString);
 		$.kScope[i] = {
 		    img: image,

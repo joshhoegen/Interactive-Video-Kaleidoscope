@@ -1,5 +1,6 @@
 if ( ! window.console ) console = { log: function(){} };
 $.kScope = [];
+
 drawKaleidoscope = function (ctx, img, imgX, imgY, mask) {
   try {
     var maskSide = !mask ? 300 : mask;
@@ -7,115 +8,125 @@ drawKaleidoscope = function (ctx, img, imgX, imgY, mask) {
     var sqDiag = Math.sqrt(2 * sqSide * sqSide);
     var c = maskSide / 2;
     var centerSide = 0;
+    
+    var bufferCanvas = document.createElement('canvas');
+    var bufferContext = bufferCanvas.getContext('2d');
+    
+    bufferCanvas.height = mask;
+    bufferCanvas.width = mask;
+
     if (img.height < img.width) {
       maskSide = Math.abs(img.height - sqDiag);
     } else {
       maskSide = Math.abs(img.width - sqDiag);
     }
+    
     /*var processCanvas = function(){
         var count = 0;
         var sc.a = 1;
         var sc.b = 1;
         while(count < 8){
-          ctx.save();
+          bufferContext.save();
           if(count < 4){
-            ctx.translate(c, c);
-            ctx.rotate(-90 * (Math.PI / 180));
+            bufferContext.translate(c, c);
+            bufferContext.rotate(-90 * (Math.PI / 180));
           } else {
-            ctx.save();
-            ctx.moveTo(c, c);
-            ctx.lineTo(c - sqSide, c);
-            ctx.lineTo(c - sqSide, c - sqSide);
-            ctx.lineTo(c, c);
-            ctx.clip();
-            ctx.translate(c, c);
+            bufferContext.save();
+            bufferContext.moveTo(c, c);
+            bufferContext.lineTo(c - sqSide, c);
+            bufferContext.lineTo(c - sqSide, c - sqSide);
+            bufferContext.lineTo(c, c);
+            bufferContext.clip();
+            bufferContext.translate(c, c);
           }
-          ctx.scale(sc.a, sc.b);
-          ctx.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
-          ctx.restore();
+          bufferContext.scale(sc.a, sc.b);
+          bufferContext.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
+          bufferContext.restore();
           count++;
           processCanvas();
         }
        
       }*/
-    ctx.clearRect(0, 0, maskSide, maskSide);
+    //bufferContext.clearRect(0, 0, maskSide, maskSide);
     //7 (1) 1
-    ctx.save();
-    ctx.translate(c, c);
-    ctx.rotate(-90 * (Math.PI / 180));
-    ctx.scale(-1, -1);
-    ctx.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
-    ctx.restore();
+    bufferContext.save();
+    bufferContext.translate(c, c);
+    bufferContext.rotate(-90 * (Math.PI / 180));
+    bufferContext.scale(-1, -1);
+    bufferContext.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
+    bufferContext.restore();
     //2 (4) 2
-    ctx.save();
-    ctx.translate(c, c);
-    ctx.rotate(-90 * (Math.PI / 180));
-    ctx.scale(1, -1);
-    ctx.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
-    ctx.restore();
+    bufferContext.save();
+    bufferContext.translate(c, c);
+    bufferContext.rotate(-90 * (Math.PI / 180));
+    bufferContext.scale(1, -1);
+    bufferContext.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
+    bufferContext.restore();
     //3 (5) 3
-    ctx.save();
-    ctx.translate(c, c);
-    ctx.rotate(-90 * (Math.PI / 180));
-    ctx.scale(1, 1);
-    ctx.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
-    ctx.restore();
+    bufferContext.save();
+    bufferContext.translate(c, c);
+    bufferContext.rotate(-90 * (Math.PI / 180));
+    bufferContext.scale(1, 1);
+    bufferContext.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
+    bufferContext.restore();
     //8 4
-    ctx.save();
-    ctx.translate(c, c);
-    ctx.rotate(-90 * (Math.PI / 180));
-    ctx.scale(-1, 1);
-    ctx.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
-    ctx.restore();
+    bufferContext.save();
+    bufferContext.translate(c, c);
+    bufferContext.rotate(-90 * (Math.PI / 180));
+    bufferContext.scale(-1, 1);
+    bufferContext.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
+    bufferContext.restore();
     //1 5
-    ctx.save();
-    ctx.moveTo(c, c);
-    ctx.lineTo(c - sqSide, c);
-    ctx.lineTo(c - sqSide, c - sqSide);
-    ctx.lineTo(c, c);
-    ctx.clip();
-    ctx.translate(c, c);
-    ctx.scale(-1, -1);
-    ctx.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
-    ctx.restore();
+    bufferContext.save();
+    bufferContext.moveTo(c, c);
+    bufferContext.lineTo(c - sqSide, c);
+    bufferContext.lineTo(c - sqSide, c - sqSide);
+    bufferContext.lineTo(c, c);
+    bufferContext.clip();
+    bufferContext.translate(c, c);
+    bufferContext.scale(-1, -1);
+    bufferContext.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
+    ctx.drawImage(bufferCanvas, 0, 0);
+    bufferContext.restore();
     //4 6
-    ctx.save();
-    ctx.moveTo(c, c);
-    ctx.lineTo(c + sqSide, c - sqSide);
-    ctx.lineTo(c + sqSide, c);
-    ctx.lineTo(c, c);
-    ctx.clip();
-    ctx.translate(c, c);
-    ctx.scale(1, -1);
-    ctx.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
-    ctx.restore();
+    bufferContext.save();
+    bufferContext.moveTo(c, c);
+    bufferContext.lineTo(c + sqSide, c - sqSide);
+    bufferContext.lineTo(c + sqSide, c);
+    bufferContext.lineTo(c, c);
+    bufferContext.clip();
+    bufferContext.translate(c, c);
+    bufferContext.scale(1, -1);
+    bufferContext.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
+    bufferContext.restore();
     //5 7
-    ctx.save();
-    ctx.moveTo(c, c);
-    ctx.lineTo(c + sqSide, c);
-    ctx.lineTo(c + sqSide, c + sqSide);
-    ctx.lineTo(c, c);
-    ctx.clip();
-    ctx.translate(c, c);
-    ctx.scale(1, 1);
-    ctx.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
-    ctx.restore();
+    bufferContext.save();
+    bufferContext.moveTo(c, c);
+    bufferContext.lineTo(c + sqSide, c);
+    bufferContext.lineTo(c + sqSide, c + sqSide);
+    bufferContext.lineTo(c, c);
+    bufferContext.clip();
+    bufferContext.translate(c, c);
+    bufferContext.scale(1, 1);
+    bufferContext.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
+    bufferContext.restore();
     //8 8
-    ctx.save();
-    ctx.moveTo(c, c);
-    ctx.lineTo(c - sqSide, c + sqSide);
-    ctx.lineTo(c - sqSide, c);
-    ctx.lineTo(c, c);
-    ctx.clip();
-    ctx.translate(c, c);
-    ctx.scale(-1, 1);
-    ctx.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
-    ctx.restore();
+    bufferContext.save();
+    bufferContext.moveTo(c, c);
+    bufferContext.lineTo(c - sqSide, c + sqSide);
+    bufferContext.lineTo(c - sqSide, c);
+    bufferContext.lineTo(c, c);
+    bufferContext.clip();
+    bufferContext.translate(c, c);
+    bufferContext.scale(-1, 1);
+    bufferContext.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
+    bufferContext.restore();
+    ctx.drawImage(bufferCanvas, 0, 0);
   } catch (err) {
     $('#currentImage').remove();
     img = '';
     $('#loadingContainer').show();
-    ctx.clearRect(0, 0, 300, 300);
+    bufferContext.clearRect(0, 0, 300, 300);
   }
 }
 
