@@ -74,21 +74,6 @@ VisualAudioContext = function (context, url, mediaStream, audioTag) {
             javascriptNode = context.createScriptProcessor(2048, 1, 1)
             sourceNode = audioTag;
             connect(0.5);
-        },
-        fadeSound = function (direction, dur) {
-            var fraction = direction / 10;
-            dur = dur || 100;
-            setTimeout(function () {
-                if (sourceNode.gain.value <= 0) {
-                    stopSound();
-                } else {
-                    sourceNode.gain.value = sourceNode.gain.value - fraction;
-                    fadeSound(direction, dur);
-                }
-            }, dur)
-        },
-        onError = function (e) {
-            console.log(e);
         }
 
     if (!mediaStream) {
