@@ -94,9 +94,12 @@ $(document).ready(function () {
 		track.user.username + '</h3><p><strong>' + track.title + '</strong> | ' +
 		track.description + ' | <a href="' + track.permalink_url + '" target="_blank">Open on SoundCloud</a></p>');
 	    if (nextTrack) {
+		buttonNext.show();
 		audioTag.on('ended', function(){
 		    playTrack(nextTrack.url, nextTrack.track);
 		});
+	    } else {
+		buttonNext.hide();
 	    }
 	},
         playList = function (tracks) {
@@ -128,11 +131,6 @@ $(document).ready(function () {
 		    }
 		}
             });
-	    if (tracks.length > 1) {
-		buttonNext.show();
-	    } else {
-		buttonNext.hide();
-	    }
 	    playTrack(first.url, first.track);
         },
 	requestFullScreen = function (element, callback) {
