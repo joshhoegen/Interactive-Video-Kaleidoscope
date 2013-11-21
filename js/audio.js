@@ -75,24 +75,6 @@ VisualAudioContext = function (context, url, mediaStream, audioTag) {
             sourceNode = audioTag;
             connect(0.5);
         },
-        loadSound = function (url, start, dur) {
-            var request = new XMLHttpRequest();
-            request.open('GET', url, true);
-            request.responseType = 'arraybuffer';
-            loaded = true;
-            // When loaded decode the data
-            request.onload = function () {
-                // decode the data
-                context.decodeAudioData(request.response, function (buffer) {
-                    // when the audio is decoded play the sound
-                    // playSound(buffer, 0);
-                    sourceNode.buffer = buffer;
-                    bufferActive = buffer;
-                    playSound(url, start, dur);
-                }, onError);
-            }
-            request.send();
-        },
         fadeSound = function (direction, dur) {
             var fraction = direction / 10;
             dur = dur || 100;
