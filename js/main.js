@@ -13,6 +13,7 @@ $(document).ready(function () {
         audioCurrentTime = 0,
 	buttonPlay = $('input[name=play]'),
 	buttonPause = $('input[name=pause]'),
+	buttonNext = $('input[name=next]'),
 	buttonFullscreen = $('input[name=fullscreen]'),
 	canvasActive = 8,
 	container = $('#sckscope'),
@@ -116,16 +117,22 @@ $(document).ready(function () {
 			'url': url,
 			'image': image.replace('large', 't500x500') + '?client_id=b2d19575a677c201c6d23c39e408927a',
 			'audioDuration': track.duration / 1000,
-			'track': track
+			'track': track,
+			'next': false
 		    };
 		    if (typeof tracks[i+1] !== 'undefined') {
 			audioCache[url].next = tracks[i+1].permalink_url.replace('http://', 'https://');
-		    }
+		    } 
 		    if (i == 0) {
 			first = audioCache[url];
 		    }
 		}
             });
+	    if (tracks.length > 1) {
+		buttonNext.show();
+	    } else {
+		buttonNext.hide();
+	    }
 	    playTrack(first.url, first.track);
         },
 	requestFullScreen = function (element, callback) {
@@ -296,6 +303,10 @@ $(document).ready(function () {
 	e.preventDefault();
 	buttonPlay.click();
     });
+    buttonNext.on('click', function(){
+    	audioTag.stop();
+	playTrack(audioCache[audioCache[audioActive].next].url, audioCache[audioCache[audioActive].next].track);
+    }).hide();
     buttonPlay.on('click', function (e) {
         var val = $('input[name=scUrl]').val().replace("http://", "https://");
 	// toggle. make 1 button.
@@ -309,7 +320,6 @@ $(document).ready(function () {
 	if (typeof audioCache[val] != 'undefined') {
 	    addNewImages(audioCache[val].image, scopeSize, canvasActive);
 	    //vac[val].playSound(audioCache[val].stream, 0, audioCache[val].audioDuration);
-	    console.log(audioCache[val]);
 	    playTrack(audioCache[val].url, audioCache[val].track);
 	    visualizeAudio(audioActive);
 	} else {
