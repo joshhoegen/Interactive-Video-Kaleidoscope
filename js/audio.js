@@ -1,7 +1,7 @@
 // create the audio context (chrome only for now)
 // The name of this file is ambiguous until there's a standard audio context.
 // Original code from: http://www.smartjava.org/content/exploring-html5-web-audio-visualizing-sound
-VisualAudioContext = function (context, url, mediaStream){
+VisualAudioContext = function (context, url, mediaStream, audioTag){
   var vac = this,
     cache = {},
     loaded = false,
@@ -70,8 +70,9 @@ VisualAudioContext = function (context, url, mediaStream){
     setupAudioNodes = function (callback) {
       // connect to destination, else it isn't called
       //javascriptNode = context.createJavaScriptNode(2048, 1, 1)
+      //audioTag.src = url;
       javascriptNode = context.createScriptProcessor(2048, 1, 1)
-      sourceNode = context.createBufferSource(),
+      sourceNode = audioTag,
       gainNode = context.createGain(),
       splitter = context.createChannelSplitter(),
       analyser = context.createAnalyser(),
@@ -104,7 +105,7 @@ VisualAudioContext = function (context, url, mediaStream){
       
       // Volume
       sourceNode.connect(gainNode);
-
+      gainNode.gain.value = 0.3;
       // splitter.connect(context.destination,0,0);
       // splitter.connect(context.destination,0,1);
       // and connect to destination
@@ -203,15 +204,6 @@ VisualAudioContext = function (context, url, mediaStream){
       }
       average = values / length;
       return average;
-    }
-    this.currentTime = function () {
-      return context.currentTime;
-    }
-    this.stopSound = function (dur, fade) {
-      stopSound(dur, fade);
-    }
-    this.playSound = function (url, start, dur) {
-      playSound(url, start, dur);
     }
     this.ch = channels;
     this.javascriptNode = javascriptNode;

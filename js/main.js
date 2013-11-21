@@ -1,10 +1,12 @@
 $(document).ready(function () {
-    var context = typeof AudioContext == 'function' ?
+    var context = typeof AudioContext !== 'undefined' ?
 	    new AudioContext() :
-	    typeof webkitAudioContext == 'function' ?
+	    typeof webkitAudioContext !== 'undefined' ?
 	    new webkitAudioContext() : $('.no-support').show().parents('body').find('#scForm').hide(),
 	ctx,
         vac = {},
+	audioTag = $('audio'),
+	source = audioTag.length ? context.createMediaElementSource(audioTag[0]) : false,
         audioCache = {},
         audioActive,
 	audioOnDeck,
@@ -53,15 +55,11 @@ $(document).ready(function () {
 	    
             vac[audioActive].javascriptNode.onaudioprocess = function (e) {
 		count++;
-		
                 vac[audioActive].ch.analyser.getByteFrequencyData(ch);
-		
                 average = vac[audioActive].getAverageVolume(ch);
-                x = average + (average + (average/2));
-		x = x < scopeSize ? x : scopeSize;
-
-		//x = x < scopeSize * 2 ? x : scopeSize;
-		y = x; // Split channels, use analyser2
+                x = (average * 2) + 70;
+		//x = x < scopeSize ? x - 60 : scopeSize;
+		y = x; // if you want to split channels, use analyser2
                 move(x, y);
             }
         },
@@ -80,14 +78,14 @@ $(document).ready(function () {
             } 
 	  
         },
+	// This is starting to get MESSY!
 	playTrack = function (url, track) {
-	    if (audioActive != url && typeof vac[audioActive] != 'undefined') {
-		vac[audioActive].stopSound(1);
-	    }
-	    prepPage();
+	    prepPage(audioCache[url].image);
 	    audioActive = url;
 	    addNewImages(audioCache[url].image, scopeSize, canvasActive);
-	    vac[url].playSound(audioCache[url].stream, 0, audioCache[url].audioDuration);
+	    audioTag.attr('src', audioCache[url].stream);
+	    vac[url] = new VisualAudioContext(context, track.stream, false, source);
+	    audioTag[0].play();
 	    visualizeAudio(audioActive);
 	    setLoadingMessage('Loading track from SoundCloud...');
 	    $('.track-info').html('<h3>' +
@@ -95,7 +93,7 @@ $(document).ready(function () {
 		track.description + ' | <a href="' + track.permalink_url + '" target="_blank">Open on SoundCloud</a></p>');
 	},
         playList = function (tracks) {
-	    var trackCount = tracks;
+	    var first;
 	    playTimeout = 0;
 	    $.each(audioCache, function(url, track){
 		if (audioCache[url].timer) {
@@ -107,29 +105,21 @@ $(document).ready(function () {
 		var url = track.permalink_url.replace('http://', 'https://'),
 		    image = track.artwork_url ? track.artwork_url : track.user.avatar_url;
 		if (track.duration < 999999) {
-		    vac[url] = new VisualAudioContext(context, track.stream, false);
 		    audioCache[url] = {
 			'stream': track.stream_url + '?client_id=b2d19575a677c201c6d23c39e408927a',
-			'url': track.permalink_url,
+			'url': url,
 			'image': image.replace('large', 't500x500') + '?client_id=b2d19575a677c201c6d23c39e408927a',
-			'audioDuration': track.duration / 1000
+			'audioDuration': track.duration / 1000,
+			'track': track
 		    };
-		    audioCache[url].timer = new Timer(function () {
-			playTrack(url, track);
-		    }, playTimeout);
-		    playTimeout += track.duration;
+		    if (i == 0) {
+			first = audioCache[url];
+		    }
 		}
             });
-	    setTimeout(function(){
-		buttonPause.hide();
-		buttonPlay.show();
-		buttonFullscreen.hide();
-		imageRefresh.pause();
-		audioActive = false;
-	    }, playTimeout);
+	    playTrack(first.url, first.track);
         },
 	requestFullScreen = function (element, callback) {
-	    // Supports most browsers and their versions.
 	    var requestMethod = element.requestFullScreen || element.webkitRequestFullScreen || element.mozRequestFullScreen || element.msRequestFullScreen;
 	    if (requestMethod) { // Native full screen.
 		requestMethod.call(element);
@@ -190,7 +180,7 @@ $(document).ready(function () {
 	    navigator.getUserMedia  = navigator.getUserMedia || navigator.webkitGetUserMedia ||
 				      navigator.mozGetUserMedia || navigator.msGetUserMedia;
 	    var preImage = $('<img class="vid-img" src="/image/kaleidoscope.jpg" height="400" width="400" />'),
-		preCanvas = $('<canvas class="vid-canvas" height="400" width="400"></canvas>');
+		preCanvas = $('<canvas class="vid-canvas" height="425" width="425"></canvas>');
 		ctx = preCanvas[0].getContext('2d'),
 		fail = function(){
 		    console.log('Failed');
@@ -259,12 +249,15 @@ $(document).ready(function () {
 	prepPage = function (src) {
 	    src = src || '';
 	    var canvas, canvasAll = $(), canvasString, image;
+	    if (imageRefresh) {
+		imageRefresh.pause();
+	    }
 	    image = $('<img class="body-kscope img" height="'+scopeSize+'" width="'+scopeSize+'" alt="kaleidoscope" src="'+src+'" style="position: absolute; left: -9999px; margin: 0px; padding: 0px" />');
 	    if (src == '') {
-		canvasAll = canvasAll.add(image);
-	    } else {
-		image.attr('src', src);
-	    }
+                canvasAll = canvasAll.add(image);
+            } else {
+                image.attr('src', src);
+            }
 	    for (i = 0; i < canvasActive; i++) {
 		canvasString = $('<canvas class="kaleidoscope" width="'+scopeSize+'" height="'+scopeSize+'"></canvas>');
 		canvasAll = canvasAll.add(canvasString);
@@ -290,21 +283,6 @@ $(document).ready(function () {
 	}
     });
     
-    buttonPause.on('click', function (e) {
-        if (typeof vac !== 'undefined' && audioCache) {
-            vac[audioActive].stopSound();
-            audioCurrentTime = vac[audioActive].currentTime();
-            //vac = new VisualAudioContext(context);
-            $(this).hide();
-            buttonPlay.show();
-            $.each(audioCache, function(url, track){
-		if(audioCache[url].timer){
-		    audioCache[url].timer.pause();   
-		}
-	    });
-        }
-    }).hide();
-    
     buttonFullscreen.on('click', function (e) {
 	fullscreen($(this).data('on'));
     }).data({on: false}).hide();
@@ -316,46 +294,41 @@ $(document).ready(function () {
     buttonPlay.on('click', function (e) {
         var val = $('input[name=scUrl]').val().replace("http://", "https://");
 	// toggle. make 1 button.
-	buttonPlay.hide();
-        buttonPause.show();
+	//buttonPlay.hide();
+        //buttonPause.show();
+	if (!audioTag[0].paused) {
+	    audioTag[0].pause();
+	}
 	buttonFullscreen.show();
-	container.show();
-        if (playlistActive == val || audioActive == val) {
-	    $.each(audioCache, function(url, track){
-		if(audioCache[url].timer){
-		    audioCache[url].timer.resume();   
-		}	
+	container.show();    
+	if (typeof audioCache[val] != 'undefined') {
+	    addNewImages(audioCache[val].image, scopeSize, canvasActive);
+	    //vac[val].playSound(audioCache[val].stream, 0, audioCache[val].audioDuration);
+	    console.log(audioCache[val]);
+	    playTrack(audioCache[val].url, audioCache[val].track);
+	    visualizeAudio(audioActive);
+	} else {
+	    // Uses SoundCloud API/SDK
+	    SC.initialize({
+		client_id: 'b2d19575a677c201c6d23c39e408927a'
 	    });
-            vac[audioActive].playSound(audioCache[audioActive].stream, audioCurrentTime, audioCache[audioActive].audioDuration);
-            visualizeAudio(audioActive);
-        } else {
-            if (typeof audioCache[val] != 'undefined') {
-                addNewImages(audioCache[val].image, scopeSize, canvasActive);
-                vac[val].playSound(audioCache[val].stream, 0, audioCache[val].audioDuration);
-                visualizeAudio(audioActive);
-            } else {
-                // Uses SoundCloud API/SDK
-                SC.initialize({
-                    client_id: 'b2d19575a677c201c6d23c39e408927a'
-                });
-                SC.get('/resolve', {
-                    url: val
-                }, function (track) {
-		    var playlist = {};
-                    playlistActive = false;
-                    if (track.kind == 'track') {
-                        playlist[0] = track;
-                    } else if (track.kind == 'playlist') {
-                        playlistActive = val;
-                        playlist = track.tracks;
-                    } else {
-                        setLoadingMessage('Please select a single track from SoundCloud. Try this: http://soundcloud.com/byutifu/nina-simone-dont-let-me-be');
-		    }
-		    $('.track-info').slideDown();
-                    playList(playlist);
-                });
-            }
-        }
+	    SC.get('/resolve', {
+		url: val
+	    }, function (track) {
+		var playlist = {};
+		playlistActive = false;
+		if (track.kind == 'track') {
+		    playlist[0] = track;
+		} else if (track.kind == 'playlist') {
+		    playlistActive = val;
+		    playlist = track.tracks;
+		} else {
+		    setLoadingMessage('Please select a single track from SoundCloud. Try this: http://soundcloud.com/byutifu/nina-simone-dont-let-me-be');
+		}
+		$('.track-info').slideDown();
+		playList(playlist);
+	    });
+	}
     });
     var tracks = ['https://soundcloud.com/byutifu/put-a-spell-on-you',
 		  'https://soundcloud.com/trapmusic/thump-by-drezo-subset-remix',

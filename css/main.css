@@ -134,3 +134,10 @@ input[type=button]:hover {
 .vid-img {
     
 }
+
+audio {
+    position: absolute;
+    right: 5px;
+    top: 5px;
+    z-index: 3;
+}
