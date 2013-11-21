@@ -80,6 +80,7 @@ $(document).ready(function () {
         },
 	// This is starting to get MESSY!
 	playTrack = function (url, track) {
+	    var nextTrack = audioCache[audioCache[url].next];
 	    prepPage(audioCache[url].image);
 	    audioActive = url;
 	    addNewImages(audioCache[url].image, scopeSize, canvasActive);
@@ -88,9 +89,14 @@ $(document).ready(function () {
 	    audioTag[0].play();
 	    visualizeAudio(audioActive);
 	    setLoadingMessage('Loading track from SoundCloud...');
-	    $('.track-info').html('<h3>' +
+	    $('.track-info').html('<img src="'+audioCache[url].image+'" alt="Original SoundCloud Image" /><h3>' +
 		track.user.username + '</h3><p><strong>' + track.title + '</strong> | ' +
 		track.description + ' | <a href="' + track.permalink_url + '" target="_blank">Open on SoundCloud</a></p>');
+	    if (nextTrack) {
+		audioTag.on('ended', function(){
+		    playTrack(nextTrack.url, nextTrack.track);
+		});
+	    }
 	},
         playList = function (tracks) {
 	    var first;
@@ -112,6 +118,9 @@ $(document).ready(function () {
 			'audioDuration': track.duration / 1000,
 			'track': track
 		    };
+		    if (typeof tracks[i+1] !== 'undefined') {
+			audioCache[url].next = tracks[i+1].permalink_url.replace('http://', 'https://');
+		    }
 		    if (i == 0) {
 			first = audioCache[url];
 		    }
@@ -209,7 +218,6 @@ $(document).ready(function () {
 		    // Note: onloadedmetadata doesn't fire in Chrome when using it with getUserMedia.
 		    // See crbug.com/110938.
 		    video.onloadedmetadata = function(e) {
-			// Ready to go. Do some stuff.
 			console.log('videLoaded');
 		    };
 		}, fail);
@@ -222,11 +230,8 @@ $(document).ready(function () {
 	snapshot = function (video, preCanvas, ctx, stream) {
 	    var img = preCanvas.toDataURL('image/webp');
 	    ctx.drawImage(video, 0, 0, scopeSize, scopeSize);
-	    // "image/webp" works in Chrome 18. In other browsers, this will fall back to image/png.
-	    //$('img').src = canvas.toDataURL('image/webp');
 	    addNewImages(img, scopeSize, canvasActive);
 	    setTimeout(function(){
-		//prepPage(img);
 		snapshot(video, preCanvas, ctx, stream);
 	    }, 10);
 	    
@@ -332,7 +337,12 @@ $(document).ready(function () {
     });
     var tracks = ['https://soundcloud.com/byutifu/put-a-spell-on-you',
 		  'https://soundcloud.com/trapmusic/thump-by-drezo-subset-remix',
-		  'https://soundcloud.com/feedme/love-is-all-i-got']
+		  'https://soundcloud.com/feedme/love-is-all-i-got',
+		  'https://soundcloud.com/byutifu/sets/end-of-summer-love',
+		  'https://soundcloud.com/griz/smash-the-funk-forthcoming',
+		  'https://soundcloud.com/nickraymondg/odesza-my-friends-never-die',
+		  'https://soundcloud.com/nickraymondg/duck-sauce-its-you-chris-lake',
+		  'https://soundcloud.com/byutifu/sets/psychedelic-dub-n-roll']
     if (video.length) {
 	prepVideo();
     } else {
