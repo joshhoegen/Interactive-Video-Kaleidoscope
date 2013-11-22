@@ -57,6 +57,11 @@ body.fullscreen {
 .fullscreen .track-info {
     display: none;
 }
+img.logo {
+    width: 30px;
+    float: left;
+    margin: 3px 10px 0 10px;
+}
 h1 {
     margin: 10px 0 10px 0;    
 }
@@ -86,6 +91,12 @@ a {
     background: #000;
     background: rgba(0, 0, 0, .6);
     padding: 20px;
+}
+.track-info img {
+    float: left;
+    margin: 0 20px 20px 0;
+    width: 100px;
+    
 }
 .kMessages {
   width: 300px;

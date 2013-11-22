@@ -13,6 +13,7 @@ $(document).ready(function () {
         audioCurrentTime = 0,
 	buttonPlay = $('input[name=play]'),
 	buttonPause = $('input[name=pause]'),
+	buttonNext = $('input[name=next]'),
 	buttonFullscreen = $('input[name=fullscreen]'),
 	canvasActive = 8,
 	container = $('#sckscope'),
@@ -26,6 +27,14 @@ $(document).ready(function () {
         playlistActive = false,
 	scopeSize = 250,
 	video = $('video'),
+	defaultTracks = ['https://soundcloud.com/byutifu/put-a-spell-on-you',
+		  'https://soundcloud.com/trapmusic/thump-by-drezo-subset-remix',
+		  'https://soundcloud.com/feedme/love-is-all-i-got',
+		  'https://soundcloud.com/byutifu/sets/end-of-summer-love',
+		  'https://soundcloud.com/griz/smash-the-funk-forthcoming',
+		  'https://soundcloud.com/byutifu/sets/psychedelic-dub-n-roll',
+		  'https://soundcloud.com/glitchhop/kontrol-freqz-by-krossbow'],
+	defaultTrackRandom = function() { return defaultTracks[Math.floor(Math.random()*defaultTracks.length)]; },
 	defaultUrl = function(){
 	    var results = new RegExp('[\\?&]scUrl=([^&#]*)').exec(window.location.href);
 	    return results ? results[1] : 0;
@@ -57,7 +66,7 @@ $(document).ready(function () {
 		count++;
                 vac[audioActive].ch.analyser.getByteFrequencyData(ch);
                 average = vac[audioActive].getAverageVolume(ch);
-                x = (average * 2) + 70;
+                x = x < (limit/2.5)+20 ? average+20 : (average * 2)+100;
 		//x = x < scopeSize ? x - 60 : scopeSize;
 		y = x; // if you want to split channels, use analyser2
                 move(x, y);
@@ -74,12 +83,14 @@ $(document).ready(function () {
                 imageRefresh = new Timer(function () {
                     prepPage(src);
 		    addNewImages(src, size, max);
-                }, parseInt(audioCache[audioActive].audioDuration/20)*1000);
+                }, parseInt(audioCache[audioActive].audioDuration/4)*1000);
             } 
 	  
         },
 	// This is starting to get MESSY!
 	playTrack = function (url, track) {
+	    var nextTrack = audioCache[audioCache[url].next],
+		random = defaultTrackRandom() == url ? defaultTrackRandom() : defaultTrackRandom();
 	    prepPage(audioCache[url].image);
 	    audioActive = url;
 	    addNewImages(audioCache[url].image, scopeSize, canvasActive);
@@ -88,9 +99,19 @@ $(document).ready(function () {
 	    audioTag[0].play();
 	    visualizeAudio(audioActive);
 	    setLoadingMessage('Loading track from SoundCloud...');
-	    $('.track-info').html('<h3>' +
+	    $('.track-info').html('<img src="'+audioCache[url].image+'" alt="Original SoundCloud Image" /><h3>' +
 		track.user.username + '</h3><p><strong>' + track.title + '</strong> | ' +
 		track.description + ' | <a href="' + track.permalink_url + '" target="_blank">Open on SoundCloud</a></p>');
+	    audioTag.on('ended', function(){
+		if (nextTrack) {
+		    buttonNext.show();
+		    playTrack(nextTrack.url, nextTrack.track);
+		} else {
+		    buttonNext.hide();
+		    imageRefresh.pause();
+		    //getSoundCloud(random);
+		}
+	    });
 	},
         playList = function (tracks) {
 	    var first;
@@ -110,8 +131,12 @@ $(document).ready(function () {
 			'url': url,
 			'image': image.replace('large', 't500x500') + '?client_id=b2d19575a677c201c6d23c39e408927a',
 			'audioDuration': track.duration / 1000,
-			'track': track
+			'track': track,
+			'next': false
 		    };
+		    if (typeof tracks[i+1] !== 'undefined') {
+			audioCache[url].next = tracks[i+1].permalink_url.replace('http://', 'https://');
+		    } 
 		    if (i == 0) {
 			first = audioCache[url];
 		    }
@@ -151,8 +176,6 @@ $(document).ready(function () {
 		    buttonFullscreen.data({on: true});    
 		});
 	    } else {
-		scopeSize = 250;
-		limit = 250;
 		if (document.cancelFullScreen) {
 		    document.cancelFullScreen();
 		} else if (document.mozCancelFullScreen) {
@@ -179,8 +202,9 @@ $(document).ready(function () {
 	    window.URL = window.URL || window.webkitURL;
 	    navigator.getUserMedia  = navigator.getUserMedia || navigator.webkitGetUserMedia ||
 				      navigator.mozGetUserMedia || navigator.msGetUserMedia;
-	    var preImage = $('<img class="vid-img" src="/image/kaleidoscope.jpg" height="400" width="400" />'),
-		preCanvas = $('<canvas class="vid-canvas" height="425" width="425"></canvas>');
+	    limit = 420;
+	    var preImage = $('<img class="vid-img" src="/image/kaleidoscope.jpg" height="500" width="500" />'),
+		preCanvas = $('<canvas class="vid-canvas" height="500" width="500"></canvas>');
 		ctx = preCanvas[0].getContext('2d'),
 		fail = function(){
 		    console.log('Failed');
@@ -209,7 +233,6 @@ $(document).ready(function () {
 		    // Note: onloadedmetadata doesn't fire in Chrome when using it with getUserMedia.
 		    // See crbug.com/110938.
 		    video.onloadedmetadata = function(e) {
-			// Ready to go. Do some stuff.
 			console.log('videLoaded');
 		    };
 		}, fail);
@@ -222,11 +245,8 @@ $(document).ready(function () {
 	snapshot = function (video, preCanvas, ctx, stream) {
 	    var img = preCanvas.toDataURL('image/webp');
 	    ctx.drawImage(video, 0, 0, scopeSize, scopeSize);
-	    // "image/webp" works in Chrome 18. In other browsers, this will fall back to image/png.
-	    //$('img').src = canvas.toDataURL('image/webp');
 	    addNewImages(img, scopeSize, canvasActive);
 	    setTimeout(function(){
-		//prepPage(img);
 		snapshot(video, preCanvas, ctx, stream);
 	    }, 10);
 	    
@@ -275,40 +295,8 @@ $(document).ready(function () {
 		canvases = $('#sckscope canvas');
 		images = $('#sckscope img');
 	    }
-	}
-
-    $(window).resize(function () {
-	if ($('body.fullscreen').length) {
-	    fullscreen();
-	}
-    });
-    
-    buttonFullscreen.on('click', function (e) {
-	fullscreen($(this).data('on'));
-    }).data({on: false}).hide();
-        
-    $('#scForm').on('submit', function(e){
-	e.preventDefault();
-	buttonPlay.click();
-    });
-    buttonPlay.on('click', function (e) {
-        var val = $('input[name=scUrl]').val().replace("http://", "https://");
-	// toggle. make 1 button.
-	//buttonPlay.hide();
-        //buttonPause.show();
-	if (!audioTag[0].paused) {
-	    audioTag[0].pause();
-	}
-	buttonFullscreen.show();
-	container.show();    
-	if (typeof audioCache[val] != 'undefined') {
-	    addNewImages(audioCache[val].image, scopeSize, canvasActive);
-	    //vac[val].playSound(audioCache[val].stream, 0, audioCache[val].audioDuration);
-	    console.log(audioCache[val]);
-	    playTrack(audioCache[val].url, audioCache[val].track);
-	    visualizeAudio(audioActive);
-	} else {
-	    // Uses SoundCloud API/SDK
+	},
+	getSoundCloud = function (val) {
 	    SC.initialize({
 		client_id: 'b2d19575a677c201c6d23c39e408927a'
 	    });
@@ -329,14 +317,49 @@ $(document).ready(function () {
 		playList(playlist);
 	    });
 	}
+
+    $(window).resize(function () {
+	if ($('body.fullscreen').length) {
+	    fullscreen();
+	}
     });
-    var tracks = ['https://soundcloud.com/byutifu/put-a-spell-on-you',
-		  'https://soundcloud.com/trapmusic/thump-by-drezo-subset-remix',
-		  'https://soundcloud.com/feedme/love-is-all-i-got']
+    
+    buttonFullscreen.on('click', function (e) {
+	fullscreen($(this).data('on'));
+    }).data({on: false}).hide();
+        
+    $('#scForm').on('submit', function(e){
+	e.preventDefault();
+	buttonPlay.click();
+    });
+    buttonNext.on('click', function(){
+    	audioTag.stop();
+	playTrack(audioCache[audioCache[audioActive].next].url, audioCache[audioCache[audioActive].next].track);
+    }).hide();
+    buttonPlay.on('click', function (e) {
+        var val = $('input[name=scUrl]').val().replace("http://", "https://");
+	// toggle. make 1 button.
+	//buttonPlay.hide();
+        //buttonPause.show();
+	if (!audioTag[0].paused) {
+	    audioTag[0].pause();
+	}
+	buttonFullscreen.show();
+	container.show();    
+	if (typeof audioCache[val] != 'undefined') {
+	    addNewImages(audioCache[val].image, scopeSize, canvasActive);
+	    //vac[val].playSound(audioCache[val].stream, 0, audioCache[val].audioDuration);
+	    playTrack(audioCache[val].url, audioCache[val].track);
+	    visualizeAudio(audioActive);
+	} else {
+	    // Uses SoundCloud API/SDK
+	    getSoundCloud(val);
+	}
+    });
     if (video.length) {
 	prepVideo();
     } else {
-	$('input[name=scUrl]').val(tracks[Math.floor(Math.random()*tracks.length)]);
+	$('input[name=scUrl]').val(defaultTrackRandom());
     }
     container.hide();
     prepPage();
