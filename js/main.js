@@ -27,6 +27,14 @@ $(document).ready(function () {
         playlistActive = false,
 	scopeSize = 250,
 	video = $('video'),
+	defaultTracks = ['https://soundcloud.com/byutifu/put-a-spell-on-you',
+		  'https://soundcloud.com/trapmusic/thump-by-drezo-subset-remix',
+		  'https://soundcloud.com/feedme/love-is-all-i-got',
+		  'https://soundcloud.com/byutifu/sets/end-of-summer-love',
+		  'https://soundcloud.com/griz/smash-the-funk-forthcoming',
+		  'https://soundcloud.com/byutifu/sets/psychedelic-dub-n-roll',
+		  'https://soundcloud.com/glitchhop/kontrol-freqz-by-krossbow'],
+	defaultTrackRandom = function() { return defaultTracks[Math.floor(Math.random()*defaultTracks.length)]; },
 	defaultUrl = function(){
 	    var results = new RegExp('[\\?&]scUrl=([^&#]*)').exec(window.location.href);
 	    return results ? results[1] : 0;
@@ -58,7 +66,7 @@ $(document).ready(function () {
 		count++;
                 vac[audioActive].ch.analyser.getByteFrequencyData(ch);
                 average = vac[audioActive].getAverageVolume(ch);
-                x = (average * 2) + 70;
+                x = x < (limit/2.5)+20 ? average+20 : (average * 2)+100;
 		//x = x < scopeSize ? x - 60 : scopeSize;
 		y = x; // if you want to split channels, use analyser2
                 move(x, y);
@@ -75,13 +83,14 @@ $(document).ready(function () {
                 imageRefresh = new Timer(function () {
                     prepPage(src);
 		    addNewImages(src, size, max);
-                }, parseInt(audioCache[audioActive].audioDuration/20)*1000);
+                }, parseInt(audioCache[audioActive].audioDuration/4)*1000);
             } 
 	  
         },
 	// This is starting to get MESSY!
 	playTrack = function (url, track) {
-	    var nextTrack = audioCache[audioCache[url].next];
+	    var nextTrack = audioCache[audioCache[url].next],
+		random = defaultTrackRandom() == url ? defaultTrackRandom() : defaultTrackRandom();
 	    prepPage(audioCache[url].image);
 	    audioActive = url;
 	    addNewImages(audioCache[url].image, scopeSize, canvasActive);
@@ -93,14 +102,16 @@ $(document).ready(function () {
 	    $('.track-info').html('<img src="'+audioCache[url].image+'" alt="Original SoundCloud Image" /><h3>' +
 		track.user.username + '</h3><p><strong>' + track.title + '</strong> | ' +
 		track.description + ' | <a href="' + track.permalink_url + '" target="_blank">Open on SoundCloud</a></p>');
-	    if (nextTrack) {
-		buttonNext.show();
-		audioTag.on('ended', function(){
+	    audioTag.on('ended', function(){
+		if (nextTrack) {
+		    buttonNext.show();
 		    playTrack(nextTrack.url, nextTrack.track);
-		});
-	    } else {
-		buttonNext.hide();
-	    }
+		} else {
+		    buttonNext.hide();
+		    imageRefresh.pause();
+		    //getSoundCloud(random);
+		}
+	    });
 	},
         playList = function (tracks) {
 	    var first;
@@ -165,8 +176,6 @@ $(document).ready(function () {
 		    buttonFullscreen.data({on: true});    
 		});
 	    } else {
-		scopeSize = 250;
-		limit = 250;
 		if (document.cancelFullScreen) {
 		    document.cancelFullScreen();
 		} else if (document.mozCancelFullScreen) {
@@ -193,8 +202,9 @@ $(document).ready(function () {
 	    window.URL = window.URL || window.webkitURL;
 	    navigator.getUserMedia  = navigator.getUserMedia || navigator.webkitGetUserMedia ||
 				      navigator.mozGetUserMedia || navigator.msGetUserMedia;
-	    var preImage = $('<img class="vid-img" src="/image/kaleidoscope.jpg" height="400" width="400" />'),
-		preCanvas = $('<canvas class="vid-canvas" height="425" width="425"></canvas>');
+	    limit = 420;
+	    var preImage = $('<img class="vid-img" src="/image/kaleidoscope.jpg" height="500" width="500" />'),
+		preCanvas = $('<canvas class="vid-canvas" height="500" width="500"></canvas>');
 		ctx = preCanvas[0].getContext('2d'),
 		fail = function(){
 		    console.log('Failed');
@@ -285,6 +295,27 @@ $(document).ready(function () {
 		canvases = $('#sckscope canvas');
 		images = $('#sckscope img');
 	    }
+	},
+	getSoundCloud = function (val) {
+	    SC.initialize({
+		client_id: 'b2d19575a677c201c6d23c39e408927a'
+	    });
+	    SC.get('/resolve', {
+		url: val
+	    }, function (track) {
+		var playlist = {};
+		playlistActive = false;
+		if (track.kind == 'track') {
+		    playlist[0] = track;
+		} else if (track.kind == 'playlist') {
+		    playlistActive = val;
+		    playlist = track.tracks;
+		} else {
+		    setLoadingMessage('Please select a single track from SoundCloud. Try this: http://soundcloud.com/byutifu/nina-simone-dont-let-me-be');
+		}
+		$('.track-info').slideDown();
+		playList(playlist);
+	    });
 	}
 
     $(window).resize(function () {
@@ -322,39 +353,13 @@ $(document).ready(function () {
 	    visualizeAudio(audioActive);
 	} else {
 	    // Uses SoundCloud API/SDK
-	    SC.initialize({
-		client_id: 'b2d19575a677c201c6d23c39e408927a'
-	    });
-	    SC.get('/resolve', {
-		url: val
-	    }, function (track) {
-		var playlist = {};
-		playlistActive = false;
-		if (track.kind == 'track') {
-		    playlist[0] = track;
-		} else if (track.kind == 'playlist') {
-		    playlistActive = val;
-		    playlist = track.tracks;
-		} else {
-		    setLoadingMessage('Please select a single track from SoundCloud. Try this: http://soundcloud.com/byutifu/nina-simone-dont-let-me-be');
-		}
-		$('.track-info').slideDown();
-		playList(playlist);
-	    });
+	    getSoundCloud(val);
 	}
     });
-    var tracks = ['https://soundcloud.com/byutifu/put-a-spell-on-you',
-		  'https://soundcloud.com/trapmusic/thump-by-drezo-subset-remix',
-		  'https://soundcloud.com/feedme/love-is-all-i-got',
-		  'https://soundcloud.com/byutifu/sets/end-of-summer-love',
-		  'https://soundcloud.com/griz/smash-the-funk-forthcoming',
-		  'https://soundcloud.com/nickraymondg/odesza-my-friends-never-die',
-		  'https://soundcloud.com/nickraymondg/duck-sauce-its-you-chris-lake',
-		  'https://soundcloud.com/byutifu/sets/psychedelic-dub-n-roll']
     if (video.length) {
 	prepVideo();
     } else {
-	$('input[name=scUrl]').val(tracks[Math.floor(Math.random()*tracks.length)]);
+	$('input[name=scUrl]').val(defaultTrackRandom());
     }
     container.hide();
     prepPage();
