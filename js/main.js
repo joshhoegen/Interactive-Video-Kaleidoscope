@@ -35,10 +35,10 @@ $(document).ready(function () {
 		  'https://soundcloud.com/byutifu/sets/psychedelic-dub-n-roll',
 		  'https://soundcloud.com/glitchhop/kontrol-freqz-by-krossbow'],
 	defaultTrackRandom = function() { return defaultTracks[Math.floor(Math.random()*defaultTracks.length)]; },
-	defaultUrl = function(){
-	    var results = new RegExp('[\\?&]scUrl=([^&#]*)').exec(window.location.href);
-	    return results ? results[1] : 0;
+	defaultUrl = function (name) {
+	    return decodeURIComponent((new RegExp('[?|&]' + name + '=' + '([^&;]+?)(&|#|;|$)').exec(location.search)||[,""])[1].replace(/\+/g, '%20'))||null;
 	},
+	defaultTrack = defaultUrl('song');
 	Timer = function (callback, delay) {
             var timerId, start, remaining = delay;
             this.pause = function () {
@@ -324,6 +324,13 @@ $(document).ready(function () {
 	}
     });
     
+    $(window).keyup(function(e) {
+	if (e.keyCode == 27) {
+	    buttonFullscreen.click();
+	    console.log('whu');
+	}
+    });
+    
     buttonFullscreen.on('click', function (e) {
 	fullscreen($(this).data('on'));
     }).data({on: false}).hide();
@@ -359,7 +366,11 @@ $(document).ready(function () {
     if (video.length) {
 	prepVideo();
     } else {
-	$('input[name=scUrl]').val(defaultTrackRandom());
+	if (defaultTrack) {
+	    $('input[name=scUrl]').val(defaultTrack);
+	} else {
+	    $('input[name=scUrl]').val(defaultTrackRandom());
+	}
     }
     container.hide();
     prepPage();
