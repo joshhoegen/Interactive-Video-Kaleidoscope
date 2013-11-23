@@ -91,12 +91,20 @@ a {
     background: #000;
     background: rgba(0, 0, 0, .6);
     padding: 20px;
+    min-height: 100px;
 }
 .track-info img {
     float: left;
     margin: 0 20px 20px 0;
     width: 100px;
     
+}
+.outlink {
+    margin: 10px;
+    display: block;
+    text-align: right;
+    color: #fff;
+    font-size: 10px;
 }
 .kMessages {
   width: 300px;

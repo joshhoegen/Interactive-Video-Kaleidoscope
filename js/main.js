@@ -14,6 +14,7 @@ $(document).ready(function () {
 	buttonPlay = $('input[name=play]'),
 	buttonPause = $('input[name=pause]'),
 	buttonNext = $('input[name=next]'),
+	buttonRandom = $('input[name=random]'),
 	buttonFullscreen = $('input[name=fullscreen]'),
 	canvasActive = 8,
 	container = $('#sckscope'),
@@ -33,8 +34,17 @@ $(document).ready(function () {
 		  'https://soundcloud.com/byutifu/sets/end-of-summer-love',
 		  'https://soundcloud.com/griz/smash-the-funk-forthcoming',
 		  'https://soundcloud.com/byutifu/sets/psychedelic-dub-n-roll',
-		  'https://soundcloud.com/glitchhop/kontrol-freqz-by-krossbow'],
-	defaultTrackRandom = function() { return defaultTracks[Math.floor(Math.random()*defaultTracks.length)]; },
+		  'https://soundcloud.com/glitchhop/kontrol-freqz-by-krossbow',
+		  'https://soundcloud.com/trapmusic/sky-hands-by-glockwize',
+		  'https://soundcloud.com/skeewiff/skeewiff-theme-from-dave-allen',
+		  'https://soundcloud.com/easy-star-records/ticklah-ft-tamar-kali-want-not'],
+	defaultTrackRandom = function(str) {
+	    var defaults = defaultTracks;
+	    if (str) {
+		delete defaults[str];
+	    }
+	    return defaults[Math.floor(Math.random()*defaults.length)];
+	},
 	defaultUrl = function (name) {
 	    return decodeURIComponent((new RegExp('[?|&]' + name + '=' + '([^&;]+?)(&|#|;|$)').exec(location.search)||[,""])[1].replace(/\+/g, '%20'))||null;
 	},
@@ -80,7 +90,10 @@ $(document).ready(function () {
             //http://stackoverflow.com/questions/4020910/html5-multiple-canvas-on-a-single-page
 	    images.attr('src', src);
 	    if(audioActive.indexOf('blob:http') === -1 && typeof audioCache[audioActive] == 'object' && audioCache[audioActive].audioDuration > 20){
-                imageRefresh = new Timer(function () {
+                if (typeof imageRefresh === 'object') {
+		    imageRefresh.pause();
+		}
+		imageRefresh = new Timer(function () {
                     prepPage(src);
 		    addNewImages(src, size, max);
                 }, parseInt(audioCache[audioActive].audioDuration/4)*1000);
@@ -99,16 +112,17 @@ $(document).ready(function () {
 	    audioTag[0].play();
 	    visualizeAudio(audioActive);
 	    setLoadingMessage('Loading track from SoundCloud...');
+	    if (nextTrack) {
+		buttonNext.show();
+	    }
 	    $('.track-info').html('<img src="'+audioCache[url].image+'" alt="Original SoundCloud Image" /><h3>' +
 		track.user.username + '</h3><p><strong>' + track.title + '</strong> | ' +
 		track.description + ' | <a href="' + track.permalink_url + '" target="_blank">Open on SoundCloud</a></p>');
 	    audioTag.on('ended', function(){
 		if (nextTrack) {
-		    buttonNext.show();
 		    playTrack(nextTrack.url, nextTrack.track);
 		} else {
 		    buttonNext.hide();
-		    imageRefresh.pause();
 		    //getSoundCloud(random);
 		}
 	    });
@@ -269,9 +283,6 @@ $(document).ready(function () {
 	prepPage = function (src) {
 	    src = src || '';
 	    var canvas, canvasAll = $(), canvasString, image;
-	    if (imageRefresh) {
-		imageRefresh.pause();
-	    }
 	    image = $('<img class="body-kscope img" height="'+scopeSize+'" width="'+scopeSize+'" alt="kaleidoscope" src="'+src+'" style="position: absolute; left: -9999px; margin: 0px; padding: 0px" />');
 	    if (src == '') {
                 canvasAll = canvasAll.add(image);
@@ -327,7 +338,6 @@ $(document).ready(function () {
     $(window).keyup(function(e) {
 	if (e.keyCode == 27) {
 	    buttonFullscreen.click();
-	    console.log('whu');
 	}
     });
     
@@ -345,9 +355,8 @@ $(document).ready(function () {
     }).hide();
     buttonPlay.on('click', function (e) {
         var val = $('input[name=scUrl]').val().replace("http://", "https://");
-	// toggle. make 1 button.
-	//buttonPlay.hide();
-        //buttonPause.show();
+	window.history.pushState({}, "Byutifu Presents: SCkscope! by Joshua Hoegen", '/?song='+val);
+	buttonNext.hide();
 	if (!audioTag[0].paused) {
 	    audioTag[0].pause();
 	}
@@ -363,9 +372,19 @@ $(document).ready(function () {
 	    getSoundCloud(val);
 	}
     });
+    buttonRandom.on('click', function () {
+	var track = $('input[name=scUrl]'),
+	    trackVal = track.val();
+	track.val(defaultTrackRandom(trackVal));
+	setTimeout(function (){
+	    audioTag.stop();
+	    buttonPlay.click();
+	}, 1000);
+    });
     if (video.length) {
 	prepVideo();
     } else {
+	audioTag[0].volume = 0.95;
 	if (defaultTrack) {
 	    $('input[name=scUrl]').val(defaultTrack);
 	} else {
