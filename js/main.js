@@ -14,12 +14,15 @@ $(document).ready(function () {
 	buttonPlay = $('input[name=play]'),
 	buttonPause = $('input[name=pause]'),
 	buttonNext = $('input[name=next]'),
+	buttonRandom = $('input[name=random]'),
 	buttonFullscreen = $('input[name=fullscreen]'),
 	canvasActive = 8,
 	container = $('#sckscope'),
 	imageRefresh,
 	images = $('#sckscope img'),
 	canvases = $('#sckscope canvas'),
+	isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1,
+	isIE = navigator.userAgent.toLowerCase().indexOf('microsoft') > -1,
 	kscope,
 	limit = 250,
 	mediaStream,
@@ -33,12 +36,21 @@ $(document).ready(function () {
 		  'https://soundcloud.com/byutifu/sets/end-of-summer-love',
 		  'https://soundcloud.com/griz/smash-the-funk-forthcoming',
 		  'https://soundcloud.com/byutifu/sets/psychedelic-dub-n-roll',
-		  'https://soundcloud.com/glitchhop/kontrol-freqz-by-krossbow'],
-	defaultTrackRandom = function() { return defaultTracks[Math.floor(Math.random()*defaultTracks.length)]; },
-	defaultUrl = function(){
-	    var results = new RegExp('[\\?&]scUrl=([^&#]*)').exec(window.location.href);
-	    return results ? results[1] : 0;
+		  'https://soundcloud.com/glitchhop/kontrol-freqz-by-krossbow',
+		  'https://soundcloud.com/trapmusic/sky-hands-by-glockwize',
+		  'https://soundcloud.com/skeewiff/skeewiff-theme-from-dave-allen',
+		  'https://soundcloud.com/easy-star-records/ticklah-ft-tamar-kali-want-not'],
+	defaultTrackRandom = function(str) {
+	    var defaults = defaultTracks;
+	    if (str) {
+		delete defaults[str];
+	    }
+	    return defaults[Math.floor(Math.random()*defaults.length)];
 	},
+	defaultUrl = function (name) {
+	    return decodeURIComponent((new RegExp('[?|&]' + name + '=' + '([^&;]+?)(&|#|;|$)').exec(location.search)||[,""])[1].replace(/\+/g, '%20'))||null;
+	},
+	defaultTrack = defaultUrl('song');
 	Timer = function (callback, delay) {
             var timerId, start, remaining = delay;
             this.pause = function () {
@@ -60,14 +72,11 @@ $(document).ready(function () {
         },
         visualizeAudio = function (audioActive) {
 	    var ch = new Uint8Array(vac[audioActive].ch.analyser.frequencyBinCount),
-		average, x, y, count = 0;
-	    
+		average, x, y;
             vac[audioActive].javascriptNode.onaudioprocess = function (e) {
-		count++;
                 vac[audioActive].ch.analyser.getByteFrequencyData(ch);
                 average = vac[audioActive].getAverageVolume(ch);
-                x = x < (limit/2.5)+20 ? average+20 : (average * 2)+100;
-		//x = x < scopeSize ? x - 60 : scopeSize;
+                x = x < (limit/2.5)+20 ? average+20 : (average * 2)+100; //x = x < scopeSize ? x - 60 : scopeSize;
 		y = x; // if you want to split channels, use analyser2
                 move(x, y);
             }
@@ -80,7 +89,10 @@ $(document).ready(function () {
             //http://stackoverflow.com/questions/4020910/html5-multiple-canvas-on-a-single-page
 	    images.attr('src', src);
 	    if(audioActive.indexOf('blob:http') === -1 && typeof audioCache[audioActive] == 'object' && audioCache[audioActive].audioDuration > 20){
-                imageRefresh = new Timer(function () {
+                if (typeof imageRefresh === 'object') {
+		    imageRefresh.pause();
+		}
+		imageRefresh = new Timer(function () {
                     prepPage(src);
 		    addNewImages(src, size, max);
                 }, parseInt(audioCache[audioActive].audioDuration/4)*1000);
@@ -96,19 +108,36 @@ $(document).ready(function () {
 	    addNewImages(audioCache[url].image, scopeSize, canvasActive);
 	    audioTag.attr('src', audioCache[url].stream);
 	    vac[url] = new VisualAudioContext(context, track.stream, false, source);
-	    audioTag[0].play();
-	    visualizeAudio(audioActive);
+	    if (isFirefox || isIE) {
+		soundManager.destroySound('flashAudio');
+		soundManager.createSound({
+		    id: 'flashAudio',
+		    url: audioCache[url].stream,
+		  }).play({
+		    whileplaying: function() {
+			average = this.peakData.left;
+			x = average < (limit/2) ? average * (limit+75) : (average * (limit+200));
+			y = x; // if you want to split channels, use analyser2
+			move(x, y);
+		    }
+		  });
+    	    } else {
+		audioTag[0].play();
+		visualizeAudio(audioActive);
+		buttonFullscreen.show();
+	    }
 	    setLoadingMessage('Loading track from SoundCloud...');
+	    if (nextTrack) {
+		buttonNext.show();
+	    }
 	    $('.track-info').html('<img src="'+audioCache[url].image+'" alt="Original SoundCloud Image" /><h3>' +
 		track.user.username + '</h3><p><strong>' + track.title + '</strong> | ' +
 		track.description + ' | <a href="' + track.permalink_url + '" target="_blank">Open on SoundCloud</a></p>');
 	    audioTag.on('ended', function(){
 		if (nextTrack) {
-		    buttonNext.show();
 		    playTrack(nextTrack.url, nextTrack.track);
 		} else {
 		    buttonNext.hide();
-		    imageRefresh.pause();
 		    //getSoundCloud(random);
 		}
 	    });
@@ -221,7 +250,7 @@ $(document).ready(function () {
 			image: preImage.attr('src')
 		    }
 		    container.show();
-		    if (navigator.userAgent.toLowerCase().indexOf('firefox') > -1) {
+		    if (isFirefox) {
 			snapshotFf(video, preCanvas[0], ctx, mediaStream);
 		    } else {
 			snapshot(video, preCanvas[0], ctx, mediaStream);
@@ -269,15 +298,12 @@ $(document).ready(function () {
 	prepPage = function (src) {
 	    src = src || '';
 	    var canvas, canvasAll = $(), canvasString, image;
-	    if (imageRefresh) {
-		imageRefresh.pause();
-	    }
 	    image = $('<img class="body-kscope img" height="'+scopeSize+'" width="'+scopeSize+'" alt="kaleidoscope" src="'+src+'" style="position: absolute; left: -9999px; margin: 0px; padding: 0px" />');
-	    if (src == '') {
+	    //if (src == '') {
                 canvasAll = canvasAll.add(image);
-            } else {
-                image.attr('src', src);
-            }
+            //} else {
+            //    image.attr('src', src);
+            //}
 	    for (i = 0; i < canvasActive; i++) {
 		canvasString = $('<canvas class="kaleidoscope" width="'+scopeSize+'" height="'+scopeSize+'"></canvas>');
 		canvasAll = canvasAll.add(canvasString);
@@ -324,6 +350,12 @@ $(document).ready(function () {
 	}
     });
     
+    $(window).keyup(function(e) {
+	if (e.keyCode == 27) {
+	    buttonFullscreen.click();
+	}
+    });
+    
     buttonFullscreen.on('click', function (e) {
 	fullscreen($(this).data('on'));
     }).data({on: false}).hide();
@@ -338,13 +370,11 @@ $(document).ready(function () {
     }).hide();
     buttonPlay.on('click', function (e) {
         var val = $('input[name=scUrl]').val().replace("http://", "https://");
-	// toggle. make 1 button.
-	//buttonPlay.hide();
-        //buttonPause.show();
+	window.history.pushState({}, "Byutifu Presents: SCkscope! by Joshua Hoegen", '/?song='+val);
+	buttonNext.hide();
 	if (!audioTag[0].paused) {
 	    audioTag[0].pause();
 	}
-	buttonFullscreen.show();
 	container.show();    
 	if (typeof audioCache[val] != 'undefined') {
 	    addNewImages(audioCache[val].image, scopeSize, canvasActive);
@@ -356,10 +386,37 @@ $(document).ready(function () {
 	    getSoundCloud(val);
 	}
     });
+    buttonRandom.on('click', function () {
+	var track = $('input[name=scUrl]'),
+	    trackVal = track.val();
+	track.val(defaultTrackRandom(trackVal));
+	setTimeout(function (){
+	    audioTag.stop();
+	    buttonPlay.click();
+	}, 1000);
+    });
     if (video.length) {
 	prepVideo();
     } else {
-	$('input[name=scUrl]').val(defaultTrackRandom());
+	audioTag[0].volume = 0.95;
+	if (defaultTrack) {
+	    $('input[name=scUrl]').val(defaultTrack);
+	} else {
+	    $('input[name=scUrl]').val(defaultTrackRandom());
+	}
+	if (isFirefox) {
+	    soundManager.setup({
+		url: '/js/soundmanager/swf/'
+	    });
+	    soundManager.flashVersion = 9;
+	    soundManager.useFlashBlock = false;
+	    soundManager.useHighPerformance = true;
+	    soundManager.flashLoadTimeout = 3000;
+	    //soundManager.flashPollingInterval = 40;
+	    soundManager.waitForWindowLoad = true;
+	    soundManager.debugMode = true;
+	    soundManager.flash9Options.usePeakData = true; 
+	}
     }
     container.hide();
     prepPage();
