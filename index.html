@@ -6,6 +6,7 @@
     <link  rel=stylesheet type="text/css" href="css/main.css" />
     <script src="http://connect.soundcloud.com/sdk.js"></script>
     <script src="js/jquery.js"></script>
+    <script src="js/soundmanager/script/soundmanager2.js"></script>
     <script src="js/audio.js"></script>
     <script src="js/kaleidoscope.js"></script>
     <script src="js/main.js"></script>
@@ -46,13 +47,6 @@
         ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
         var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
       })();
-    
-    $(document).ready(function(){
-        if(navigator.userAgent.toLowerCase().indexOf('firefox') > -1){
-            window.location.href = 'http://byutifu.com/live.html';
-            $('span.ff').hide();
-        }
-    });
     </script>
     </body>
 </html>
