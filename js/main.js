@@ -1,12 +1,16 @@
 $(document).ready(function () {
+    $.kScope = [];
     var context = typeof AudioContext !== 'undefined' ?
 	    new AudioContext() :
 	    typeof webkitAudioContext !== 'undefined' ?
-	    new webkitAudioContext() : $('.no-support').show().parents('body').find('#scForm').hide(),
+	    new webkitAudioContext() : function(){
+		$('.no-support').show();
+		return false;
+	    }, //.parents('body').find('#scForm').hide(),
 	ctx,
         vac = {},
 	audioTag = $('audio'),
-	source = audioTag.length ? context.createMediaElementSource(audioTag[0]) : false,
+	source = audioTag.length && context ? context.createMediaElementSource(audioTag[0]) : false,
         audioCache = {},
         audioActive,
 	audioOnDeck,
@@ -50,7 +54,7 @@ $(document).ready(function () {
 	defaultUrl = function (name) {
 	    return decodeURIComponent((new RegExp('[?|&]' + name + '=' + '([^&;]+?)(&|#|;|$)').exec(location.search)||[,""])[1].replace(/\+/g, '%20'))||null;
 	},
-	defaultTrack = defaultUrl('song');
+	defaultTrack = defaultUrl('song'),
 	Timer = function (callback, delay) {
             var timerId, start, remaining = delay;
             this.pause = function () {
@@ -66,8 +70,7 @@ $(document).ready(function () {
         },
         move = function (x, y) {
 	    $.each($.kScope, function(i){
-		kscope = $.kScope[i];
-                drawKaleidoscope(kscope['ctx'], images[0], x, y, scopeSize);
+                drawKaleidoscope(this.ctx, images[0], x, y, scopeSize);
 	    });
         },
         visualizeAudio = function (audioActive) {
@@ -94,20 +97,21 @@ $(document).ready(function () {
 		}
 		imageRefresh = new Timer(function () {
                     prepPage(src);
-		    addNewImages(src, size, max);
+		    //addNewImages(src, size, max);
                 }, parseInt(audioCache[audioActive].audioDuration/4)*1000);
             } 
 	  
         },
-	// This is starting to get MESSY!
 	playTrack = function (url, track) {
 	    var nextTrack = audioCache[audioCache[url].next],
 		random = defaultTrackRandom() == url ? defaultTrackRandom() : defaultTrackRandom();
-	    prepPage(audioCache[url].image);
 	    audioActive = url;
-	    addNewImages(audioCache[url].image, scopeSize, canvasActive);
+	    if (!audioTag.paused) {
+		audioTag.stop();
+	    }
+	    prepPage(audioCache[url].image);
 	    audioTag.attr('src', audioCache[url].stream);
-	    vac[url] = new VisualAudioContext(context, track.stream, false, source);
+	    vac[url] = typeof vac[url] !== 'undefined' ? vac[url] : new VisualAudioContext(context, track.stream, false, source);
 	    if (isFirefox || isIE) {
 		soundManager.destroySound('flashAudio');
 		soundManager.createSound({
@@ -317,11 +321,13 @@ $(document).ready(function () {
 		}
 	    }
 	    container.html(canvasAll);
-	    if (!canvases.length || !images.length) {
-		canvases = $('#sckscope canvas');
-		images = $('#sckscope img');
+	    if (audioActive) {
+		addNewImages(src, scopeSize, canvasActive);
 	    }
+	    canvases = $('#sckscope canvas');
+	    images = $('#sckscope img');
 	},
+	// Uses SoundCloud API/SDK
 	getSoundCloud = function (val) {
 	    SC.initialize({
 		client_id: 'b2d19575a677c201c6d23c39e408927a'
@@ -365,24 +371,19 @@ $(document).ready(function () {
 	buttonPlay.click();
     });
     buttonNext.on('click', function(){
-    	audioTag.stop();
 	playTrack(audioCache[audioCache[audioActive].next].url, audioCache[audioCache[audioActive].next].track);
     }).hide();
     buttonPlay.on('click', function (e) {
         var val = $('input[name=scUrl]').val().replace("http://", "https://");
 	window.history.pushState({}, "Byutifu Presents: SCkscope! by Joshua Hoegen", '/?song='+val);
 	buttonNext.hide();
+	container.show();
 	if (!audioTag[0].paused) {
 	    audioTag[0].pause();
-	}
-	container.show();    
+	}    
 	if (typeof audioCache[val] != 'undefined') {
-	    addNewImages(audioCache[val].image, scopeSize, canvasActive);
-	    //vac[val].playSound(audioCache[val].stream, 0, audioCache[val].audioDuration);
 	    playTrack(audioCache[val].url, audioCache[val].track);
-	    visualizeAudio(audioActive);
 	} else {
-	    // Uses SoundCloud API/SDK
 	    getSoundCloud(val);
 	}
     });
@@ -391,7 +392,6 @@ $(document).ready(function () {
 	    trackVal = track.val();
 	track.val(defaultTrackRandom(trackVal));
 	setTimeout(function (){
-	    audioTag.stop();
 	    buttonPlay.click();
 	}, 1000);
     });
@@ -404,7 +404,7 @@ $(document).ready(function () {
 	} else {
 	    $('input[name=scUrl]').val(defaultTrackRandom());
 	}
-	if (isFirefox) {
+	if (isFirefox || isIE) {
 	    soundManager.setup({
 		url: '/js/soundmanager/swf/'
 	    });
@@ -415,7 +415,8 @@ $(document).ready(function () {
 	    //soundManager.flashPollingInterval = 40;
 	    soundManager.waitForWindowLoad = true;
 	    soundManager.debugMode = true;
-	    soundManager.flash9Options.usePeakData = true; 
+	    soundManager.flash9Options.usePeakData = true;
+	    $('body').addClass('flash');
 	}
     }
     container.hide();

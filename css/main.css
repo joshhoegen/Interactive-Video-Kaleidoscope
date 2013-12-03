@@ -161,20 +161,6 @@ audio {
     z-index: 3;
 }
 
-.audiojs {
-    background: -moz-linear-gradient(center top , #444444 0%, #555555 50%, #444444 51%, #444444 100%) repeat scroll 0 0 #404040;
-    box-shadow: 1px 1px 8px rgba(0, 0, 0, 0.3);
-    font-family: monospace;
-    font-size: 12px;
-    height: 36px;
-    overflow: hidden;
-    position: absolute;
-    right: 5px;
-    top: 5px;
-    width: 460px;
-    z-index: 3;
-}
-
-.audiojs audio {
+body.flash audio {
     display: none;
 }

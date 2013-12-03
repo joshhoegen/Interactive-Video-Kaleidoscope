@@ -14,7 +14,7 @@
 
 <body>
     <div class="wrapper">
-        <img class="logo" src="image/jh-logo-80.png" alt="Josh Hoegen" /><h1>A Byutifu SCkscope!</h1>
+        <a href="/" title="home"><img class="logo" src="image/jh-logo-80.png" alt="Josh Hoegen" /></a><h1>A Byutifu SCkscope!</h1>
         <!--https://soundcloud.com/feedme/love-is-all-i-got-->
         <form id="scForm">Paste a <a href="http://soundcloud.com/byutifu" target="_blank">SoundCloud</a> track URL
             <input type="text" name="scUrl" value="https://soundcloud.com/trapmusic/thump-by-drezo-subset-remix"/>
@@ -28,6 +28,10 @@
         <audio controls="true"></audio>
         <div id="sckscope"></div>
         <div class="track-info"></div>
+        <div class="info">This toy will put a SoundCloud track into a kaleidoscope,
+        moving the track's image to its accompanying music.<br/>
+        Works best in Chrome. Some features and controls are not available in Firefox.<br/><br/>
+        -Josh</div>
         <a href="http://soundcloud.com/byutifu" class="outlink" target="_blank">Listen to Byutifu on SoundCloud!</a>
         <div class="no-support">
             It looks like your browser doesn't support <a href="https://www.google.com/search?q=audiocontext">AudioContext</a>. Try <a href="https://www.google.com/chrome">Google Chrome</a> or <a href="http://www.mozilla.org/en-US/firefox/new/" target="_blank">Firefox</a>.
@@ -41,6 +45,7 @@
       _gaq.push(['_setAccount', 'UA-45544224-2']);
       _gaq.push(['_setDomainName', 'byutifu.com']);
       _gaq.push(['_trackPageview']);
+      setTimeout("_gaq.push(['_trackEvent', '90_seconds', 'read'])",90000);
     
       (function() {
         var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
