@@ -1,6 +1,3 @@
-if ( ! window.console ) console = { log: function(){} };
-$.kScope = [];
-
 drawKaleidoscope = function (ctx, img, imgX, imgY, mask) {
   try {
     var maskSide = !mask ? 300 : mask;
@@ -103,19 +100,3 @@ drawKaleidoscope = function (ctx, img, imgX, imgY, mask) {
     bufferContext.clearRect(0, 0, 300, 300);
   }
 }
-
-$.KSC = {AudioCache: {}, Loaded: ''};
-$(document).ready(function () {
-  var defaultUrl = function(name){
-          var results = new RegExp('[\\?&]' + name + '=([^&#]*)').exec(window.location.href);
-          return results ? results[1] : 0;
-      },
-      scUrl = defaultUrl('scUrl');
-      
-  if (scUrl !== 0) {
-    $('input[name=urlSoundCloud]').val(scUrl);
-    setTimeout(function(){
-      $('input[name=sc-submit]').click();
-    }, 2000);
-  }
-});
