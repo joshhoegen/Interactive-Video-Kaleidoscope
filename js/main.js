@@ -1,16 +1,14 @@
 $(document).ready(function () {
-    $.kScope = [];
+    var kScope = [];
     var context = typeof AudioContext !== 'undefined' ?
 	    new AudioContext() :
 	    typeof webkitAudioContext !== 'undefined' ?
-	    new webkitAudioContext() : function(){
-		$('.no-support').show();
-		return false;
-	    }, //.parents('body').find('#scForm').hide(),
+	    new webkitAudioContext() :
+	    false, //.parents('body').find('#scForm').hide(),
 	ctx,
-        vac = {},
+	vac = {},
 	audioTag = $('audio'),
-	source = audioTag.length && context ? context.createMediaElementSource(audioTag[0]) : false,
+	source = audioTag.length && typeof context.createMediaElementSource === 'function' ? context.createMediaElementSource(audioTag[0]) : false,
         audioCache = {},
         audioActive,
 	audioOnDeck,
@@ -69,7 +67,7 @@ $(document).ready(function () {
             this.resume();
         },
         move = function (x, y) {
-	    $.each($.kScope, function(i){
+	    $.each(kScope, function(i){
                 drawKaleidoscope(this.ctx, images[0], x, y, scopeSize);
 	    });
         },
@@ -106,7 +104,7 @@ $(document).ready(function () {
 	    var nextTrack = audioCache[audioCache[url].next],
 		random = defaultTrackRandom() == url ? defaultTrackRandom() : defaultTrackRandom();
 	    audioActive = url;
-	    if (!audioTag.paused) {
+	    if (!audioTag[0].paused) {
 		audioTag.stop();
 	    }
 	    prepPage(audioCache[url].image);
@@ -311,7 +309,7 @@ $(document).ready(function () {
 	    for (i = 0; i < canvasActive; i++) {
 		canvasString = $('<canvas class="kaleidoscope" width="'+scopeSize+'" height="'+scopeSize+'"></canvas>');
 		canvasAll = canvasAll.add(canvasString);
-		$.kScope[i] = {
+		kScope[i] = {
 		    img: image,
 		    height: scopeSize,
 		    width: scopeSize,
@@ -377,10 +375,7 @@ $(document).ready(function () {
         var val = $('input[name=scUrl]').val().replace("http://", "https://");
 	window.history.pushState({}, "Byutifu Presents: SCkscope! by Joshua Hoegen", '/?song='+val);
 	buttonNext.hide();
-	container.show();
-	if (!audioTag[0].paused) {
-	    audioTag[0].pause();
-	}    
+	container.show();    
 	if (typeof audioCache[val] != 'undefined') {
 	    playTrack(audioCache[val].url, audioCache[val].track);
 	} else {
@@ -397,6 +392,9 @@ $(document).ready(function () {
     });
     if (video.length) {
 	prepVideo();
+    } else if (!context) {
+	$('.no-support').show();
+	$('#scForm, audio').hide();
     } else {
 	audioTag[0].volume = 0.95;
 	if (defaultTrack) {
