@@ -1,0 +1,23 @@
+{
+  "name": "react-backbone-browserify",
+  "version": "0.0.0",
+  "authors": [
+    "andgrankin <andgrankin@gmail.com>"
+  ],
+  "description": "Project structure for react",
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "www/components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "jquery": "~2.0.3",
+    "react": "~0.8.0",
+    "backbone": "~1.1.0",
+    "underscore": "~1.5.2"
+  }
+}

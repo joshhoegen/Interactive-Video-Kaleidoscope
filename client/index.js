@@ -1,1 +1,0 @@
-alert('NEW USCO{PE');

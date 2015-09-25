@@ -1,37 +1,28 @@
 {
-  "name": "uscope_backbone-react",
-  "version": "2.0.0",
-  "description": "A new version of the uscope without dom manipulation",
-  "main": "index.js",
-  "directories": {
-    "test": "test"
-  },
+  "name": "react-backbone-browserify",
+  "version": "0.0.0",
+  "description": "React, backbone, browserify, grunt",
+  "main": "www/index.html",
   "scripts": {
-    "test": "test"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "Josh Hoegen",
+  "author": "Grankin Andrey",
   "license": "ISC",
   "devDependencies": {
-    "browserify": "^11.1.0",
-    "browserify-shim": "^3.8.10",
-    "chai": "^3.2.0",
-    "gulp": "^3.9.0",
-    "gulp-autoprefixer": "^3.0.1",
-    "gulp-browserify": "^0.5.1",
-    "gulp-jshint": "^1.11.2",
-    "gulp-less": "^3.0.3",
-    "gulp-minify-css": "^1.2.1",
-    "gulp-mocha-phantomjs": "^0.10.1",
-    "gulp-rename": "^1.2.2",
-    "gulp-uglify": "^1.4.1",
-    "mocha": "^2.3.2"
+    "grunt-react": "",
+    "grunt-browserify": "",
+    "grunt-contrib-clean": "",
+    "grunt": "",
+    "grunt-contrib-watch": "",
+    "reactify": "",
+    "node-jsx": "",
+    "underscore": ""
   },
-  "browserify-shim": {
-    "jquery": "$"
-  },
-  "browserify": {
-    "transform": [
-      "browserify-shim"
-    ]
+  "dependencies": {
+    "react.backbone": "^0.6.0",
+    "backbone": "^1.2.3",
+    "react": "^0.13.3",
+    "react-tools": "~0.8.0",
+    "jquery": ""
   }
 }

@@ -1,0 +1,30 @@
+[
+    {
+        "id": 4,
+        "uid": 4,
+        "username": "Dan",
+        "avatar": "https://media.licdn.com/mpr/mpr/shrinknp_400_400/p/4/000/1b3/105/3b328bd.jpg",
+        "likeCount": 90003
+    },
+    {
+        "id": 1,
+        "uid": 1,
+        "username": "Beavis",
+        "avatar": "http://www.cs.dartmouth.edu/~rockmore/rockmoreb.gif",
+        "likeCount": 90000
+    },
+    {
+        "id": 2,
+        "uid": 2,
+        "username": "Butt-Head",
+        "avatar": "https://pbs.twimg.com/profile_images/2151989668/Beavis_-_butt-head_400x400.jpg",
+        "likeCount": 90000
+    },
+    {
+        "id": 3,
+        "uid": 3,
+        "username": "Josh",
+        "avatar": "https://media.licdn.com/mpr/mpr/shrinknp_400_400/p/5/005/009/0c3/0df54a5.jpg",
+        "likeCount": 90001
+    }
+]
