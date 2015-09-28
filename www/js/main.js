@@ -9,18 +9,23 @@ var UsersIndexScreen = require('./users/component');
         routes: {
             "": "index",
             "users": "users",
-            "users/:id": "user"
+            "users/:id": "user",
+            "kscope": "kscope"
         },
-        users: function () {
+        kscope: function() {
+            var Kscope = require('./kaleidoscope');
+            Kscope.init();
+        },
+        users: function() {
             var UsersIndexView = require('./users');
             UsersIndexView.list();
         },
-        user: function (id) {
+        user: function(id) {
             var UsersIndexView = require('./users');
             UsersIndexView.show(id);
             
         },
-        index: function () {
+        index: function() {
             var movies = require('./collections/movies');
             var List = require('./component/List');
             React.render(<List movies={movies} />, document.getElementById('container'));

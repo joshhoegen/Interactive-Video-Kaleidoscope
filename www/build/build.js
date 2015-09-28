@@ -1896,1555 +1896,308 @@
 }));
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"jquery":4,"underscore":2}],2:[function(require,module,exports){
-//     Underscore.js 1.8.3
-//     http://underscorejs.org
-//     (c) 2009-2015 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
-//     Underscore may be freely distributed under the MIT license.
+},{"jquery":4,"underscore":189}],2:[function(require,module,exports){
+// Copyright Joyent, Inc. and other Node contributors.
+//
+// Permission is hereby granted, free of charge, to any person obtaining a
+// copy of this software and associated documentation files (the
+// "Software"), to deal in the Software without restriction, including
+// without limitation the rights to use, copy, modify, merge, publish,
+// distribute, sublicense, and/or sell copies of the Software, and to permit
+// persons to whom the Software is furnished to do so, subject to the
+// following conditions:
+//
+// The above copyright notice and this permission notice shall be included
+// in all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+// MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
+// NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
+// DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
+// OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
+// USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-(function() {
+function EventEmitter() {
+  this._events = this._events || {};
+  this._maxListeners = this._maxListeners || undefined;
+}
+module.exports = EventEmitter;
 
-  // Baseline setup
-  // --------------
+// Backwards-compat with node 0.10.x
+EventEmitter.EventEmitter = EventEmitter;
 
-  // Establish the root object, `window` in the browser, or `exports` on the server.
-  var root = this;
+EventEmitter.prototype._events = undefined;
+EventEmitter.prototype._maxListeners = undefined;
 
-  // Save the previous value of the `_` variable.
-  var previousUnderscore = root._;
+// By default EventEmitters will print a warning if more than 10 listeners are
+// added to it. This is a useful default which helps finding memory leaks.
+EventEmitter.defaultMaxListeners = 10;
 
-  // Save bytes in the minified (but not gzipped) version:
-  var ArrayProto = Array.prototype, ObjProto = Object.prototype, FuncProto = Function.prototype;
+// Obviously not all Emitters should be limited to 10. This function allows
+// that to be increased. Set to zero for unlimited.
+EventEmitter.prototype.setMaxListeners = function(n) {
+  if (!isNumber(n) || n < 0 || isNaN(n))
+    throw TypeError('n must be a positive number');
+  this._maxListeners = n;
+  return this;
+};
 
-  // Create quick reference variables for speed access to core prototypes.
-  var
-    push             = ArrayProto.push,
-    slice            = ArrayProto.slice,
-    toString         = ObjProto.toString,
-    hasOwnProperty   = ObjProto.hasOwnProperty;
+EventEmitter.prototype.emit = function(type) {
+  var er, handler, len, args, i, listeners;
 
-  // All **ECMAScript 5** native function implementations that we hope to use
-  // are declared here.
-  var
-    nativeIsArray      = Array.isArray,
-    nativeKeys         = Object.keys,
-    nativeBind         = FuncProto.bind,
-    nativeCreate       = Object.create;
+  if (!this._events)
+    this._events = {};
 
-  // Naked function reference for surrogate-prototype-swapping.
-  var Ctor = function(){};
-
-  // Create a safe reference to the Underscore object for use below.
-  var _ = function(obj) {
-    if (obj instanceof _) return obj;
-    if (!(this instanceof _)) return new _(obj);
-    this._wrapped = obj;
-  };
-
-  // Export the Underscore object for **Node.js**, with
-  // backwards-compatibility for the old `require()` API. If we're in
-  // the browser, add `_` as a global object.
-  if (typeof exports !== 'undefined') {
-    if (typeof module !== 'undefined' && module.exports) {
-      exports = module.exports = _;
+  // If there is no 'error' event listener then throw.
+  if (type === 'error') {
+    if (!this._events.error ||
+        (isObject(this._events.error) && !this._events.error.length)) {
+      er = arguments[1];
+      if (er instanceof Error) {
+        throw er; // Unhandled 'error' event
+      }
+      throw TypeError('Uncaught, unspecified "error" event.');
     }
-    exports._ = _;
-  } else {
-    root._ = _;
   }
 
-  // Current version.
-  _.VERSION = '1.8.3';
+  handler = this._events[type];
 
-  // Internal function that returns an efficient (for current engines) version
-  // of the passed-in callback, to be repeatedly applied in other Underscore
-  // functions.
-  var optimizeCb = function(func, context, argCount) {
-    if (context === void 0) return func;
-    switch (argCount == null ? 3 : argCount) {
-      case 1: return function(value) {
-        return func.call(context, value);
-      };
-      case 2: return function(value, other) {
-        return func.call(context, value, other);
-      };
-      case 3: return function(value, index, collection) {
-        return func.call(context, value, index, collection);
-      };
-      case 4: return function(accumulator, value, index, collection) {
-        return func.call(context, accumulator, value, index, collection);
-      };
-    }
-    return function() {
-      return func.apply(context, arguments);
-    };
-  };
-
-  // A mostly-internal function to generate callbacks that can be applied
-  // to each element in a collection, returning the desired result — either
-  // identity, an arbitrary callback, a property matcher, or a property accessor.
-  var cb = function(value, context, argCount) {
-    if (value == null) return _.identity;
-    if (_.isFunction(value)) return optimizeCb(value, context, argCount);
-    if (_.isObject(value)) return _.matcher(value);
-    return _.property(value);
-  };
-  _.iteratee = function(value, context) {
-    return cb(value, context, Infinity);
-  };
-
-  // An internal function for creating assigner functions.
-  var createAssigner = function(keysFunc, undefinedOnly) {
-    return function(obj) {
-      var length = arguments.length;
-      if (length < 2 || obj == null) return obj;
-      for (var index = 1; index < length; index++) {
-        var source = arguments[index],
-            keys = keysFunc(source),
-            l = keys.length;
-        for (var i = 0; i < l; i++) {
-          var key = keys[i];
-          if (!undefinedOnly || obj[key] === void 0) obj[key] = source[key];
-        }
-      }
-      return obj;
-    };
-  };
-
-  // An internal function for creating a new object that inherits from another.
-  var baseCreate = function(prototype) {
-    if (!_.isObject(prototype)) return {};
-    if (nativeCreate) return nativeCreate(prototype);
-    Ctor.prototype = prototype;
-    var result = new Ctor;
-    Ctor.prototype = null;
-    return result;
-  };
-
-  var property = function(key) {
-    return function(obj) {
-      return obj == null ? void 0 : obj[key];
-    };
-  };
-
-  // Helper for collection methods to determine whether a collection
-  // should be iterated as an array or as an object
-  // Related: http://people.mozilla.org/~jorendorff/es6-draft.html#sec-tolength
-  // Avoids a very nasty iOS 8 JIT bug on ARM-64. #2094
-  var MAX_ARRAY_INDEX = Math.pow(2, 53) - 1;
-  var getLength = property('length');
-  var isArrayLike = function(collection) {
-    var length = getLength(collection);
-    return typeof length == 'number' && length >= 0 && length <= MAX_ARRAY_INDEX;
-  };
-
-  // Collection Functions
-  // --------------------
-
-  // The cornerstone, an `each` implementation, aka `forEach`.
-  // Handles raw objects in addition to array-likes. Treats all
-  // sparse array-likes as if they were dense.
-  _.each = _.forEach = function(obj, iteratee, context) {
-    iteratee = optimizeCb(iteratee, context);
-    var i, length;
-    if (isArrayLike(obj)) {
-      for (i = 0, length = obj.length; i < length; i++) {
-        iteratee(obj[i], i, obj);
-      }
-    } else {
-      var keys = _.keys(obj);
-      for (i = 0, length = keys.length; i < length; i++) {
-        iteratee(obj[keys[i]], keys[i], obj);
-      }
-    }
-    return obj;
-  };
-
-  // Return the results of applying the iteratee to each element.
-  _.map = _.collect = function(obj, iteratee, context) {
-    iteratee = cb(iteratee, context);
-    var keys = !isArrayLike(obj) && _.keys(obj),
-        length = (keys || obj).length,
-        results = Array(length);
-    for (var index = 0; index < length; index++) {
-      var currentKey = keys ? keys[index] : index;
-      results[index] = iteratee(obj[currentKey], currentKey, obj);
-    }
-    return results;
-  };
-
-  // Create a reducing function iterating left or right.
-  function createReduce(dir) {
-    // Optimized iterator function as using arguments.length
-    // in the main function will deoptimize the, see #1991.
-    function iterator(obj, iteratee, memo, keys, index, length) {
-      for (; index >= 0 && index < length; index += dir) {
-        var currentKey = keys ? keys[index] : index;
-        memo = iteratee(memo, obj[currentKey], currentKey, obj);
-      }
-      return memo;
-    }
-
-    return function(obj, iteratee, memo, context) {
-      iteratee = optimizeCb(iteratee, context, 4);
-      var keys = !isArrayLike(obj) && _.keys(obj),
-          length = (keys || obj).length,
-          index = dir > 0 ? 0 : length - 1;
-      // Determine the initial value if none is provided.
-      if (arguments.length < 3) {
-        memo = obj[keys ? keys[index] : index];
-        index += dir;
-      }
-      return iterator(obj, iteratee, memo, keys, index, length);
-    };
-  }
-
-  // **Reduce** builds up a single result from a list of values, aka `inject`,
-  // or `foldl`.
-  _.reduce = _.foldl = _.inject = createReduce(1);
-
-  // The right-associative version of reduce, also known as `foldr`.
-  _.reduceRight = _.foldr = createReduce(-1);
-
-  // Return the first value which passes a truth test. Aliased as `detect`.
-  _.find = _.detect = function(obj, predicate, context) {
-    var key;
-    if (isArrayLike(obj)) {
-      key = _.findIndex(obj, predicate, context);
-    } else {
-      key = _.findKey(obj, predicate, context);
-    }
-    if (key !== void 0 && key !== -1) return obj[key];
-  };
-
-  // Return all the elements that pass a truth test.
-  // Aliased as `select`.
-  _.filter = _.select = function(obj, predicate, context) {
-    var results = [];
-    predicate = cb(predicate, context);
-    _.each(obj, function(value, index, list) {
-      if (predicate(value, index, list)) results.push(value);
-    });
-    return results;
-  };
-
-  // Return all the elements for which a truth test fails.
-  _.reject = function(obj, predicate, context) {
-    return _.filter(obj, _.negate(cb(predicate)), context);
-  };
-
-  // Determine whether all of the elements match a truth test.
-  // Aliased as `all`.
-  _.every = _.all = function(obj, predicate, context) {
-    predicate = cb(predicate, context);
-    var keys = !isArrayLike(obj) && _.keys(obj),
-        length = (keys || obj).length;
-    for (var index = 0; index < length; index++) {
-      var currentKey = keys ? keys[index] : index;
-      if (!predicate(obj[currentKey], currentKey, obj)) return false;
-    }
-    return true;
-  };
-
-  // Determine if at least one element in the object matches a truth test.
-  // Aliased as `any`.
-  _.some = _.any = function(obj, predicate, context) {
-    predicate = cb(predicate, context);
-    var keys = !isArrayLike(obj) && _.keys(obj),
-        length = (keys || obj).length;
-    for (var index = 0; index < length; index++) {
-      var currentKey = keys ? keys[index] : index;
-      if (predicate(obj[currentKey], currentKey, obj)) return true;
-    }
+  if (isUndefined(handler))
     return false;
-  };
 
-  // Determine if the array or object contains a given item (using `===`).
-  // Aliased as `includes` and `include`.
-  _.contains = _.includes = _.include = function(obj, item, fromIndex, guard) {
-    if (!isArrayLike(obj)) obj = _.values(obj);
-    if (typeof fromIndex != 'number' || guard) fromIndex = 0;
-    return _.indexOf(obj, item, fromIndex) >= 0;
-  };
-
-  // Invoke a method (with arguments) on every item in a collection.
-  _.invoke = function(obj, method) {
-    var args = slice.call(arguments, 2);
-    var isFunc = _.isFunction(method);
-    return _.map(obj, function(value) {
-      var func = isFunc ? method : value[method];
-      return func == null ? func : func.apply(value, args);
-    });
-  };
-
-  // Convenience version of a common use case of `map`: fetching a property.
-  _.pluck = function(obj, key) {
-    return _.map(obj, _.property(key));
-  };
-
-  // Convenience version of a common use case of `filter`: selecting only objects
-  // containing specific `key:value` pairs.
-  _.where = function(obj, attrs) {
-    return _.filter(obj, _.matcher(attrs));
-  };
-
-  // Convenience version of a common use case of `find`: getting the first object
-  // containing specific `key:value` pairs.
-  _.findWhere = function(obj, attrs) {
-    return _.find(obj, _.matcher(attrs));
-  };
-
-  // Return the maximum element (or element-based computation).
-  _.max = function(obj, iteratee, context) {
-    var result = -Infinity, lastComputed = -Infinity,
-        value, computed;
-    if (iteratee == null && obj != null) {
-      obj = isArrayLike(obj) ? obj : _.values(obj);
-      for (var i = 0, length = obj.length; i < length; i++) {
-        value = obj[i];
-        if (value > result) {
-          result = value;
-        }
-      }
-    } else {
-      iteratee = cb(iteratee, context);
-      _.each(obj, function(value, index, list) {
-        computed = iteratee(value, index, list);
-        if (computed > lastComputed || computed === -Infinity && result === -Infinity) {
-          result = value;
-          lastComputed = computed;
-        }
-      });
+  if (isFunction(handler)) {
+    switch (arguments.length) {
+      // fast cases
+      case 1:
+        handler.call(this);
+        break;
+      case 2:
+        handler.call(this, arguments[1]);
+        break;
+      case 3:
+        handler.call(this, arguments[1], arguments[2]);
+        break;
+      // slower
+      default:
+        len = arguments.length;
+        args = new Array(len - 1);
+        for (i = 1; i < len; i++)
+          args[i - 1] = arguments[i];
+        handler.apply(this, args);
     }
-    return result;
-  };
+  } else if (isObject(handler)) {
+    len = arguments.length;
+    args = new Array(len - 1);
+    for (i = 1; i < len; i++)
+      args[i - 1] = arguments[i];
 
-  // Return the minimum element (or element-based computation).
-  _.min = function(obj, iteratee, context) {
-    var result = Infinity, lastComputed = Infinity,
-        value, computed;
-    if (iteratee == null && obj != null) {
-      obj = isArrayLike(obj) ? obj : _.values(obj);
-      for (var i = 0, length = obj.length; i < length; i++) {
-        value = obj[i];
-        if (value < result) {
-          result = value;
-        }
-      }
-    } else {
-      iteratee = cb(iteratee, context);
-      _.each(obj, function(value, index, list) {
-        computed = iteratee(value, index, list);
-        if (computed < lastComputed || computed === Infinity && result === Infinity) {
-          result = value;
-          lastComputed = computed;
-        }
-      });
-    }
-    return result;
-  };
-
-  // Shuffle a collection, using the modern version of the
-  // [Fisher-Yates shuffle](http://en.wikipedia.org/wiki/Fisher–Yates_shuffle).
-  _.shuffle = function(obj) {
-    var set = isArrayLike(obj) ? obj : _.values(obj);
-    var length = set.length;
-    var shuffled = Array(length);
-    for (var index = 0, rand; index < length; index++) {
-      rand = _.random(0, index);
-      if (rand !== index) shuffled[index] = shuffled[rand];
-      shuffled[rand] = set[index];
-    }
-    return shuffled;
-  };
-
-  // Sample **n** random values from a collection.
-  // If **n** is not specified, returns a single random element.
-  // The internal `guard` argument allows it to work with `map`.
-  _.sample = function(obj, n, guard) {
-    if (n == null || guard) {
-      if (!isArrayLike(obj)) obj = _.values(obj);
-      return obj[_.random(obj.length - 1)];
-    }
-    return _.shuffle(obj).slice(0, Math.max(0, n));
-  };
-
-  // Sort the object's values by a criterion produced by an iteratee.
-  _.sortBy = function(obj, iteratee, context) {
-    iteratee = cb(iteratee, context);
-    return _.pluck(_.map(obj, function(value, index, list) {
-      return {
-        value: value,
-        index: index,
-        criteria: iteratee(value, index, list)
-      };
-    }).sort(function(left, right) {
-      var a = left.criteria;
-      var b = right.criteria;
-      if (a !== b) {
-        if (a > b || a === void 0) return 1;
-        if (a < b || b === void 0) return -1;
-      }
-      return left.index - right.index;
-    }), 'value');
-  };
-
-  // An internal function used for aggregate "group by" operations.
-  var group = function(behavior) {
-    return function(obj, iteratee, context) {
-      var result = {};
-      iteratee = cb(iteratee, context);
-      _.each(obj, function(value, index) {
-        var key = iteratee(value, index, obj);
-        behavior(result, value, key);
-      });
-      return result;
-    };
-  };
-
-  // Groups the object's values by a criterion. Pass either a string attribute
-  // to group by, or a function that returns the criterion.
-  _.groupBy = group(function(result, value, key) {
-    if (_.has(result, key)) result[key].push(value); else result[key] = [value];
-  });
-
-  // Indexes the object's values by a criterion, similar to `groupBy`, but for
-  // when you know that your index values will be unique.
-  _.indexBy = group(function(result, value, key) {
-    result[key] = value;
-  });
-
-  // Counts instances of an object that group by a certain criterion. Pass
-  // either a string attribute to count by, or a function that returns the
-  // criterion.
-  _.countBy = group(function(result, value, key) {
-    if (_.has(result, key)) result[key]++; else result[key] = 1;
-  });
-
-  // Safely create a real, live array from anything iterable.
-  _.toArray = function(obj) {
-    if (!obj) return [];
-    if (_.isArray(obj)) return slice.call(obj);
-    if (isArrayLike(obj)) return _.map(obj, _.identity);
-    return _.values(obj);
-  };
-
-  // Return the number of elements in an object.
-  _.size = function(obj) {
-    if (obj == null) return 0;
-    return isArrayLike(obj) ? obj.length : _.keys(obj).length;
-  };
-
-  // Split a collection into two arrays: one whose elements all satisfy the given
-  // predicate, and one whose elements all do not satisfy the predicate.
-  _.partition = function(obj, predicate, context) {
-    predicate = cb(predicate, context);
-    var pass = [], fail = [];
-    _.each(obj, function(value, key, obj) {
-      (predicate(value, key, obj) ? pass : fail).push(value);
-    });
-    return [pass, fail];
-  };
-
-  // Array Functions
-  // ---------------
-
-  // Get the first element of an array. Passing **n** will return the first N
-  // values in the array. Aliased as `head` and `take`. The **guard** check
-  // allows it to work with `_.map`.
-  _.first = _.head = _.take = function(array, n, guard) {
-    if (array == null) return void 0;
-    if (n == null || guard) return array[0];
-    return _.initial(array, array.length - n);
-  };
-
-  // Returns everything but the last entry of the array. Especially useful on
-  // the arguments object. Passing **n** will return all the values in
-  // the array, excluding the last N.
-  _.initial = function(array, n, guard) {
-    return slice.call(array, 0, Math.max(0, array.length - (n == null || guard ? 1 : n)));
-  };
-
-  // Get the last element of an array. Passing **n** will return the last N
-  // values in the array.
-  _.last = function(array, n, guard) {
-    if (array == null) return void 0;
-    if (n == null || guard) return array[array.length - 1];
-    return _.rest(array, Math.max(0, array.length - n));
-  };
-
-  // Returns everything but the first entry of the array. Aliased as `tail` and `drop`.
-  // Especially useful on the arguments object. Passing an **n** will return
-  // the rest N values in the array.
-  _.rest = _.tail = _.drop = function(array, n, guard) {
-    return slice.call(array, n == null || guard ? 1 : n);
-  };
-
-  // Trim out all falsy values from an array.
-  _.compact = function(array) {
-    return _.filter(array, _.identity);
-  };
-
-  // Internal implementation of a recursive `flatten` function.
-  var flatten = function(input, shallow, strict, startIndex) {
-    var output = [], idx = 0;
-    for (var i = startIndex || 0, length = getLength(input); i < length; i++) {
-      var value = input[i];
-      if (isArrayLike(value) && (_.isArray(value) || _.isArguments(value))) {
-        //flatten current level of array or arguments object
-        if (!shallow) value = flatten(value, shallow, strict);
-        var j = 0, len = value.length;
-        output.length += len;
-        while (j < len) {
-          output[idx++] = value[j++];
-        }
-      } else if (!strict) {
-        output[idx++] = value;
-      }
-    }
-    return output;
-  };
-
-  // Flatten out an array, either recursively (by default), or just one level.
-  _.flatten = function(array, shallow) {
-    return flatten(array, shallow, false);
-  };
-
-  // Return a version of the array that does not contain the specified value(s).
-  _.without = function(array) {
-    return _.difference(array, slice.call(arguments, 1));
-  };
-
-  // Produce a duplicate-free version of the array. If the array has already
-  // been sorted, you have the option of using a faster algorithm.
-  // Aliased as `unique`.
-  _.uniq = _.unique = function(array, isSorted, iteratee, context) {
-    if (!_.isBoolean(isSorted)) {
-      context = iteratee;
-      iteratee = isSorted;
-      isSorted = false;
-    }
-    if (iteratee != null) iteratee = cb(iteratee, context);
-    var result = [];
-    var seen = [];
-    for (var i = 0, length = getLength(array); i < length; i++) {
-      var value = array[i],
-          computed = iteratee ? iteratee(value, i, array) : value;
-      if (isSorted) {
-        if (!i || seen !== computed) result.push(value);
-        seen = computed;
-      } else if (iteratee) {
-        if (!_.contains(seen, computed)) {
-          seen.push(computed);
-          result.push(value);
-        }
-      } else if (!_.contains(result, value)) {
-        result.push(value);
-      }
-    }
-    return result;
-  };
-
-  // Produce an array that contains the union: each distinct element from all of
-  // the passed-in arrays.
-  _.union = function() {
-    return _.uniq(flatten(arguments, true, true));
-  };
-
-  // Produce an array that contains every item shared between all the
-  // passed-in arrays.
-  _.intersection = function(array) {
-    var result = [];
-    var argsLength = arguments.length;
-    for (var i = 0, length = getLength(array); i < length; i++) {
-      var item = array[i];
-      if (_.contains(result, item)) continue;
-      for (var j = 1; j < argsLength; j++) {
-        if (!_.contains(arguments[j], item)) break;
-      }
-      if (j === argsLength) result.push(item);
-    }
-    return result;
-  };
-
-  // Take the difference between one array and a number of other arrays.
-  // Only the elements present in just the first array will remain.
-  _.difference = function(array) {
-    var rest = flatten(arguments, true, true, 1);
-    return _.filter(array, function(value){
-      return !_.contains(rest, value);
-    });
-  };
-
-  // Zip together multiple lists into a single array -- elements that share
-  // an index go together.
-  _.zip = function() {
-    return _.unzip(arguments);
-  };
-
-  // Complement of _.zip. Unzip accepts an array of arrays and groups
-  // each array's elements on shared indices
-  _.unzip = function(array) {
-    var length = array && _.max(array, getLength).length || 0;
-    var result = Array(length);
-
-    for (var index = 0; index < length; index++) {
-      result[index] = _.pluck(array, index);
-    }
-    return result;
-  };
-
-  // Converts lists into objects. Pass either a single array of `[key, value]`
-  // pairs, or two parallel arrays of the same length -- one of keys, and one of
-  // the corresponding values.
-  _.object = function(list, values) {
-    var result = {};
-    for (var i = 0, length = getLength(list); i < length; i++) {
-      if (values) {
-        result[list[i]] = values[i];
-      } else {
-        result[list[i][0]] = list[i][1];
-      }
-    }
-    return result;
-  };
-
-  // Generator function to create the findIndex and findLastIndex functions
-  function createPredicateIndexFinder(dir) {
-    return function(array, predicate, context) {
-      predicate = cb(predicate, context);
-      var length = getLength(array);
-      var index = dir > 0 ? 0 : length - 1;
-      for (; index >= 0 && index < length; index += dir) {
-        if (predicate(array[index], index, array)) return index;
-      }
-      return -1;
-    };
+    listeners = handler.slice();
+    len = listeners.length;
+    for (i = 0; i < len; i++)
+      listeners[i].apply(this, args);
   }
 
-  // Returns the first index on an array-like that passes a predicate test
-  _.findIndex = createPredicateIndexFinder(1);
-  _.findLastIndex = createPredicateIndexFinder(-1);
+  return true;
+};
 
-  // Use a comparator function to figure out the smallest index at which
-  // an object should be inserted so as to maintain order. Uses binary search.
-  _.sortedIndex = function(array, obj, iteratee, context) {
-    iteratee = cb(iteratee, context, 1);
-    var value = iteratee(obj);
-    var low = 0, high = getLength(array);
-    while (low < high) {
-      var mid = Math.floor((low + high) / 2);
-      if (iteratee(array[mid]) < value) low = mid + 1; else high = mid;
-    }
-    return low;
-  };
+EventEmitter.prototype.addListener = function(type, listener) {
+  var m;
 
-  // Generator function to create the indexOf and lastIndexOf functions
-  function createIndexFinder(dir, predicateFind, sortedIndex) {
-    return function(array, item, idx) {
-      var i = 0, length = getLength(array);
-      if (typeof idx == 'number') {
-        if (dir > 0) {
-            i = idx >= 0 ? idx : Math.max(idx + length, i);
-        } else {
-            length = idx >= 0 ? Math.min(idx + 1, length) : idx + length + 1;
-        }
-      } else if (sortedIndex && idx && length) {
-        idx = sortedIndex(array, item);
-        return array[idx] === item ? idx : -1;
-      }
-      if (item !== item) {
-        idx = predicateFind(slice.call(array, i, length), _.isNaN);
-        return idx >= 0 ? idx + i : -1;
-      }
-      for (idx = dir > 0 ? i : length - 1; idx >= 0 && idx < length; idx += dir) {
-        if (array[idx] === item) return idx;
-      }
-      return -1;
-    };
-  }
+  if (!isFunction(listener))
+    throw TypeError('listener must be a function');
 
-  // Return the position of the first occurrence of an item in an array,
-  // or -1 if the item is not included in the array.
-  // If the array is large and already in sort order, pass `true`
-  // for **isSorted** to use binary search.
-  _.indexOf = createIndexFinder(1, _.findIndex, _.sortedIndex);
-  _.lastIndexOf = createIndexFinder(-1, _.findLastIndex);
+  if (!this._events)
+    this._events = {};
 
-  // Generate an integer Array containing an arithmetic progression. A port of
-  // the native Python `range()` function. See
-  // [the Python documentation](http://docs.python.org/library/functions.html#range).
-  _.range = function(start, stop, step) {
-    if (stop == null) {
-      stop = start || 0;
-      start = 0;
-    }
-    step = step || 1;
+  // To avoid recursion in the case that type === "newListener"! Before
+  // adding it to the listeners, first emit "newListener".
+  if (this._events.newListener)
+    this.emit('newListener', type,
+              isFunction(listener.listener) ?
+              listener.listener : listener);
 
-    var length = Math.max(Math.ceil((stop - start) / step), 0);
-    var range = Array(length);
+  if (!this._events[type])
+    // Optimize the case of one listener. Don't need the extra array object.
+    this._events[type] = listener;
+  else if (isObject(this._events[type]))
+    // If we've already got an array, just append.
+    this._events[type].push(listener);
+  else
+    // Adding the second element, need to change to array.
+    this._events[type] = [this._events[type], listener];
 
-    for (var idx = 0; idx < length; idx++, start += step) {
-      range[idx] = start;
+  // Check for listener leak
+  if (isObject(this._events[type]) && !this._events[type].warned) {
+    var m;
+    if (!isUndefined(this._maxListeners)) {
+      m = this._maxListeners;
+    } else {
+      m = EventEmitter.defaultMaxListeners;
     }
 
-    return range;
-  };
-
-  // Function (ahem) Functions
-  // ------------------
-
-  // Determines whether to execute a function as a constructor
-  // or a normal function with the provided arguments
-  var executeBound = function(sourceFunc, boundFunc, context, callingContext, args) {
-    if (!(callingContext instanceof boundFunc)) return sourceFunc.apply(context, args);
-    var self = baseCreate(sourceFunc.prototype);
-    var result = sourceFunc.apply(self, args);
-    if (_.isObject(result)) return result;
-    return self;
-  };
-
-  // Create a function bound to a given object (assigning `this`, and arguments,
-  // optionally). Delegates to **ECMAScript 5**'s native `Function.bind` if
-  // available.
-  _.bind = function(func, context) {
-    if (nativeBind && func.bind === nativeBind) return nativeBind.apply(func, slice.call(arguments, 1));
-    if (!_.isFunction(func)) throw new TypeError('Bind must be called on a function');
-    var args = slice.call(arguments, 2);
-    var bound = function() {
-      return executeBound(func, bound, context, this, args.concat(slice.call(arguments)));
-    };
-    return bound;
-  };
-
-  // Partially apply a function by creating a version that has had some of its
-  // arguments pre-filled, without changing its dynamic `this` context. _ acts
-  // as a placeholder, allowing any combination of arguments to be pre-filled.
-  _.partial = function(func) {
-    var boundArgs = slice.call(arguments, 1);
-    var bound = function() {
-      var position = 0, length = boundArgs.length;
-      var args = Array(length);
-      for (var i = 0; i < length; i++) {
-        args[i] = boundArgs[i] === _ ? arguments[position++] : boundArgs[i];
-      }
-      while (position < arguments.length) args.push(arguments[position++]);
-      return executeBound(func, bound, this, this, args);
-    };
-    return bound;
-  };
-
-  // Bind a number of an object's methods to that object. Remaining arguments
-  // are the method names to be bound. Useful for ensuring that all callbacks
-  // defined on an object belong to it.
-  _.bindAll = function(obj) {
-    var i, length = arguments.length, key;
-    if (length <= 1) throw new Error('bindAll must be passed function names');
-    for (i = 1; i < length; i++) {
-      key = arguments[i];
-      obj[key] = _.bind(obj[key], obj);
-    }
-    return obj;
-  };
-
-  // Memoize an expensive function by storing its results.
-  _.memoize = function(func, hasher) {
-    var memoize = function(key) {
-      var cache = memoize.cache;
-      var address = '' + (hasher ? hasher.apply(this, arguments) : key);
-      if (!_.has(cache, address)) cache[address] = func.apply(this, arguments);
-      return cache[address];
-    };
-    memoize.cache = {};
-    return memoize;
-  };
-
-  // Delays a function for the given number of milliseconds, and then calls
-  // it with the arguments supplied.
-  _.delay = function(func, wait) {
-    var args = slice.call(arguments, 2);
-    return setTimeout(function(){
-      return func.apply(null, args);
-    }, wait);
-  };
-
-  // Defers a function, scheduling it to run after the current call stack has
-  // cleared.
-  _.defer = _.partial(_.delay, _, 1);
-
-  // Returns a function, that, when invoked, will only be triggered at most once
-  // during a given window of time. Normally, the throttled function will run
-  // as much as it can, without ever going more than once per `wait` duration;
-  // but if you'd like to disable the execution on the leading edge, pass
-  // `{leading: false}`. To disable execution on the trailing edge, ditto.
-  _.throttle = function(func, wait, options) {
-    var context, args, result;
-    var timeout = null;
-    var previous = 0;
-    if (!options) options = {};
-    var later = function() {
-      previous = options.leading === false ? 0 : _.now();
-      timeout = null;
-      result = func.apply(context, args);
-      if (!timeout) context = args = null;
-    };
-    return function() {
-      var now = _.now();
-      if (!previous && options.leading === false) previous = now;
-      var remaining = wait - (now - previous);
-      context = this;
-      args = arguments;
-      if (remaining <= 0 || remaining > wait) {
-        if (timeout) {
-          clearTimeout(timeout);
-          timeout = null;
-        }
-        previous = now;
-        result = func.apply(context, args);
-        if (!timeout) context = args = null;
-      } else if (!timeout && options.trailing !== false) {
-        timeout = setTimeout(later, remaining);
-      }
-      return result;
-    };
-  };
-
-  // Returns a function, that, as long as it continues to be invoked, will not
-  // be triggered. The function will be called after it stops being called for
-  // N milliseconds. If `immediate` is passed, trigger the function on the
-  // leading edge, instead of the trailing.
-  _.debounce = function(func, wait, immediate) {
-    var timeout, args, context, timestamp, result;
-
-    var later = function() {
-      var last = _.now() - timestamp;
-
-      if (last < wait && last >= 0) {
-        timeout = setTimeout(later, wait - last);
-      } else {
-        timeout = null;
-        if (!immediate) {
-          result = func.apply(context, args);
-          if (!timeout) context = args = null;
-        }
-      }
-    };
-
-    return function() {
-      context = this;
-      args = arguments;
-      timestamp = _.now();
-      var callNow = immediate && !timeout;
-      if (!timeout) timeout = setTimeout(later, wait);
-      if (callNow) {
-        result = func.apply(context, args);
-        context = args = null;
-      }
-
-      return result;
-    };
-  };
-
-  // Returns the first function passed as an argument to the second,
-  // allowing you to adjust arguments, run code before and after, and
-  // conditionally execute the original function.
-  _.wrap = function(func, wrapper) {
-    return _.partial(wrapper, func);
-  };
-
-  // Returns a negated version of the passed-in predicate.
-  _.negate = function(predicate) {
-    return function() {
-      return !predicate.apply(this, arguments);
-    };
-  };
-
-  // Returns a function that is the composition of a list of functions, each
-  // consuming the return value of the function that follows.
-  _.compose = function() {
-    var args = arguments;
-    var start = args.length - 1;
-    return function() {
-      var i = start;
-      var result = args[start].apply(this, arguments);
-      while (i--) result = args[i].call(this, result);
-      return result;
-    };
-  };
-
-  // Returns a function that will only be executed on and after the Nth call.
-  _.after = function(times, func) {
-    return function() {
-      if (--times < 1) {
-        return func.apply(this, arguments);
-      }
-    };
-  };
-
-  // Returns a function that will only be executed up to (but not including) the Nth call.
-  _.before = function(times, func) {
-    var memo;
-    return function() {
-      if (--times > 0) {
-        memo = func.apply(this, arguments);
-      }
-      if (times <= 1) func = null;
-      return memo;
-    };
-  };
-
-  // Returns a function that will be executed at most one time, no matter how
-  // often you call it. Useful for lazy initialization.
-  _.once = _.partial(_.before, 2);
-
-  // Object Functions
-  // ----------------
-
-  // Keys in IE < 9 that won't be iterated by `for key in ...` and thus missed.
-  var hasEnumBug = !{toString: null}.propertyIsEnumerable('toString');
-  var nonEnumerableProps = ['valueOf', 'isPrototypeOf', 'toString',
-                      'propertyIsEnumerable', 'hasOwnProperty', 'toLocaleString'];
-
-  function collectNonEnumProps(obj, keys) {
-    var nonEnumIdx = nonEnumerableProps.length;
-    var constructor = obj.constructor;
-    var proto = (_.isFunction(constructor) && constructor.prototype) || ObjProto;
-
-    // Constructor is a special case.
-    var prop = 'constructor';
-    if (_.has(obj, prop) && !_.contains(keys, prop)) keys.push(prop);
-
-    while (nonEnumIdx--) {
-      prop = nonEnumerableProps[nonEnumIdx];
-      if (prop in obj && obj[prop] !== proto[prop] && !_.contains(keys, prop)) {
-        keys.push(prop);
+    if (m && m > 0 && this._events[type].length > m) {
+      this._events[type].warned = true;
+      console.error('(node) warning: possible EventEmitter memory ' +
+                    'leak detected. %d listeners added. ' +
+                    'Use emitter.setMaxListeners() to increase limit.',
+                    this._events[type].length);
+      if (typeof console.trace === 'function') {
+        // not supported in IE 10
+        console.trace();
       }
     }
   }
 
-  // Retrieve the names of an object's own properties.
-  // Delegates to **ECMAScript 5**'s native `Object.keys`
-  _.keys = function(obj) {
-    if (!_.isObject(obj)) return [];
-    if (nativeKeys) return nativeKeys(obj);
-    var keys = [];
-    for (var key in obj) if (_.has(obj, key)) keys.push(key);
-    // Ahem, IE < 9.
-    if (hasEnumBug) collectNonEnumProps(obj, keys);
-    return keys;
-  };
+  return this;
+};
 
-  // Retrieve all the property names of an object.
-  _.allKeys = function(obj) {
-    if (!_.isObject(obj)) return [];
-    var keys = [];
-    for (var key in obj) keys.push(key);
-    // Ahem, IE < 9.
-    if (hasEnumBug) collectNonEnumProps(obj, keys);
-    return keys;
-  };
+EventEmitter.prototype.on = EventEmitter.prototype.addListener;
 
-  // Retrieve the values of an object's properties.
-  _.values = function(obj) {
-    var keys = _.keys(obj);
-    var length = keys.length;
-    var values = Array(length);
-    for (var i = 0; i < length; i++) {
-      values[i] = obj[keys[i]];
+EventEmitter.prototype.once = function(type, listener) {
+  if (!isFunction(listener))
+    throw TypeError('listener must be a function');
+
+  var fired = false;
+
+  function g() {
+    this.removeListener(type, g);
+
+    if (!fired) {
+      fired = true;
+      listener.apply(this, arguments);
     }
-    return values;
-  };
-
-  // Returns the results of applying the iteratee to each element of the object
-  // In contrast to _.map it returns an object
-  _.mapObject = function(obj, iteratee, context) {
-    iteratee = cb(iteratee, context);
-    var keys =  _.keys(obj),
-          length = keys.length,
-          results = {},
-          currentKey;
-      for (var index = 0; index < length; index++) {
-        currentKey = keys[index];
-        results[currentKey] = iteratee(obj[currentKey], currentKey, obj);
-      }
-      return results;
-  };
-
-  // Convert an object into a list of `[key, value]` pairs.
-  _.pairs = function(obj) {
-    var keys = _.keys(obj);
-    var length = keys.length;
-    var pairs = Array(length);
-    for (var i = 0; i < length; i++) {
-      pairs[i] = [keys[i], obj[keys[i]]];
-    }
-    return pairs;
-  };
-
-  // Invert the keys and values of an object. The values must be serializable.
-  _.invert = function(obj) {
-    var result = {};
-    var keys = _.keys(obj);
-    for (var i = 0, length = keys.length; i < length; i++) {
-      result[obj[keys[i]]] = keys[i];
-    }
-    return result;
-  };
-
-  // Return a sorted list of the function names available on the object.
-  // Aliased as `methods`
-  _.functions = _.methods = function(obj) {
-    var names = [];
-    for (var key in obj) {
-      if (_.isFunction(obj[key])) names.push(key);
-    }
-    return names.sort();
-  };
-
-  // Extend a given object with all the properties in passed-in object(s).
-  _.extend = createAssigner(_.allKeys);
-
-  // Assigns a given object with all the own properties in the passed-in object(s)
-  // (https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object/assign)
-  _.extendOwn = _.assign = createAssigner(_.keys);
-
-  // Returns the first key on an object that passes a predicate test
-  _.findKey = function(obj, predicate, context) {
-    predicate = cb(predicate, context);
-    var keys = _.keys(obj), key;
-    for (var i = 0, length = keys.length; i < length; i++) {
-      key = keys[i];
-      if (predicate(obj[key], key, obj)) return key;
-    }
-  };
-
-  // Return a copy of the object only containing the whitelisted properties.
-  _.pick = function(object, oiteratee, context) {
-    var result = {}, obj = object, iteratee, keys;
-    if (obj == null) return result;
-    if (_.isFunction(oiteratee)) {
-      keys = _.allKeys(obj);
-      iteratee = optimizeCb(oiteratee, context);
-    } else {
-      keys = flatten(arguments, false, false, 1);
-      iteratee = function(value, key, obj) { return key in obj; };
-      obj = Object(obj);
-    }
-    for (var i = 0, length = keys.length; i < length; i++) {
-      var key = keys[i];
-      var value = obj[key];
-      if (iteratee(value, key, obj)) result[key] = value;
-    }
-    return result;
-  };
-
-   // Return a copy of the object without the blacklisted properties.
-  _.omit = function(obj, iteratee, context) {
-    if (_.isFunction(iteratee)) {
-      iteratee = _.negate(iteratee);
-    } else {
-      var keys = _.map(flatten(arguments, false, false, 1), String);
-      iteratee = function(value, key) {
-        return !_.contains(keys, key);
-      };
-    }
-    return _.pick(obj, iteratee, context);
-  };
-
-  // Fill in a given object with default properties.
-  _.defaults = createAssigner(_.allKeys, true);
-
-  // Creates an object that inherits from the given prototype object.
-  // If additional properties are provided then they will be added to the
-  // created object.
-  _.create = function(prototype, props) {
-    var result = baseCreate(prototype);
-    if (props) _.extendOwn(result, props);
-    return result;
-  };
-
-  // Create a (shallow-cloned) duplicate of an object.
-  _.clone = function(obj) {
-    if (!_.isObject(obj)) return obj;
-    return _.isArray(obj) ? obj.slice() : _.extend({}, obj);
-  };
-
-  // Invokes interceptor with the obj, and then returns obj.
-  // The primary purpose of this method is to "tap into" a method chain, in
-  // order to perform operations on intermediate results within the chain.
-  _.tap = function(obj, interceptor) {
-    interceptor(obj);
-    return obj;
-  };
-
-  // Returns whether an object has a given set of `key:value` pairs.
-  _.isMatch = function(object, attrs) {
-    var keys = _.keys(attrs), length = keys.length;
-    if (object == null) return !length;
-    var obj = Object(object);
-    for (var i = 0; i < length; i++) {
-      var key = keys[i];
-      if (attrs[key] !== obj[key] || !(key in obj)) return false;
-    }
-    return true;
-  };
-
-
-  // Internal recursive comparison function for `isEqual`.
-  var eq = function(a, b, aStack, bStack) {
-    // Identical objects are equal. `0 === -0`, but they aren't identical.
-    // See the [Harmony `egal` proposal](http://wiki.ecmascript.org/doku.php?id=harmony:egal).
-    if (a === b) return a !== 0 || 1 / a === 1 / b;
-    // A strict comparison is necessary because `null == undefined`.
-    if (a == null || b == null) return a === b;
-    // Unwrap any wrapped objects.
-    if (a instanceof _) a = a._wrapped;
-    if (b instanceof _) b = b._wrapped;
-    // Compare `[[Class]]` names.
-    var className = toString.call(a);
-    if (className !== toString.call(b)) return false;
-    switch (className) {
-      // Strings, numbers, regular expressions, dates, and booleans are compared by value.
-      case '[object RegExp]':
-      // RegExps are coerced to strings for comparison (Note: '' + /a/i === '/a/i')
-      case '[object String]':
-        // Primitives and their corresponding object wrappers are equivalent; thus, `"5"` is
-        // equivalent to `new String("5")`.
-        return '' + a === '' + b;
-      case '[object Number]':
-        // `NaN`s are equivalent, but non-reflexive.
-        // Object(NaN) is equivalent to NaN
-        if (+a !== +a) return +b !== +b;
-        // An `egal` comparison is performed for other numeric values.
-        return +a === 0 ? 1 / +a === 1 / b : +a === +b;
-      case '[object Date]':
-      case '[object Boolean]':
-        // Coerce dates and booleans to numeric primitive values. Dates are compared by their
-        // millisecond representations. Note that invalid dates with millisecond representations
-        // of `NaN` are not equivalent.
-        return +a === +b;
-    }
-
-    var areArrays = className === '[object Array]';
-    if (!areArrays) {
-      if (typeof a != 'object' || typeof b != 'object') return false;
-
-      // Objects with different constructors are not equivalent, but `Object`s or `Array`s
-      // from different frames are.
-      var aCtor = a.constructor, bCtor = b.constructor;
-      if (aCtor !== bCtor && !(_.isFunction(aCtor) && aCtor instanceof aCtor &&
-                               _.isFunction(bCtor) && bCtor instanceof bCtor)
-                          && ('constructor' in a && 'constructor' in b)) {
-        return false;
-      }
-    }
-    // Assume equality for cyclic structures. The algorithm for detecting cyclic
-    // structures is adapted from ES 5.1 section 15.12.3, abstract operation `JO`.
-
-    // Initializing stack of traversed objects.
-    // It's done here since we only need them for objects and arrays comparison.
-    aStack = aStack || [];
-    bStack = bStack || [];
-    var length = aStack.length;
-    while (length--) {
-      // Linear search. Performance is inversely proportional to the number of
-      // unique nested structures.
-      if (aStack[length] === a) return bStack[length] === b;
-    }
-
-    // Add the first object to the stack of traversed objects.
-    aStack.push(a);
-    bStack.push(b);
-
-    // Recursively compare objects and arrays.
-    if (areArrays) {
-      // Compare array lengths to determine if a deep comparison is necessary.
-      length = a.length;
-      if (length !== b.length) return false;
-      // Deep compare the contents, ignoring non-numeric properties.
-      while (length--) {
-        if (!eq(a[length], b[length], aStack, bStack)) return false;
-      }
-    } else {
-      // Deep compare objects.
-      var keys = _.keys(a), key;
-      length = keys.length;
-      // Ensure that both objects contain the same number of properties before comparing deep equality.
-      if (_.keys(b).length !== length) return false;
-      while (length--) {
-        // Deep compare each member
-        key = keys[length];
-        if (!(_.has(b, key) && eq(a[key], b[key], aStack, bStack))) return false;
-      }
-    }
-    // Remove the first object from the stack of traversed objects.
-    aStack.pop();
-    bStack.pop();
-    return true;
-  };
-
-  // Perform a deep comparison to check if two objects are equal.
-  _.isEqual = function(a, b) {
-    return eq(a, b);
-  };
-
-  // Is a given array, string, or object empty?
-  // An "empty" object has no enumerable own-properties.
-  _.isEmpty = function(obj) {
-    if (obj == null) return true;
-    if (isArrayLike(obj) && (_.isArray(obj) || _.isString(obj) || _.isArguments(obj))) return obj.length === 0;
-    return _.keys(obj).length === 0;
-  };
-
-  // Is a given value a DOM element?
-  _.isElement = function(obj) {
-    return !!(obj && obj.nodeType === 1);
-  };
-
-  // Is a given value an array?
-  // Delegates to ECMA5's native Array.isArray
-  _.isArray = nativeIsArray || function(obj) {
-    return toString.call(obj) === '[object Array]';
-  };
-
-  // Is a given variable an object?
-  _.isObject = function(obj) {
-    var type = typeof obj;
-    return type === 'function' || type === 'object' && !!obj;
-  };
-
-  // Add some isType methods: isArguments, isFunction, isString, isNumber, isDate, isRegExp, isError.
-  _.each(['Arguments', 'Function', 'String', 'Number', 'Date', 'RegExp', 'Error'], function(name) {
-    _['is' + name] = function(obj) {
-      return toString.call(obj) === '[object ' + name + ']';
-    };
-  });
-
-  // Define a fallback version of the method in browsers (ahem, IE < 9), where
-  // there isn't any inspectable "Arguments" type.
-  if (!_.isArguments(arguments)) {
-    _.isArguments = function(obj) {
-      return _.has(obj, 'callee');
-    };
   }
 
-  // Optimize `isFunction` if appropriate. Work around some typeof bugs in old v8,
-  // IE 11 (#1621), and in Safari 8 (#1929).
-  if (typeof /./ != 'function' && typeof Int8Array != 'object') {
-    _.isFunction = function(obj) {
-      return typeof obj == 'function' || false;
-    };
-  }
+  g.listener = listener;
+  this.on(type, g);
 
-  // Is a given object a finite number?
-  _.isFinite = function(obj) {
-    return isFinite(obj) && !isNaN(parseFloat(obj));
-  };
+  return this;
+};
 
-  // Is the given value `NaN`? (NaN is the only number which does not equal itself).
-  _.isNaN = function(obj) {
-    return _.isNumber(obj) && obj !== +obj;
-  };
+// emits a 'removeListener' event iff the listener was removed
+EventEmitter.prototype.removeListener = function(type, listener) {
+  var list, position, length, i;
 
-  // Is a given value a boolean?
-  _.isBoolean = function(obj) {
-    return obj === true || obj === false || toString.call(obj) === '[object Boolean]';
-  };
+  if (!isFunction(listener))
+    throw TypeError('listener must be a function');
 
-  // Is a given value equal to null?
-  _.isNull = function(obj) {
-    return obj === null;
-  };
-
-  // Is a given variable undefined?
-  _.isUndefined = function(obj) {
-    return obj === void 0;
-  };
-
-  // Shortcut function for checking if an object has a given property directly
-  // on itself (in other words, not on a prototype).
-  _.has = function(obj, key) {
-    return obj != null && hasOwnProperty.call(obj, key);
-  };
-
-  // Utility Functions
-  // -----------------
-
-  // Run Underscore.js in *noConflict* mode, returning the `_` variable to its
-  // previous owner. Returns a reference to the Underscore object.
-  _.noConflict = function() {
-    root._ = previousUnderscore;
+  if (!this._events || !this._events[type])
     return this;
-  };
 
-  // Keep the identity function around for default iteratees.
-  _.identity = function(value) {
-    return value;
-  };
+  list = this._events[type];
+  length = list.length;
+  position = -1;
 
-  // Predicate-generating functions. Often useful outside of Underscore.
-  _.constant = function(value) {
-    return function() {
-      return value;
-    };
-  };
+  if (list === listener ||
+      (isFunction(list.listener) && list.listener === listener)) {
+    delete this._events[type];
+    if (this._events.removeListener)
+      this.emit('removeListener', type, listener);
 
-  _.noop = function(){};
-
-  _.property = property;
-
-  // Generates a function for a given object that returns a given property.
-  _.propertyOf = function(obj) {
-    return obj == null ? function(){} : function(key) {
-      return obj[key];
-    };
-  };
-
-  // Returns a predicate for checking whether an object has a given set of
-  // `key:value` pairs.
-  _.matcher = _.matches = function(attrs) {
-    attrs = _.extendOwn({}, attrs);
-    return function(obj) {
-      return _.isMatch(obj, attrs);
-    };
-  };
-
-  // Run a function **n** times.
-  _.times = function(n, iteratee, context) {
-    var accum = Array(Math.max(0, n));
-    iteratee = optimizeCb(iteratee, context, 1);
-    for (var i = 0; i < n; i++) accum[i] = iteratee(i);
-    return accum;
-  };
-
-  // Return a random integer between min and max (inclusive).
-  _.random = function(min, max) {
-    if (max == null) {
-      max = min;
-      min = 0;
-    }
-    return min + Math.floor(Math.random() * (max - min + 1));
-  };
-
-  // A (possibly faster) way to get the current timestamp as an integer.
-  _.now = Date.now || function() {
-    return new Date().getTime();
-  };
-
-   // List of HTML entities for escaping.
-  var escapeMap = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#x27;',
-    '`': '&#x60;'
-  };
-  var unescapeMap = _.invert(escapeMap);
-
-  // Functions for escaping and unescaping strings to/from HTML interpolation.
-  var createEscaper = function(map) {
-    var escaper = function(match) {
-      return map[match];
-    };
-    // Regexes for identifying a key that needs to be escaped
-    var source = '(?:' + _.keys(map).join('|') + ')';
-    var testRegexp = RegExp(source);
-    var replaceRegexp = RegExp(source, 'g');
-    return function(string) {
-      string = string == null ? '' : '' + string;
-      return testRegexp.test(string) ? string.replace(replaceRegexp, escaper) : string;
-    };
-  };
-  _.escape = createEscaper(escapeMap);
-  _.unescape = createEscaper(unescapeMap);
-
-  // If the value of the named `property` is a function then invoke it with the
-  // `object` as context; otherwise, return it.
-  _.result = function(object, property, fallback) {
-    var value = object == null ? void 0 : object[property];
-    if (value === void 0) {
-      value = fallback;
-    }
-    return _.isFunction(value) ? value.call(object) : value;
-  };
-
-  // Generate a unique integer id (unique within the entire client session).
-  // Useful for temporary DOM ids.
-  var idCounter = 0;
-  _.uniqueId = function(prefix) {
-    var id = ++idCounter + '';
-    return prefix ? prefix + id : id;
-  };
-
-  // By default, Underscore uses ERB-style template delimiters, change the
-  // following template settings to use alternative delimiters.
-  _.templateSettings = {
-    evaluate    : /<%([\s\S]+?)%>/g,
-    interpolate : /<%=([\s\S]+?)%>/g,
-    escape      : /<%-([\s\S]+?)%>/g
-  };
-
-  // When customizing `templateSettings`, if you don't want to define an
-  // interpolation, evaluation or escaping regex, we need one that is
-  // guaranteed not to match.
-  var noMatch = /(.)^/;
-
-  // Certain characters need to be escaped so that they can be put into a
-  // string literal.
-  var escapes = {
-    "'":      "'",
-    '\\':     '\\',
-    '\r':     'r',
-    '\n':     'n',
-    '\u2028': 'u2028',
-    '\u2029': 'u2029'
-  };
-
-  var escaper = /\\|'|\r|\n|\u2028|\u2029/g;
-
-  var escapeChar = function(match) {
-    return '\\' + escapes[match];
-  };
-
-  // JavaScript micro-templating, similar to John Resig's implementation.
-  // Underscore templating handles arbitrary delimiters, preserves whitespace,
-  // and correctly escapes quotes within interpolated code.
-  // NB: `oldSettings` only exists for backwards compatibility.
-  _.template = function(text, settings, oldSettings) {
-    if (!settings && oldSettings) settings = oldSettings;
-    settings = _.defaults({}, settings, _.templateSettings);
-
-    // Combine delimiters into one regular expression via alternation.
-    var matcher = RegExp([
-      (settings.escape || noMatch).source,
-      (settings.interpolate || noMatch).source,
-      (settings.evaluate || noMatch).source
-    ].join('|') + '|$', 'g');
-
-    // Compile the template source, escaping string literals appropriately.
-    var index = 0;
-    var source = "__p+='";
-    text.replace(matcher, function(match, escape, interpolate, evaluate, offset) {
-      source += text.slice(index, offset).replace(escaper, escapeChar);
-      index = offset + match.length;
-
-      if (escape) {
-        source += "'+\n((__t=(" + escape + "))==null?'':_.escape(__t))+\n'";
-      } else if (interpolate) {
-        source += "'+\n((__t=(" + interpolate + "))==null?'':__t)+\n'";
-      } else if (evaluate) {
-        source += "';\n" + evaluate + "\n__p+='";
+  } else if (isObject(list)) {
+    for (i = length; i-- > 0;) {
+      if (list[i] === listener ||
+          (list[i].listener && list[i].listener === listener)) {
+        position = i;
+        break;
       }
-
-      // Adobe VMs need the match returned to produce the correct offest.
-      return match;
-    });
-    source += "';\n";
-
-    // If a variable is not specified, place data values in local scope.
-    if (!settings.variable) source = 'with(obj||{}){\n' + source + '}\n';
-
-    source = "var __t,__p='',__j=Array.prototype.join," +
-      "print=function(){__p+=__j.call(arguments,'');};\n" +
-      source + 'return __p;\n';
-
-    try {
-      var render = new Function(settings.variable || 'obj', '_', source);
-    } catch (e) {
-      e.source = source;
-      throw e;
     }
 
-    var template = function(data) {
-      return render.call(this, data, _);
-    };
+    if (position < 0)
+      return this;
 
-    // Provide the compiled source as a convenience for precompilation.
-    var argument = settings.variable || 'obj';
-    template.source = 'function(' + argument + '){\n' + source + '}';
+    if (list.length === 1) {
+      list.length = 0;
+      delete this._events[type];
+    } else {
+      list.splice(position, 1);
+    }
 
-    return template;
-  };
-
-  // Add a "chain" function. Start chaining a wrapped Underscore object.
-  _.chain = function(obj) {
-    var instance = _(obj);
-    instance._chain = true;
-    return instance;
-  };
-
-  // OOP
-  // ---------------
-  // If Underscore is called as a function, it returns a wrapped object that
-  // can be used OO-style. This wrapper holds altered versions of all the
-  // underscore functions. Wrapped objects may be chained.
-
-  // Helper function to continue chaining intermediate results.
-  var result = function(instance, obj) {
-    return instance._chain ? _(obj).chain() : obj;
-  };
-
-  // Add your own custom functions to the Underscore object.
-  _.mixin = function(obj) {
-    _.each(_.functions(obj), function(name) {
-      var func = _[name] = obj[name];
-      _.prototype[name] = function() {
-        var args = [this._wrapped];
-        push.apply(args, arguments);
-        return result(this, func.apply(_, args));
-      };
-    });
-  };
-
-  // Add all of the Underscore functions to the wrapper object.
-  _.mixin(_);
-
-  // Add all mutator Array functions to the wrapper.
-  _.each(['pop', 'push', 'reverse', 'shift', 'sort', 'splice', 'unshift'], function(name) {
-    var method = ArrayProto[name];
-    _.prototype[name] = function() {
-      var obj = this._wrapped;
-      method.apply(obj, arguments);
-      if ((name === 'shift' || name === 'splice') && obj.length === 0) delete obj[0];
-      return result(this, obj);
-    };
-  });
-
-  // Add all accessor Array functions to the wrapper.
-  _.each(['concat', 'join', 'slice'], function(name) {
-    var method = ArrayProto[name];
-    _.prototype[name] = function() {
-      return result(this, method.apply(this._wrapped, arguments));
-    };
-  });
-
-  // Extracts the result from a wrapped and chained object.
-  _.prototype.value = function() {
-    return this._wrapped;
-  };
-
-  // Provide unwrapping proxy for some methods used in engine operations
-  // such as arithmetic and JSON stringification.
-  _.prototype.valueOf = _.prototype.toJSON = _.prototype.value;
-
-  _.prototype.toString = function() {
-    return '' + this._wrapped;
-  };
-
-  // AMD registration happens at the end for compatibility with AMD loaders
-  // that may not enforce next-turn semantics on modules. Even though general
-  // practice for AMD registration is to be anonymous, underscore registers
-  // as a named module because, like jQuery, it is a base library that is
-  // popular enough to be bundled in a third party lib, but not be part of
-  // an AMD load request. Those cases could generate an error when an
-  // anonymous define() is called outside of a loader request.
-  if (typeof define === 'function' && define.amd) {
-    define('underscore', [], function() {
-      return _;
-    });
+    if (this._events.removeListener)
+      this.emit('removeListener', type, listener);
   }
-}.call(this));
+
+  return this;
+};
+
+EventEmitter.prototype.removeAllListeners = function(type) {
+  var key, listeners;
+
+  if (!this._events)
+    return this;
+
+  // not listening for removeListener, no need to emit
+  if (!this._events.removeListener) {
+    if (arguments.length === 0)
+      this._events = {};
+    else if (this._events[type])
+      delete this._events[type];
+    return this;
+  }
+
+  // emit removeListener for all listeners on all events
+  if (arguments.length === 0) {
+    for (key in this._events) {
+      if (key === 'removeListener') continue;
+      this.removeAllListeners(key);
+    }
+    this.removeAllListeners('removeListener');
+    this._events = {};
+    return this;
+  }
+
+  listeners = this._events[type];
+
+  if (isFunction(listeners)) {
+    this.removeListener(type, listeners);
+  } else {
+    // LIFO order
+    while (listeners.length)
+      this.removeListener(type, listeners[listeners.length - 1]);
+  }
+  delete this._events[type];
+
+  return this;
+};
+
+EventEmitter.prototype.listeners = function(type) {
+  var ret;
+  if (!this._events || !this._events[type])
+    ret = [];
+  else if (isFunction(this._events[type]))
+    ret = [this._events[type]];
+  else
+    ret = this._events[type].slice();
+  return ret;
+};
+
+EventEmitter.listenerCount = function(emitter, type) {
+  var ret;
+  if (!emitter._events || !emitter._events[type])
+    ret = 0;
+  else if (isFunction(emitter._events[type]))
+    ret = 1;
+  else
+    ret = emitter._events[type].length;
+  return ret;
+};
+
+function isFunction(arg) {
+  return typeof arg === 'function';
+}
+
+function isNumber(arg) {
+  return typeof arg === 'number';
+}
+
+function isObject(arg) {
+  return typeof arg === 'object' && arg !== null;
+}
+
+function isUndefined(arg) {
+  return arg === void 0;
+}
 
 },{}],3:[function(require,module,exports){
 // shim for using process in browser
@@ -12752,6 +11505,4844 @@ return jQuery;
 }));
 
 },{}],5:[function(require,module,exports){
+'use strict';
+
+var assign = require('react/lib/Object.assign');
+
+// Note that this class intentionally does not use PooledClass.
+// DrawingUtils manages <canvas> pooling for more fine-grained control.
+
+function Canvas (width, height, scale) {
+  // Re-purposing an existing canvas element.
+  if (!this._canvas) {
+    this._canvas = document.createElement('canvas');
+  }
+
+  this.width = width;
+  this.height = height;
+  this.scale = scale || window.devicePixelRatio;
+
+  this._canvas.width = this.width * this.scale;
+  this._canvas.height = this.height * this.scale;
+  this._canvas.getContext('2d').scale(this.scale, this.scale);
+}
+
+assign(Canvas.prototype, {
+
+  getRawCanvas: function () {
+    return this._canvas;
+  },
+
+  getContext: function () {
+    return this._canvas.getContext('2d');
+  }
+
+});
+
+// PooledClass:
+
+// Be fairly conserative - we are potentially drawing a large number of medium
+// to large size images.
+Canvas.poolSize = 30;
+
+module.exports = Canvas;
+
+},{"react/lib/Object.assign":59}],6:[function(require,module,exports){
+'use strict';
+
+var FontFace = require('./FontFace');
+var clamp = require('./clamp');
+var measureText = require('./measureText');
+
+/**
+ * Draw an image into a <canvas>. This operation requires that the image
+ * already be loaded.
+ *
+ * @param {CanvasContext} ctx
+ * @param {Image} image The source image (from ImageCache.get())
+ * @param {Number} x The x-coordinate to begin drawing
+ * @param {Number} y The y-coordinate to begin drawing
+ * @param {Number} width The desired width
+ * @param {Number} height The desired height
+ * @param {Object} options Available options are:
+ *   {Number} originalWidth
+ *   {Number} originalHeight
+ *   {Object} focusPoint {x,y}
+ *   {String} backgroundColor
+ */
+function drawImage (ctx, image, x, y, width, height, options) {
+  options = options || {};
+
+  if (options.backgroundColor) {
+    ctx.save();
+    ctx.fillStyle = options.backgroundColor;
+    ctx.fillRect(x, y, width, height);
+    ctx.restore();
+  }
+
+  var dx = 0;
+  var dy = 0;
+  var dw = 0;
+  var dh = 0;
+  var sx = 0;
+  var sy = 0;
+  var sw = 0;
+  var sh = 0;
+  var scale;
+  var scaledSize;
+  var actualSize;
+  var focusPoint = options.focusPoint;
+
+  actualSize = {
+    width: image.getWidth(),
+    height: image.getHeight()
+  };
+
+  scale = Math.max(
+    width / actualSize.width,
+    height / actualSize.height
+  ) || 1;
+  scale = parseFloat(scale.toFixed(4), 10);
+
+  scaledSize = {
+    width: actualSize.width * scale,
+    height: actualSize.height * scale
+  };
+
+  if (focusPoint) {
+    // Since image hints are relative to image "original" dimensions (original != actual),
+    // use the original size for focal point cropping.
+    if (options.originalHeight) {
+      focusPoint.x *= (actualSize.height / options.originalHeight);
+      focusPoint.y *= (actualSize.height / options.originalHeight);
+    }
+  } else {
+    // Default focal point to [0.5, 0.5]
+    focusPoint = {
+      x: actualSize.width * 0.5,
+      y: actualSize.height * 0.5
+    };
+  }
+
+  // Clip the image to rectangle (sx, sy, sw, sh).
+  sx = Math.round(clamp(width * 0.5 - focusPoint.x * scale, width - scaledSize.width, 0)) * (-1 / scale);
+  sy = Math.round(clamp(height * 0.5 - focusPoint.y * scale, height - scaledSize.height, 0)) * (-1 / scale);
+  sw = Math.round(actualSize.width - (sx * 2));
+  sh = Math.round(actualSize.height - (sy * 2));
+
+  // Scale the image to dimensions (dw, dh).
+  dw = Math.round(width);
+  dh = Math.round(height);
+
+  // Draw the image on the canvas at coordinates (dx, dy).
+  dx = Math.round(x);
+  dy = Math.round(y);
+
+  ctx.drawImage(image.getRawImage(), sx, sy, sw, sh, dx, dy, dw, dh);
+}
+
+/**
+ * @param {CanvasContext} ctx
+ * @param {String} text The text string to render
+ * @param {Number} x The x-coordinate to begin drawing
+ * @param {Number} y The y-coordinate to begin drawing
+ * @param {Number} width The maximum allowed width
+ * @param {Number} height The maximum allowed height
+ * @param {FontFace} fontFace The FontFace to to use
+ * @param {Object} options Available options are:
+ *   {Number} fontSize
+ *   {Number} lineHeight
+ *   {String} textAlign
+ *   {String} color
+ *   {String} backgroundColor
+ */
+function drawText (ctx, text, x, y, width, height, fontFace, options) {
+  var textMetrics;
+  var currX = x;
+  var currY = y;
+  var currText;
+  var options = options || {};
+
+  options.fontSize = options.fontSize || 16;
+  options.lineHeight = options.lineHeight || 18;
+  options.textAlign = options.textAlign || 'left';
+  options.backgroundColor = options.backgroundColor || 'transparent';
+  options.color = options.color || '#000';
+
+  textMetrics = measureText(
+    text,
+    width,
+    fontFace,
+    options.fontSize,
+    options.lineHeight
+  );
+
+  ctx.save();
+
+  // Draw the background
+  if (options.backgroundColor !== 'transparent') {
+    ctx.fillStyle = options.backgroundColor;
+    ctx.fillRect(0, 0, width, height);
+  }
+
+  ctx.fillStyle = options.color;
+  ctx.font = fontFace.attributes.style + ' normal ' + fontFace.attributes.weight + ' ' + options.fontSize + 'pt ' + fontFace.family;
+
+  textMetrics.lines.forEach(function (line, index) {
+    currText = line.text;
+    currY = (index === 0) ? y + options.fontSize :
+      (y + options.fontSize + options.lineHeight * index);
+
+    // Account for text-align: left|right|center
+    switch (options.textAlign) {
+      case 'center':
+        currX = x + (width / 2) - (line.width / 2);
+        break;
+      case 'right':
+        currX = x + width - line.width;
+        break;
+      default:
+        currX = x;
+    }
+
+    if ((index < textMetrics.lines.length - 1) &&
+      ((options.fontSize + options.lineHeight * (index + 1)) > height)) {
+      currText = currText.replace(/\,?\s?\w+$/, '…');
+    }
+
+    if (currY <= (height + y)) {
+      ctx.fillText(currText, currX, currY);
+    }
+  });
+
+  ctx.restore();
+}
+
+/**
+ * Draw a linear gradient
+ *
+ * @param {CanvasContext} ctx
+ * @param {Number} x1 gradient start-x coordinate
+ * @param {Number} y1 gradient start-y coordinate
+ * @param {Number} x2 gradient end-x coordinate
+ * @param {Number} y2 gradient end-y coordinate
+ * @param {Array} colorStops Array of {(String)color, (Number)position} values
+ * @param {Number} x x-coordinate to begin fill
+ * @param {Number} y y-coordinate to begin fill
+ * @param {Number} width how wide to fill
+ * @param {Number} height how tall to fill
+ */
+function drawGradient(ctx, x1, y1, x2, y2, colorStops, x, y, width, height) {
+  var grad;
+
+  ctx.save();
+  grad = ctx.createLinearGradient(x1, y1, x2, y2);
+
+  colorStops.forEach(function (colorStop) {
+    grad.addColorStop(colorStop.position, colorStop.color);
+  });
+
+  ctx.fillStyle = grad;
+  ctx.fillRect(x, y, width, height);
+  ctx.restore();
+}
+
+module.exports = {
+  drawImage: drawImage,
+  drawText: drawText,
+  drawGradient: drawGradient,
+};
+
+
+},{"./FontFace":11,"./clamp":25,"./measureText":29}],7:[function(require,module,exports){
+'use strict';
+
+// Adapted from ReactART:
+// https://github.com/reactjs/react-art
+
+var React = require('react');
+var ReactMultiChild = require('react/lib/ReactMultiChild');
+var assign = require('react/lib/Object.assign');
+var emptyObject = require('react/lib/emptyObject');
+
+var ContainerMixin = assign({}, ReactMultiChild.Mixin, {
+
+  /**
+   * Moves a child component to the supplied index.
+   *
+   * @param {ReactComponent} child Component to move.
+   * @param {number} toIndex Destination index of the element.
+   * @protected
+   */
+  moveChild: function(child, toIndex) {
+    var childNode = child._mountImage;
+    var mostRecentlyPlacedChild = this._mostRecentlyPlacedChild;
+    if (mostRecentlyPlacedChild == null) {
+      // I'm supposed to be first.
+      if (childNode.previousSibling) {
+        if (this.node.firstChild) {
+          childNode.injectBefore(this.node.firstChild);
+        } else {
+          childNode.inject(this.node);
+        }
+      }
+    } else {
+      // I'm supposed to be after the previous one.
+      if (mostRecentlyPlacedChild.nextSibling !== childNode) {
+        if (mostRecentlyPlacedChild.nextSibling) {
+          childNode.injectBefore(mostRecentlyPlacedChild.nextSibling);
+        } else {
+          childNode.inject(this.node);
+        }
+      }
+    }
+    this._mostRecentlyPlacedChild = childNode;
+  },
+
+  /**
+   * Creates a child component.
+   *
+   * @param {ReactComponent} child Component to create.
+   * @param {object} childNode ART node to insert.
+   * @protected
+   */
+  createChild: function(child, childNode) {
+    child._mountImage = childNode;
+    var mostRecentlyPlacedChild = this._mostRecentlyPlacedChild;
+    if (mostRecentlyPlacedChild == null) {
+      // I'm supposed to be first.
+      if (this.node.firstChild) {
+        childNode.injectBefore(this.node.firstChild);
+      } else {
+        childNode.inject(this.node);
+      }
+    } else {
+      // I'm supposed to be after the previous one.
+      if (mostRecentlyPlacedChild.nextSibling) {
+        childNode.injectBefore(mostRecentlyPlacedChild.nextSibling);
+      } else {
+        childNode.inject(this.node);
+      }
+    }
+    this._mostRecentlyPlacedChild = childNode;
+  },
+
+  /**
+   * Removes a child component.
+   *
+   * @param {ReactComponent} child Child to remove.
+   * @protected
+   */
+  removeChild: function(child) {
+    child._mountImage.remove();
+    child._mountImage = null;
+    this.node.invalidateLayout();
+  },
+
+  updateChildrenAtRoot: function(nextChildren, transaction) {
+    this.updateChildren(nextChildren, transaction, emptyObject);
+  },
+
+  mountAndInjectChildrenAtRoot: function(children, transaction) {
+    this.mountAndInjectChildren(children, transaction, emptyObject);
+  },
+
+  /**
+   * Override to bypass batch updating because it is not necessary.
+   *
+   * @param {?object} nextChildren.
+   * @param {ReactReconcileTransaction} transaction
+   * @internal
+   * @override {ReactMultiChild.Mixin.updateChildren}
+   */
+  updateChildren: function(nextChildren, transaction, context) {
+    this._mostRecentlyPlacedChild = null;
+    this._updateChildren(nextChildren, transaction, context);
+  },
+
+  // Shorthands
+
+  mountAndInjectChildren: function(children, transaction, context) {
+    var mountedImages = this.mountChildren(
+      children,
+      transaction,
+      context
+    );
+
+    // Each mount image corresponds to one of the flattened children
+    var i = 0;
+    for (var key in this._renderedChildren) {
+      if (this._renderedChildren.hasOwnProperty(key)) {
+        var child = this._renderedChildren[key];
+        child._mountImage = mountedImages[i];
+        mountedImages[i].inject(this.node);
+        i++;
+      }
+    }
+  }
+
+});
+
+module.exports = ContainerMixin;
+
+},{"react":188,"react/lib/Object.assign":59,"react/lib/ReactMultiChild":104,"react/lib/emptyObject":148}],8:[function(require,module,exports){
+'use strict';
+
+var ImageCache = require('./ImageCache');
+var FontUtils = require('./FontUtils');
+var FontFace = require('./FontFace');
+var FrameUtils = require('./FrameUtils');
+var CanvasUtils = require('./CanvasUtils');
+var Canvas = require('./Canvas');
+
+// Global backing store <canvas> cache
+var _backingStores = [];
+
+/**
+ * Maintain a cache of backing <canvas> for RenderLayer's which are accessible
+ * through the RenderLayer's `backingStoreId` property.
+ *
+ * @param {String} id The unique `backingStoreId` for a RenderLayer
+ * @return {HTMLCanvasElement}
+ */
+function getBackingStore (id) {
+  for (var i=0, len=_backingStores.length; i < len; i++) {
+    if (_backingStores[i].id === id) {
+      return _backingStores[i].canvas;
+    }
+  }
+  return null;
+}
+
+/**
+ * Purge a layer's backing store from the cache.
+ *
+ * @param {String} id The layer's backingStoreId
+ */
+function invalidateBackingStore (id) {
+  for (var i=0, len=_backingStores.length; i < len; i++) {
+    if (_backingStores[i].id === id) {
+      _backingStores.splice(i, 1);
+      break;
+    }
+  }
+}
+
+/**
+ * Purge the entire backing store cache.
+ */
+function invalidateAllBackingStores () {
+  _backingStores = [];
+}
+
+/**
+ * Find the nearest backing store ancestor for a given layer.
+ *
+ * @param {RenderLayer} layer
+ */
+function getBackingStoreAncestor (layer) {
+  while (layer) {
+    if (layer.backingStoreId) {
+      return layer;
+    }
+    layer = layer.parentLayer;
+  }
+  return null;
+}
+
+/**
+ * Check if a layer is using a given image URL.
+ *
+ * @param {RenderLayer} layer
+ * @param {String} imageUrl
+ * @return {Boolean}
+ */
+function layerContainsImage (layer, imageUrl) {
+  // Check the layer itself.
+  if (layer.type === 'image' && layer.imageUrl === imageUrl) {
+    return layer;
+  }
+
+  // Check the layer's children.
+  if (layer.children) {
+    for (var i=0, len=layer.children.length; i < len; i++) {
+      if (layerContainsImage(layer.children[i], imageUrl)) {
+        return layer.children[i];
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Check if a layer is using a given FontFace.
+ *
+ * @param {RenderLayer} layer
+ * @param {FontFace} fontFace
+ * @return {Boolean}
+ */
+function layerContainsFontFace (layer, fontFace) {
+  // Check the layer itself.
+  if (layer.type === 'text' && layer.fontFace && layer.fontFace.id === fontFace.id) {
+    return layer;
+  }
+
+  // Check the layer's children.
+  if (layer.children) {
+    for (var i=0, len=layer.children.length; i < len; i++) {
+      if (layerContainsFontFace(layer.children[i], fontFace)) {
+        return layer.children[i];
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Invalidates the backing stores for layers which contain an image layer
+ * associated with the given imageUrl.
+ *
+ * @param {String} imageUrl
+ */
+function handleImageLoad (imageUrl) {
+  _backingStores.forEach(function (backingStore) {
+    if (layerContainsImage(backingStore.layer, imageUrl)) {
+      invalidateBackingStore(backingStore.id);
+    }
+  });
+}
+
+/**
+ * Invalidates the backing stores for layers which contain a text layer
+ * associated with the given font face.
+ *
+ * @param {FontFace} fontFace
+ */
+function handleFontLoad (fontFace) {
+  _backingStores.forEach(function (backingStore) {
+    if (layerContainsFontFace(backingStore.layer, fontFace)) {
+      invalidateBackingStore(backingStore.id);
+    }
+  });
+}
+
+/**
+ * Draw a RenderLayer instance to a <canvas> context.
+ *
+ * @param {CanvasRenderingContext2d} ctx
+ * @param {RenderLayer} layer
+ */
+function drawRenderLayer (ctx, layer) {
+  var customDrawFunc;
+
+  // Performance: avoid drawing hidden layers.
+  if (typeof layer.alpha === 'number' && layer.alpha <= 0) {
+    return;
+  }
+
+  switch (layer.type) {
+    case 'image':
+      customDrawFunc = drawImageRenderLayer;
+      break;
+
+    case 'text':
+      customDrawFunc = drawTextRenderLayer;
+      break;
+
+    case 'gradient':
+      customDrawFunc = drawGradientRenderLayer;
+      break;
+  }
+
+  // Establish drawing context for certain properties:
+  // - alpha
+  // - translate
+  var saveContext = (layer.alpha !== null && layer.alpha < 1) ||
+                    (layer.translateX || layer.translateY);
+
+  if (saveContext) {
+    ctx.save();
+
+    // Alpha:
+    if (layer.alpha !== null && layer.alpha < 1) {
+      ctx.globalAlpha = layer.alpha;
+    }
+
+    // Translation:
+    if (layer.translateX || layer.translateY) {
+      ctx.translate(layer.translateX || 0, layer.translateY || 0);
+    }
+  }
+
+  // If the layer is bitmap-cacheable, draw in a pooled off-screen canvas.
+  // We disable backing stores on pad since we flip there.
+  if (layer.backingStoreId) {
+    drawCacheableRenderLayer(ctx, layer, customDrawFunc);
+  } else {
+    // Draw default properties, such as background color.
+    ctx.save();
+    drawBaseRenderLayer(ctx, layer);
+
+    // Draw custom properties if needed.
+    customDrawFunc && customDrawFunc(ctx, layer);
+    ctx.restore();
+
+    // Draw child layers, sorted by their z-index.
+    if (layer.children) {
+      layer.children.slice().sort(sortByZIndexAscending).forEach(function (childLayer) {
+        drawRenderLayer(ctx, childLayer);
+      });
+    }
+  }
+
+  // Pop the context state if we established a new drawing context.
+  if (saveContext) {
+    ctx.restore();
+  }
+}
+
+/**
+ * Draw base layer properties into a rendering context.
+ * NOTE: The caller is responsible for calling save() and restore() as needed.
+ *
+ * @param {CanvasRenderingContext2d} ctx
+ * @param {RenderLayer} layer
+ */
+function drawBaseRenderLayer (ctx, layer) {
+  var frame = layer.frame;
+
+  // Border radius:
+  if (layer.borderRadius) {
+    ctx.beginPath();
+    ctx.moveTo(frame.x + layer.borderRadius, frame.y);
+    ctx.arcTo(frame.x + frame.width, frame.y, frame.x + frame.width, frame.y + frame.height, layer.borderRadius);
+    ctx.arcTo(frame.x + frame.width, frame.y + frame.height, frame.x, frame.y + frame.height, layer.borderRadius);
+    ctx.arcTo(frame.x, frame.y + frame.height, frame.x, frame.y, layer.borderRadius);
+    ctx.arcTo(frame.x, frame.y, frame.x + frame.width, frame.y, layer.borderRadius);
+    ctx.closePath();
+
+    // Create a clipping path when drawing an image or using border radius.
+    if (layer.type === 'image') {
+      ctx.clip();
+    }
+
+    // Border with border radius:
+    if (layer.borderColor) {
+      ctx.lineWidth = layer.borderWidth || 1;
+      ctx.strokeStyle = layer.borderColor;
+      ctx.stroke();
+    }
+  }
+
+  // Border color (no border radius):
+  if (layer.borderColor && !layer.borderRadius) {
+    ctx.lineWidth = layer.borderWidth || 1;
+    ctx.strokeStyle = layer.borderColor;
+    ctx.strokeRect(frame.x, frame.y, frame.width, frame.height);
+  }
+
+  // Background color:
+  if (layer.backgroundColor) {
+    ctx.fillStyle = layer.backgroundColor;
+    if (layer.borderRadius) {
+      // Fill the current path when there is a borderRadius set.
+      ctx.fill();
+    } else {
+      ctx.fillRect(frame.x, frame.y, frame.width, frame.height);
+    }
+  }
+}
+
+/**
+ * Draw a bitmap-cacheable layer into a pooled <canvas>. The result will be
+ * drawn into the given context. This will populate the layer backing store
+ * cache with the result.
+ *
+ * @param {CanvasRenderingContext2d} ctx
+ * @param {RenderLayer} layer
+ * @param {Function} customDrawFunc
+ * @private
+ */
+function drawCacheableRenderLayer (ctx, layer, customDrawFunc) {
+  // See if there is a pre-drawn canvas in the pool.
+  var backingStore = getBackingStore(layer.backingStoreId);
+  var backingStoreScale = layer.scale || window.devicePixelRatio;
+  var frameOffsetY = layer.frame.y;
+  var frameOffsetX = layer.frame.x;
+  var backingContext;
+
+  if (!backingStore) {
+    if (_backingStores.length >= Canvas.poolSize) {
+      // Re-use the oldest backing store once we reach the pooling limit.
+      backingStore = _backingStores[0].canvas;
+      Canvas.call(backingStore, layer.frame.width, layer.frame.height, backingStoreScale);
+
+      // Move the re-use canvas to the front of the queue.
+      _backingStores[0].id = layer.backingStoreId;
+      _backingStores[0].canvas = backingStore;
+      _backingStores.push(_backingStores.shift());
+    } else {
+      // Create a new backing store, we haven't yet reached the pooling limit
+      backingStore = new Canvas(layer.frame.width, layer.frame.height, backingStoreScale);
+      _backingStores.push({
+        id: layer.backingStoreId,
+        layer: layer,
+        canvas: backingStore
+      });
+    }
+
+    // Draw into the backing <canvas> at (0, 0) - we will later use the
+    // <canvas> to draw the layer as an image at the proper coordinates.
+    backingContext = backingStore.getContext('2d');
+    layer.translate(-frameOffsetX, -frameOffsetY);
+
+    // Draw default properties, such as background color.
+    backingContext.save();
+    drawBaseRenderLayer(backingContext, layer);
+
+    // Custom drawing operations
+    customDrawFunc && customDrawFunc(backingContext, layer);
+    backingContext.restore();
+
+    // Draw child layers, sorted by their z-index.
+    if (layer.children) {
+      layer.children.slice().sort(sortByZIndexAscending).forEach(function (childLayer) {
+        drawRenderLayer(backingContext, childLayer);
+      });
+    }
+
+    // Restore layer's original frame.
+    layer.translate(frameOffsetX, frameOffsetY);
+  }
+
+  // We have the pre-rendered canvas ready, draw it into the destination canvas.
+  if (layer.clipRect) {
+    // Fill the clipping rect in the destination canvas.
+    var sx = (layer.clipRect.x - layer.frame.x) * backingStoreScale;
+    var sy = (layer.clipRect.y - layer.frame.y) * backingStoreScale;
+    var sw = layer.clipRect.width * backingStoreScale;
+    var sh = layer.clipRect.height * backingStoreScale;
+    var dx = layer.clipRect.x;
+    var dy = layer.clipRect.y;
+    var dw = layer.clipRect.width;
+    var dh = layer.clipRect.height;
+
+    // No-op for zero size rects. iOS / Safari will throw an exception.
+    if (sw > 0 && sh > 0) {
+      ctx.drawImage(backingStore.getRawCanvas(), sx, sy, sw, sh, dx, dy, dw, dh);
+    }
+  } else {
+    // Fill the entire canvas
+    ctx.drawImage(backingStore.getRawCanvas(), layer.frame.x, layer.frame.y, layer.frame.width, layer.frame.height);
+  }
+}
+
+/**
+ * @private
+ */
+function sortByZIndexAscending (layerA, layerB) {
+  return (layerA.zIndex || 0) - (layerB.zIndex || 0);
+}
+
+/**
+ * @private
+ */
+function drawImageRenderLayer (ctx, layer) {
+  if (!layer.imageUrl) {
+    return;
+  }
+
+  // Don't draw until loaded
+  var image = ImageCache.get(layer.imageUrl);
+  if (!image.isLoaded()) {
+    return;
+  }
+
+  CanvasUtils.drawImage(ctx, image, layer.frame.x, layer.frame.y, layer.frame.width, layer.frame.height);
+}
+
+/**
+ * @private
+ */
+function drawTextRenderLayer (ctx, layer) {
+  // Fallback to standard font.
+  var fontFace = layer.fontFace || FontFace.Default();
+
+  // Don't draw text until loaded
+  if (!FontUtils.isFontLoaded(fontFace)) {
+    return;
+  }
+
+  CanvasUtils.drawText(ctx, layer.text, layer.frame.x, layer.frame.y, layer.frame.width, layer.frame.height, fontFace, {
+    fontSize: layer.fontSize,
+    lineHeight: layer.lineHeight,
+    textAlign: layer.textAlign,
+    color: layer.color
+  });
+}
+
+/**
+ * @private
+ */
+function drawGradientRenderLayer (ctx, layer) {
+  // Default to linear gradient from top to bottom.
+  var x1 = layer.x1 || layer.frame.x;
+  var y1 = layer.y1 || layer.frame.y;
+  var x2 = layer.x2 || layer.frame.x;
+  var y2 = layer.y2 || layer.frame.y + layer.frame.height;
+  CanvasUtils.drawGradient(ctx, x1, y1, x2, y2, layer.colorStops, layer.frame.x, layer.frame.y, layer.frame.width, layer.frame.height);
+}
+
+module.exports = {
+  drawRenderLayer: drawRenderLayer,
+  invalidateBackingStore: invalidateBackingStore,
+  invalidateAllBackingStores: invalidateAllBackingStores,
+  handleImageLoad: handleImageLoad,
+  handleFontLoad: handleFontLoad,
+  layerContainsImage: layerContainsImage,
+  layerContainsFontFace: layerContainsFontFace
+};
+
+},{"./Canvas":5,"./CanvasUtils":6,"./FontFace":11,"./FontUtils":12,"./FrameUtils":13,"./ImageCache":16}],9:[function(require,module,exports){
+// Penner easing equations
+// https://gist.github.com/gre/1650294
+
+var Easing = {
+
+  linear: function (t) {
+    return t;
+  },
+
+  easeInQuad: function (t) {
+    return Math.pow(t, 2);
+  },
+
+  easeOutQuad: function (t) {
+    return t * (2-t);
+  },
+
+  easeInOutQuad: function (t) {
+    return t < .5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+  },
+
+  easeInCubic: function (t) {
+    return t * t * t;
+  },
+
+  easeOutCubic: function (t) {
+    return (--t) * t * t + 1;
+  },
+
+  easeInOutCubic: function (t) {
+    return t < .5 ? 4 * t * t * t : (t-1) * (2*t - 2) * (2*t - 2) + 1;
+  }
+
+};
+
+module.exports = Easing;
+
+},{}],10:[function(require,module,exports){
+'use strict';
+
+// Supported events that RenderLayer's can subscribe to.
+
+module.exports = {
+  onTouchStart: 'touchstart',
+  onTouchMove: 'touchmove',
+  onTouchEnd: 'touchend',
+  onTouchCancel: 'touchcancel',
+  onClick: 'click'
+};
+
+},{}],11:[function(require,module,exports){
+'use strict';
+
+var _fontFaces = {};
+
+/**
+ * @param {String} family The CSS font-family value
+ * @param {String} url The remote URL for the font file
+ * @param {Object} attributes Font attributes supported: style, weight
+ * @return {Object}
+ */
+function FontFace (family, url, attributes) {
+  var fontFace;
+  var fontId;
+
+  attributes = attributes || {};
+  attributes.style = attributes.style || 'normal';
+  attributes.weight = attributes.weight || 400;
+
+  fontId = getCacheKey(family, url, attributes);
+  fontFace = _fontFaces[fontId];
+
+  if (!fontFace) {
+    fontFace = {};
+    fontFace.id = fontId;
+    fontFace.family = family;
+    fontFace.url = url;
+    fontFace.attributes = attributes;
+    _fontFaces[fontId] = fontFace;
+  }
+
+  return fontFace;
+}
+
+/**
+ * Helper for retrieving the default family by weight.
+ *
+ * @param {Number} fontWeight
+ * @return {FontFace}
+ */
+FontFace.Default = function (fontWeight) {
+  return FontFace('sans-serif', null, {weight: fontWeight});
+};
+
+/**
+ * @internal
+ */
+function getCacheKey (family, url, attributes) {
+  return family + url + Object.keys(attributes).sort().map(function (key) {
+    return attributes[key];
+  });
+}
+
+module.exports = FontFace;
+
+},{}],12:[function(require,module,exports){
+'use strict';
+
+var FontFace = require('./FontFace');
+
+var _useNativeImpl = (typeof window.FontFace !== 'undefined');
+var _pendingFonts = {};
+var _loadedFonts = {};
+var _failedFonts = {};
+
+var kFontLoadTimeout = 3000;
+
+/**
+ * Check if a font face has loaded
+ * @param {FontFace} fontFace
+ * @return {Boolean}
+ */
+function isFontLoaded (fontFace) {
+  // For remote URLs, check the cache. System fonts (sans url) assume loaded.
+  return _loadedFonts[fontFace.id] !== undefined || !fontFace.url;
+}
+
+/**
+ * Load a remote font and execute a callback.
+ * @param {FontFace} fontFace The font to Load
+ * @param {Function} callback Function executed upon font Load
+ */
+function loadFont (fontFace, callback) {
+  var defaultNode;
+  var testNode;
+  var checkFont;
+
+  // See if we've previously loaded it.
+  if (_loadedFonts[fontFace.id]) {
+    return callback(null);
+  }
+
+  // See if we've previously failed to load it.
+  if (_failedFonts[fontFace.id]) {
+    return callback(_failedFonts[fontFace.id]);
+  }
+
+  // System font: assume already loaded.
+  if (!fontFace.url) {
+    return callback(null);
+  }
+
+  // Font load is already in progress:
+  if (_pendingFonts[fontFace.id]) {
+    _pendingFonts[fontFace.id].callbacks.push(callback);
+    return;
+  }
+
+  // Create the test <span>'s for measuring.
+  defaultNode = createTestNode('Helvetica', fontFace.attributes);
+  testNode = createTestNode(fontFace.family, fontFace.attributes);
+  document.body.appendChild(testNode);
+  document.body.appendChild(defaultNode);
+
+  _pendingFonts[fontFace.id] = {
+    startTime: Date.now(),
+    defaultNode: defaultNode,
+    testNode: testNode,
+    callbacks: [callback]
+  };
+
+  // Font watcher
+  checkFont = function () {
+    var currWidth = testNode.getBoundingClientRect().width;
+    var defaultWidth = defaultNode.getBoundingClientRect().width;
+    var loaded = currWidth !== defaultWidth;
+
+    if (loaded) {
+      handleFontLoad(fontFace, null);
+    } else {
+      // Timeout?
+      if (Date.now() - _pendingFonts[fontFace.id].startTime >= kFontLoadTimeout) {
+        handleFontLoad(fontFace, true);
+      } else {
+        requestAnimationFrame(checkFont);
+      }
+    }
+  };
+
+  // Start watching
+  checkFont();
+}
+
+// Internal
+// ========
+
+/**
+ * Native FontFace loader implementation
+ * @internal
+ */
+function loadFontNative (fontFace, callback) {
+  var theFontFace;
+
+  // See if we've previously loaded it.
+  if (_loadedFonts[fontFace.id]) {
+    return callback(null);
+  }
+
+  // See if we've previously failed to load it.
+  if (_failedFonts[fontFace.id]) {
+    return callback(_failedFonts[fontFace.id]);
+  }
+
+  // System font: assume it's installed.
+  if (!fontFace.url) {
+    return callback(null);
+  }
+
+  // Font load is already in progress:
+  if (_pendingFonts[fontFace.id]) {
+    _pendingFonts[fontFace.id].callbacks.push(callback);
+    return;
+  }
+
+  _pendingFonts[fontFace.id] = {
+    startTime: Date.now(),
+    callbacks: [callback]
+  };
+
+  // Use font loader API
+  theFontFace = new window.FontFace(fontFace.family,
+    'url(' + fontFace.url + ')', fontFace.attributes);
+
+  theFontFace.load().then(function () {
+    _loadedFonts[fontFace.id] = true;
+    callback(null);
+  }, function (err) {
+    _failedFonts[fontFace.id] = err;
+    callback(err);
+  });
+}
+
+/**
+ * Helper method for created a hidden <span> with a given font.
+ * Uses TypeKit's default test string, which is said to result
+ * in highly varied measured widths when compared to the default font.
+ * @internal
+ */
+function createTestNode (family, attributes) {
+  var span = document.createElement('span');
+  span.setAttribute('data-fontfamily', family);
+  span.style.cssText = 'position:absolute; left:-5000px; top:-5000px; visibility:hidden;' +
+    'font-size:100px; font-family:"' + family + '", Helvetica;font-weight: ' + attributes.weight + ';' +
+    'font-style:' + attributes.style + ';';
+  span.innerHTML = 'BESs';
+  return span;
+}
+
+/**
+ * @internal
+ */
+function handleFontLoad (fontFace, timeout) {
+  var error = timeout ? 'Exceeded load timeout of ' + kFontLoadTimeout + 'ms' : null;
+
+  if (!error) {
+    _loadedFonts[fontFace.id] = true;
+  } else {
+    _failedFonts[fontFace.id] = error;
+  }
+
+  // Execute pending callbacks.
+  _pendingFonts[fontFace.id].callbacks.forEach(function (callback) {
+    callback(error);
+  });
+
+  // Clean up DOM
+  if (_pendingFonts[fontFace.id].defaultNode) {
+    document.body.removeChild(_pendingFonts[fontFace.id].defaultNode);
+  }
+  if (_pendingFonts[fontFace.id].testNode) {
+    document.body.removeChild(_pendingFonts[fontFace.id].testNode);
+  }
+
+  // Clean up waiting queue
+  delete _pendingFonts[fontFace.id];
+}
+
+module.exports = {
+  isFontLoaded: isFontLoaded,
+  loadFont: _useNativeImpl ? loadFontNative : loadFont
+};
+
+},{"./FontFace":11}],13:[function(require,module,exports){
+'use strict';
+
+function Frame (x, y, width, height) {
+  this.x = x;
+  this.y = y;
+  this.width = width;
+  this.height = height;
+}
+
+/**
+ * Get a frame object
+ *
+ * @param {Number} x
+ * @param {Number} y
+ * @param {Number} width
+ * @param {Number} height
+ * @return {Frame}
+ */
+function make (x, y, width, height) {
+  return new Frame(x, y, width, height);
+}
+
+/**
+ * Return a zero size anchored at (0, 0).
+ *
+ * @return {Frame}
+ */
+function zero () {
+  return make(0, 0, 0, 0);
+}
+
+/**
+ * Return a cloned frame
+ *
+ * @param {Frame} frame
+ * @return {Frame}
+ */
+function clone (frame) {
+  return make(frame.x, frame.y, frame.width, frame.height);
+}
+
+/**
+ * Creates a new frame by a applying edge insets. This method accepts CSS
+ * shorthand notation e.g. inset(myFrame, 10, 0);
+ *
+ * @param {Frame} frame
+ * @param {Number} top
+ * @param {Number} right
+ * @param {?Number} bottom
+ * @param {?Number} left
+ * @return {Frame}
+ */
+function inset (frame, top, right, bottom, left) {
+  var frameCopy = clone(frame);
+
+  // inset(myFrame, 10, 0) => inset(myFrame, 10, 0, 10, 0)
+  if (typeof bottom === 'undefined') {
+    bottom = top;
+    left = right;
+  }
+
+  // inset(myFrame, 10) => inset(myFrame, 10, 10, 10, 10)
+  if (typeof right === 'undefined') {
+    right = bottom = left = top;
+  }
+
+  frameCopy.x += left;
+  frameCopy.y += top;
+  frameCopy.height -= (top + bottom);
+  frameCopy.width -= (left + right);
+
+  return frameCopy;
+}
+
+/**
+ * Compute the intersection region between 2 frames.
+ *
+ * @param {Frame} frame
+ * @param {Frame} otherFrame
+ * @return {Frame}
+ */
+function intersection (frame, otherFrame) {
+  var x = Math.max(frame.x, otherFrame.x);
+  var width = Math.min(frame.x + frame.width, otherFrame.x + otherFrame.width);
+  var y = Math.max(frame.y, otherFrame.y);
+  var height = Math.min(frame.y + frame.height, otherFrame.y + otherFrame.height);
+  if (width >= x && height >= y) {
+    return make(x, y, width - x, height - y);
+  }
+  return null;
+}
+
+/**
+ * Compute the union of two frames
+ *
+ * @param {Frame} frame
+ * @param {Frame} otherFrame
+ * @return {Frame}
+ */
+function union (frame, otherFrame) {
+  var x1 = Math.min(frame.x, otherFrame.x);
+  var x2 = Math.max(frame.x + frame.width, otherFrame.x + otherFrame.width);
+  var y1 = Math.min(frame.y, otherFrame.y);
+  var y2 = Math.max(frame.y + frame.height, otherFrame.y + otherFrame.height);
+  return make(x1, y1, x2 - x1, y2 - y1);
+}
+
+/**
+ * Determine if 2 frames intersect each other
+ *
+ * @param {Frame} frame
+ * @param {Frame} otherFrame
+ * @return {Boolean}
+ */
+function intersects (frame, otherFrame) {
+  return !(otherFrame.x > frame.x + frame.width ||
+           otherFrame.x + otherFrame.width < frame.x ||
+           otherFrame.y > frame.y + frame.height ||
+           otherFrame.y + otherFrame.height < frame.y);
+}
+
+module.exports = {
+  make: make,
+  zero: zero,
+  clone: clone,
+  inset: inset,
+  intersection: intersection,
+  intersects: intersects,
+  union: union
+};
+
+
+},{}],14:[function(require,module,exports){
+'use strict';
+
+var createComponent = require('./createComponent');
+var ContainerMixin = require('./ContainerMixin');
+var LayerMixin = require('./LayerMixin');
+var RenderLayer = require('./RenderLayer');
+
+var Group = createComponent('Group', LayerMixin, ContainerMixin, {
+
+  mountComponent: function (rootID, transaction, context) {
+    var props = this._currentElement.props;
+    var layer = this.node;
+
+    this.applyLayerProps({}, props);
+    this.mountAndInjectChildren(props.children, transaction, context);
+
+    return layer;
+  },
+
+  receiveComponent: function (nextComponent, transaction, context) {
+    var props = nextComponent.props;
+    var prevProps = this._currentElement.props;
+    this.applyLayerProps(prevProps, props);
+    this.updateChildren(props.children, transaction, context);
+    this._currentElement = nextComponent;
+  },
+
+  unmountComponent: function () {
+    LayerMixin.unmountComponent.call(this);
+    this.unmountChildren();
+  }
+
+});
+
+module.exports = Group;
+
+},{"./ContainerMixin":7,"./LayerMixin":18,"./RenderLayer":22,"./createComponent":26}],15:[function(require,module,exports){
+'use strict';
+
+var React = require('react');
+var assign = require('react/lib/Object.assign');
+var createComponent = require('./createComponent');
+var LayerMixin = require('./LayerMixin');
+var Layer = require('./Layer');
+var Group = require('./Group');
+var ImageCache = require('./ImageCache');
+var Easing = require('./Easing');
+var clamp = require('./clamp');
+
+var FADE_DURATION = 200;
+
+var RawImage = createComponent('Image', LayerMixin, {
+
+  applyImageProps: function (prevProps, props) {
+    var layer = this.node;
+
+    layer.type = 'image';
+    layer.imageUrl = props.src;
+  },
+
+  mountComponent: function (rootID, transaction, context) {
+    var props = this._currentElement.props;
+    var layer = this.node;
+    this.applyLayerProps({}, props);
+    this.applyImageProps({}, props);
+    return layer;
+  },
+
+  receiveComponent: function (nextComponent, transaction, context) {
+    var prevProps = this._currentElement.props;
+    var props = nextComponent.props;
+    this.applyLayerProps(prevProps, props);
+    this._currentElement = nextComponent;
+  },
+
+});
+
+var Image = React.createClass({
+
+  propTypes: {
+    src: React.PropTypes.string.isRequired,
+    style: React.PropTypes.object,
+    useBackingStore: React.PropTypes.bool,
+    fadeIn: React.PropTypes.bool,
+    fadeInDuration: React.PropTypes.number
+  },
+
+  getInitialState: function () {
+    var loaded = ImageCache.get(this.props.src).isLoaded();
+    return {
+      loaded: loaded,
+      imageAlpha: loaded ? 1 : 0
+    };
+  },
+
+  componentDidMount: function () {
+    ImageCache.get(this.props.src).on('load', this.handleImageLoad);
+  },
+
+  componentWillUnmount: function () {
+    if (this._pendingAnimationFrame) {
+      cancelAnimationFrame(this._pendingAnimationFrame);
+    }
+    ImageCache.get(this.props.src).removeListener('load', this.handleImageLoad);
+  },
+
+  componentDidUpdate: function (prevProps, prevState) {
+    if (this.refs.image) {
+      this.refs.image.invalidateLayout();
+    }
+  },
+
+  render: function () {
+    var rawImage;
+    var imageStyle = assign({}, this.props.style);
+    var useBackingStore = this.state.loaded ? this.props.useBackingStore : false;
+
+    // Hide the image until loaded.
+    imageStyle.alpha = this.state.imageAlpha;
+
+    return (
+      React.createElement(Group, {ref: 'main', style: this.props.style},
+        React.createElement(RawImage, {ref: 'image', src: this.props.src, style: imageStyle, useBackingStore: useBackingStore})
+      )
+    );
+  },
+
+  handleImageLoad: function () {
+    var imageAlpha = 1;
+    if (this.props.fadeIn) {
+      imageAlpha = 0;
+      this._animationStartTime = Date.now();
+      this._pendingAnimationFrame = requestAnimationFrame(this.stepThroughAnimation);
+    }
+    this.setState({ loaded: true, imageAlpha: imageAlpha });
+  },
+
+  stepThroughAnimation: function () {
+    var fadeInDuration = this.props.fadeInDuration || FADE_DURATION;
+    var alpha = Easing.easeInCubic((Date.now() - this._animationStartTime) / fadeInDuration);
+    alpha = clamp(alpha, 0, 1);
+    this.setState({ imageAlpha: alpha });
+    if (alpha < 1) {
+      this._pendingAnimationFrame = requestAnimationFrame(this.stepThroughAnimation);
+    }
+  }
+
+});
+
+module.exports = Image;
+
+},{"./Easing":9,"./Group":14,"./ImageCache":16,"./Layer":17,"./LayerMixin":18,"./clamp":25,"./createComponent":26,"react":188,"react/lib/Object.assign":59}],16:[function(require,module,exports){
+'use strict';
+
+var EventEmitter = require('events');
+var assign = require('react/lib/Object.assign');
+
+var NOOP = function () {};
+
+function Img (src) {
+  this._originalSrc = src;
+  this._img = new Image();
+  this._img.onload = this.emit.bind(this, 'load');
+  this._img.onerror = this.emit.bind(this, 'error');
+  this._img.src = src;
+
+  // The default impl of events emitter will throw on any 'error' event unless
+  // there is at least 1 handler. Logging anything in this case is unnecessary
+  // since the browser console will log it too.
+  this.on('error', NOOP);
+
+  // Default is just 10.
+  this.setMaxListeners(100);
+}
+
+assign(Img.prototype, EventEmitter.prototype, {
+
+  /**
+   * Pooling owner looks for this
+   */
+  destructor: function () {
+    // Make sure we aren't leaking callbacks.
+    this.removeAllListeners();
+  },
+
+  /**
+   * Retrieve the original image URL before browser normalization
+   *
+   * @return {String}
+   */
+  getOriginalSrc: function () {
+    return this._originalSrc;
+  },
+
+  /**
+   * Retrieve a reference to the underyling <img> node.
+   *
+   * @return {HTMLImageElement}
+   */
+  getRawImage: function () {
+    return this._img;
+  },
+
+  /**
+   * Retrieve the loaded image width
+   *
+   * @return {Number}
+   */
+  getWidth: function () {
+    return this._img.naturalWidth;
+  },
+
+  /**
+   * Retrieve the loaded image height
+   *
+   * @return {Number}
+   */
+  getHeight: function () {
+    return this._img.naturalHeight;
+  },
+
+  /**
+   * @return {Bool}
+   */
+  isLoaded: function () {
+    return this._img.naturalHeight > 0;
+  }
+
+});
+
+var kInstancePoolLength = 300;
+var _instancePool = [];
+
+function getPooledImage (src) {
+  for (var i=0, len=_instancePool.length; i < len; i++) {
+    if (_instancePool[i].getOriginalSrc() === src) {
+      return _instancePool[i];
+    }
+  }
+  return null;
+}
+
+var ImageCache = {
+
+  /**
+   * Retrieve an image from the cache
+   *
+   * @return {Img}
+   */
+  get: function (src) {
+    var image = getPooledImage(src);
+    if (!image) {
+      // Simple FIFO queue
+      image = new Img(src);
+      if (_instancePool.length >= kInstancePoolLength) {
+        _instancePool.shift().destructor();
+      }
+    _instancePool.push(image);
+    }
+    return image;
+  }
+
+};
+
+module.exports = ImageCache;
+
+},{"events":2,"react/lib/Object.assign":59}],17:[function(require,module,exports){
+'use strict';
+
+var createComponent = require('./createComponent');
+var LayerMixin = require('./LayerMixin');
+
+var Layer = createComponent('Layer', LayerMixin, {
+
+  mountComponent: function (rootID, transaction, context) {
+    var props = this._currentElement.props;
+    var layer = this.node;
+    this.applyLayerProps({}, props);
+    return layer;
+  },
+
+  receiveComponent: function (nextComponent, transaction, context) {
+    var prevProps = this._currentElement.props;
+    var props = nextComponent.props;
+    this.applyLayerProps(prevProps, props);
+    this._currentElement = nextComponent;
+  }
+
+});
+
+module.exports = Layer;
+
+},{"./LayerMixin":18,"./createComponent":26}],18:[function(require,module,exports){
+'use strict';
+
+// Adapted from ReactART:
+// https://github.com/reactjs/react-art
+
+var FrameUtils = require('./FrameUtils');
+var DrawingUtils = require('./DrawingUtils');
+var EventTypes = require('./EventTypes');
+
+var LAYER_GUID = 0;
+
+var LayerMixin = {
+
+  construct: function(element) {
+    this._currentElement = element;
+    this._layerId = LAYER_GUID++;
+  },
+
+  getPublicInstance: function() {
+    return this.node;
+  },
+
+  putEventListener: function(type, listener) {
+    var subscriptions = this.subscriptions || (this.subscriptions = {});
+    var listeners = this.listeners || (this.listeners = {});
+    listeners[type] = listener;
+    if (listener) {
+      if (!subscriptions[type]) {
+        subscriptions[type] = this.node.subscribe(type, listener, this);
+      }
+    } else {
+      if (subscriptions[type]) {
+        subscriptions[type]();
+        delete subscriptions[type];
+      }
+    }
+  },
+
+  handleEvent: function(event) {
+    // TODO
+  },
+
+  destroyEventListeners: function() {
+    // TODO
+  },
+
+  applyLayerProps: function (prevProps, props) {
+    var layer = this.node;
+    var style = (props && props.style) ? props.style : {};
+    layer._originalStyle = style;
+
+    // Common layer properties
+    layer.alpha = style.alpha;
+    layer.backgroundColor = style.backgroundColor;
+    layer.borderColor = style.borderColor;
+    layer.borderRadius = style.borderRadius;
+    layer.clipRect = style.clipRect;
+    layer.frame = FrameUtils.make(style.left || 0, style.top || 0, style.width || 0, style.height || 0);
+    layer.scale = style.scale;
+    layer.translateX = style.translateX;
+    layer.translateY = style.translateY;
+    layer.zIndex = style.zIndex;
+
+    // Generate backing store ID as needed.
+    if (props.useBackingStore) {
+      layer.backingStoreId = this._layerId;
+    }
+
+    // Register events
+    for (var type in EventTypes) {
+      this.putEventListener(EventTypes[type], props[type]);
+    }
+  },
+
+  mountComponentIntoNode: function(rootID, container) {
+    throw new Error(
+      'You cannot render a Canvas component standalone. ' +
+      'You need to wrap it in a Surface.'
+    );
+  },
+
+  unmountComponent: function() {
+    // Purge backing stores on unmount.
+    var layer = this.node;
+    if (layer.backingStoreId) {
+      DrawingUtils.invalidateBackingStore(layer.backingStoreId);
+    }
+    this.destroyEventListeners();
+  }
+
+};
+
+module.exports = LayerMixin;
+
+},{"./DrawingUtils":8,"./EventTypes":10,"./FrameUtils":13}],19:[function(require,module,exports){
+// https://github.com/facebook/css-layout
+
+/**
+ * Copyright (c) 2014, Facebook, Inc.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree. An additional grant
+ * of patent rights can be found in the PATENTS file in the same directory.
+ */
+
+var computeLayout = (function() {
+
+  function capitalizeFirst(str) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
+  }
+
+  function getSpacing(node, type, suffix, location) {
+    var key = type + capitalizeFirst(location) + suffix;
+    if (key in node.style) {
+      return node.style[key];
+    }
+
+    key = type + suffix;
+    if (key in node.style) {
+      return node.style[key];
+    }
+
+    return 0;
+  }
+
+  function getPositiveSpacing(node, type, suffix, location) {
+    var key = type + capitalizeFirst(location) + suffix;
+    if (key in node.style && node.style[key] >= 0) {
+      return node.style[key];
+    }
+
+    key = type + suffix;
+    if (key in node.style && node.style[key] >= 0) {
+      return node.style[key];
+    }
+
+    return 0;
+  }
+
+  function isUndefined(value) {
+    return value === undefined;
+  }
+
+  function getMargin(node, location) {
+    return getSpacing(node, 'margin', '', location);
+  }
+
+  function getPadding(node, location) {
+    return getPositiveSpacing(node, 'padding', '', location);
+  }
+
+  function getBorder(node, location) {
+    return getPositiveSpacing(node, 'border', 'Width', location);
+  }
+
+  function getPaddingAndBorder(node, location) {
+    return getPadding(node, location) + getBorder(node, location);
+  }
+
+  function getMarginAxis(node, axis) {
+    return getMargin(node, leading[axis]) + getMargin(node, trailing[axis]);
+  }
+
+  function getPaddingAndBorderAxis(node, axis) {
+    return getPaddingAndBorder(node, leading[axis]) + getPaddingAndBorder(node, trailing[axis]);
+  }
+
+  function getJustifyContent(node) {
+    if ('justifyContent' in node.style) {
+      return node.style.justifyContent;
+    }
+    return 'flex-start';
+  }
+
+  function getAlignItem(node, child) {
+    if ('alignSelf' in child.style) {
+      return child.style.alignSelf;
+    }
+    if ('alignItems' in node.style) {
+      return node.style.alignItems;
+    }
+    return 'stretch';
+  }
+
+  function getFlexDirection(node) {
+    if ('flexDirection' in node.style) {
+      return node.style.flexDirection;
+    }
+    return 'column';
+  }
+
+  function getPositionType(node) {
+    if ('position' in node.style) {
+      return node.style.position;
+    }
+    return 'relative';
+  }
+
+  function getFlex(node) {
+    return node.style.flex;
+  }
+
+  function isFlex(node) {
+    return (
+      getPositionType(node) === CSS_POSITION_RELATIVE &&
+      getFlex(node) > 0
+    );
+  }
+
+  function isFlexWrap(node) {
+    return node.style.flexWrap === 'wrap';
+  }
+
+  function getDimWithMargin(node, axis) {
+    return node.layout[dim[axis]] + getMarginAxis(node, axis);
+  }
+
+  function isDimDefined(node, axis) {
+    return !isUndefined(node.style[dim[axis]]) && node.style[dim[axis]] >= 0;
+  }
+
+  function isPosDefined(node, pos) {
+    return !isUndefined(node.style[pos]);
+  }
+
+  function isMeasureDefined(node) {
+    return 'measure' in node.style;
+  }
+
+  function getPosition(node, pos) {
+    if (pos in node.style) {
+      return node.style[pos];
+    }
+    return 0;
+  }
+
+  // When the user specifically sets a value for width or height
+  function setDimensionFromStyle(node, axis) {
+    // The parent already computed us a width or height. We just skip it
+    if (!isUndefined(node.layout[dim[axis]])) {
+      return;
+    }
+    // We only run if there's a width or height defined
+    if (!isDimDefined(node, axis)) {
+      return;
+    }
+
+    // The dimensions can never be smaller than the padding and border
+    node.layout[dim[axis]] = fmaxf(
+      node.style[dim[axis]],
+      getPaddingAndBorderAxis(node, axis)
+    );
+  }
+
+  // If both left and right are defined, then use left. Otherwise return
+  // +left or -right depending on which is defined.
+  function getRelativePosition(node, axis) {
+    if (leading[axis] in node.style) {
+      return getPosition(node, leading[axis]);
+    }
+    return -getPosition(node, trailing[axis]);
+  }
+
+  var leading = {
+    row: 'left',
+    column: 'top'
+  };
+  var trailing = {
+    row: 'right',
+    column: 'bottom'
+  };
+  var pos = {
+    row: 'left',
+    column: 'top'
+  };
+  var dim = {
+    row: 'width',
+    column: 'height'
+  };
+
+  function fmaxf(a, b) {
+    if (a > b) {
+      return a;
+    }
+    return b;
+  }
+
+  var CSS_UNDEFINED = undefined;
+
+  var CSS_FLEX_DIRECTION_ROW = 'row';
+  var CSS_FLEX_DIRECTION_COLUMN = 'column';
+
+  var CSS_JUSTIFY_FLEX_START = 'flex-start';
+  var CSS_JUSTIFY_CENTER = 'center';
+  var CSS_JUSTIFY_FLEX_END = 'flex-end';
+  var CSS_JUSTIFY_SPACE_BETWEEN = 'space-between';
+  var CSS_JUSTIFY_SPACE_AROUND = 'space-around';
+
+  var CSS_ALIGN_FLEX_START = 'flex-start';
+  var CSS_ALIGN_CENTER = 'center';
+  var CSS_ALIGN_FLEX_END = 'flex-end';
+  var CSS_ALIGN_STRETCH = 'stretch';
+
+  var CSS_POSITION_RELATIVE = 'relative';
+  var CSS_POSITION_ABSOLUTE = 'absolute';
+
+  return function layoutNode(node, parentMaxWidth) {
+    var/*css_flex_direction_t*/ mainAxis = getFlexDirection(node);
+    var/*css_flex_direction_t*/ crossAxis = mainAxis === CSS_FLEX_DIRECTION_ROW ?
+      CSS_FLEX_DIRECTION_COLUMN :
+      CSS_FLEX_DIRECTION_ROW;
+
+    // Handle width and height style attributes
+    setDimensionFromStyle(node, mainAxis);
+    setDimensionFromStyle(node, crossAxis);
+
+    // The position is set by the parent, but we need to complete it with a
+    // delta composed of the margin and left/top/right/bottom
+    node.layout[leading[mainAxis]] += getMargin(node, leading[mainAxis]) +
+      getRelativePosition(node, mainAxis);
+    node.layout[leading[crossAxis]] += getMargin(node, leading[crossAxis]) +
+      getRelativePosition(node, crossAxis);
+
+    if (isMeasureDefined(node)) {
+      var/*float*/ width = CSS_UNDEFINED;
+      if (isDimDefined(node, CSS_FLEX_DIRECTION_ROW)) {
+        width = node.style.width;
+      } else if (!isUndefined(node.layout[dim[CSS_FLEX_DIRECTION_ROW]])) {
+        width = node.layout[dim[CSS_FLEX_DIRECTION_ROW]];
+      } else {
+        width = parentMaxWidth -
+          getMarginAxis(node, CSS_FLEX_DIRECTION_ROW);
+      }
+      width -= getPaddingAndBorderAxis(node, CSS_FLEX_DIRECTION_ROW);
+
+      // We only need to give a dimension for the text if we haven't got any
+      // for it computed yet. It can either be from the style attribute or because
+      // the element is flexible.
+      var/*bool*/ isRowUndefined = !isDimDefined(node, CSS_FLEX_DIRECTION_ROW) &&
+        isUndefined(node.layout[dim[CSS_FLEX_DIRECTION_ROW]]);
+      var/*bool*/ isColumnUndefined = !isDimDefined(node, CSS_FLEX_DIRECTION_COLUMN) &&
+        isUndefined(node.layout[dim[CSS_FLEX_DIRECTION_COLUMN]]);
+
+      // Let's not measure the text if we already know both dimensions
+      if (isRowUndefined || isColumnUndefined) {
+        var/*css_dim_t*/ measure_dim = node.style.measure(
+          /*(c)!node->context,*/
+          width
+        );
+        if (isRowUndefined) {
+          node.layout.width = measure_dim.width +
+            getPaddingAndBorderAxis(node, CSS_FLEX_DIRECTION_ROW);
+        }
+        if (isColumnUndefined) {
+          node.layout.height = measure_dim.height +
+            getPaddingAndBorderAxis(node, CSS_FLEX_DIRECTION_COLUMN);
+        }
+      }
+      return;
+    }
+
+    // Pre-fill some dimensions straight from the parent
+    for (var/*int*/ i = 0; i < node.children.length; ++i) {
+      var/*css_node_t**/ child = node.children[i];
+      // Pre-fill cross axis dimensions when the child is using stretch before
+      // we call the recursive layout pass
+      if (getAlignItem(node, child) === CSS_ALIGN_STRETCH &&
+          getPositionType(child) === CSS_POSITION_RELATIVE &&
+          !isUndefined(node.layout[dim[crossAxis]]) &&
+          !isDimDefined(child, crossAxis)) {
+        child.layout[dim[crossAxis]] = fmaxf(
+          node.layout[dim[crossAxis]] -
+            getPaddingAndBorderAxis(node, crossAxis) -
+            getMarginAxis(child, crossAxis),
+          // You never want to go smaller than padding
+          getPaddingAndBorderAxis(child, crossAxis)
+        );
+      } else if (getPositionType(child) == CSS_POSITION_ABSOLUTE) {
+        // Pre-fill dimensions when using absolute position and both offsets for the axis are defined (either both
+        // left and right or top and bottom).
+        for (var/*int*/ ii = 0; ii < 2; ii++) {
+          var/*css_flex_direction_t*/ axis = (ii != 0) ? CSS_FLEX_DIRECTION_ROW : CSS_FLEX_DIRECTION_COLUMN;
+          if (!isUndefined(node.layout[dim[axis]]) &&
+              !isDimDefined(child, axis) &&
+              isPosDefined(child, leading[axis]) &&
+              isPosDefined(child, trailing[axis])) {
+            child.layout[dim[axis]] = fmaxf(
+              node.layout[dim[axis]] -
+              getPaddingAndBorderAxis(node, axis) -
+              getMarginAxis(child, axis) -
+              getPosition(child, leading[axis]) -
+              getPosition(child, trailing[axis]),
+              // You never want to go smaller than padding
+              getPaddingAndBorderAxis(child, axis)
+            );
+          }
+        }
+      }
+    }
+
+    var/*float*/ definedMainDim = CSS_UNDEFINED;
+    if (!isUndefined(node.layout[dim[mainAxis]])) {
+      definedMainDim = node.layout[dim[mainAxis]] -
+          getPaddingAndBorderAxis(node, mainAxis);
+    }
+
+    // We want to execute the next two loops one per line with flex-wrap
+    var/*int*/ startLine = 0;
+    var/*int*/ endLine = 0;
+    var/*int*/ nextOffset = 0;
+    var/*int*/ alreadyComputedNextLayout = 0;
+    // We aggregate the total dimensions of the container in those two variables
+    var/*float*/ linesCrossDim = 0;
+    var/*float*/ linesMainDim = 0;
+    while (endLine < node.children.length) {
+      // <Loop A> Layout non flexible children and count children by type
+
+      // mainContentDim is accumulation of the dimensions and margin of all the
+      // non flexible children. This will be used in order to either set the
+      // dimensions of the node if none already exist, or to compute the
+      // remaining space left for the flexible children.
+      var/*float*/ mainContentDim = 0;
+
+      // There are three kind of children, non flexible, flexible and absolute.
+      // We need to know how many there are in order to distribute the space.
+      var/*int*/ flexibleChildrenCount = 0;
+      var/*float*/ totalFlexible = 0;
+      var/*int*/ nonFlexibleChildrenCount = 0;
+      for (var/*int*/ i = startLine; i < node.children.length; ++i) {
+        var/*css_node_t**/ child = node.children[i];
+        var/*float*/ nextContentDim = 0;
+
+        // It only makes sense to consider a child flexible if we have a computed
+        // dimension for the node.
+        if (!isUndefined(node.layout[dim[mainAxis]]) && isFlex(child)) {
+          flexibleChildrenCount++;
+          totalFlexible += getFlex(child);
+
+          // Even if we don't know its exact size yet, we already know the padding,
+          // border and margin. We'll use this partial information to compute the
+          // remaining space.
+          nextContentDim = getPaddingAndBorderAxis(child, mainAxis) +
+            getMarginAxis(child, mainAxis);
+
+        } else {
+          var/*float*/ maxWidth = CSS_UNDEFINED;
+          if (mainAxis === CSS_FLEX_DIRECTION_ROW) {
+            // do nothing
+          } else if (isDimDefined(node, CSS_FLEX_DIRECTION_ROW)) {
+            maxWidth = node.layout[dim[CSS_FLEX_DIRECTION_ROW]] -
+              getPaddingAndBorderAxis(node, CSS_FLEX_DIRECTION_ROW);
+          } else {
+            maxWidth = parentMaxWidth -
+              getMarginAxis(node, CSS_FLEX_DIRECTION_ROW) -
+              getPaddingAndBorderAxis(node, CSS_FLEX_DIRECTION_ROW);
+          }
+
+          // This is the main recursive call. We layout non flexible children.
+          if (alreadyComputedNextLayout === 0) {
+            layoutNode(child, maxWidth);
+          }
+
+          // Absolute positioned elements do not take part of the layout, so we
+          // don't use them to compute mainContentDim
+          if (getPositionType(child) === CSS_POSITION_RELATIVE) {
+            nonFlexibleChildrenCount++;
+            // At this point we know the final size and margin of the element.
+            nextContentDim = getDimWithMargin(child, mainAxis);
+          }
+        }
+
+        // The element we are about to add would make us go to the next line
+        if (isFlexWrap(node) &&
+            !isUndefined(node.layout[dim[mainAxis]]) &&
+            mainContentDim + nextContentDim > definedMainDim &&
+            // If there's only one element, then it's bigger than the content
+            // and needs its own line
+            i !== startLine) {
+          alreadyComputedNextLayout = 1;
+          break;
+        }
+        alreadyComputedNextLayout = 0;
+        mainContentDim += nextContentDim;
+        endLine = i + 1;
+      }
+
+      // <Loop B> Layout flexible children and allocate empty space
+
+      // In order to position the elements in the main axis, we have two
+      // controls. The space between the beginning and the first element
+      // and the space between each two elements.
+      var/*float*/ leadingMainDim = 0;
+      var/*float*/ betweenMainDim = 0;
+
+      // The remaining available space that needs to be allocated
+      var/*float*/ remainingMainDim = 0;
+      if (!isUndefined(node.layout[dim[mainAxis]])) {
+        remainingMainDim = definedMainDim - mainContentDim;
+      } else {
+        remainingMainDim = fmaxf(mainContentDim, 0) - mainContentDim;
+      }
+
+      // If there are flexible children in the mix, they are going to fill the
+      // remaining space
+      if (flexibleChildrenCount !== 0) {
+        var/*float*/ flexibleMainDim = remainingMainDim / totalFlexible;
+
+        // The non flexible children can overflow the container, in this case
+        // we should just assume that there is no space available.
+        if (flexibleMainDim < 0) {
+          flexibleMainDim = 0;
+        }
+        // We iterate over the full array and only apply the action on flexible
+        // children. This is faster than actually allocating a new array that
+        // contains only flexible children.
+        for (var/*int*/ i = startLine; i < endLine; ++i) {
+          var/*css_node_t**/ child = node.children[i];
+          if (isFlex(child)) {
+            // At this point we know the final size of the element in the main
+            // dimension
+            child.layout[dim[mainAxis]] = flexibleMainDim * getFlex(child) +
+              getPaddingAndBorderAxis(child, mainAxis);
+
+            var/*float*/ maxWidth = CSS_UNDEFINED;
+            if (mainAxis === CSS_FLEX_DIRECTION_ROW) {
+              // do nothing
+            } else if (isDimDefined(node, CSS_FLEX_DIRECTION_ROW)) {
+              maxWidth = node.layout[dim[CSS_FLEX_DIRECTION_ROW]] -
+                getPaddingAndBorderAxis(node, CSS_FLEX_DIRECTION_ROW);
+            } else {
+              maxWidth = parentMaxWidth -
+                getMarginAxis(node, CSS_FLEX_DIRECTION_ROW) -
+                getPaddingAndBorderAxis(node, CSS_FLEX_DIRECTION_ROW);
+            }
+
+            // And we recursively call the layout algorithm for this child
+            layoutNode(child, maxWidth);
+          }
+        }
+
+      // We use justifyContent to figure out how to allocate the remaining
+      // space available
+      } else {
+        var/*css_justify_t*/ justifyContent = getJustifyContent(node);
+        if (justifyContent === CSS_JUSTIFY_FLEX_START) {
+          // Do nothing
+        } else if (justifyContent === CSS_JUSTIFY_CENTER) {
+          leadingMainDim = remainingMainDim / 2;
+        } else if (justifyContent === CSS_JUSTIFY_FLEX_END) {
+          leadingMainDim = remainingMainDim;
+        } else if (justifyContent === CSS_JUSTIFY_SPACE_BETWEEN) {
+          remainingMainDim = fmaxf(remainingMainDim, 0);
+          if (flexibleChildrenCount + nonFlexibleChildrenCount - 1 !== 0) {
+            betweenMainDim = remainingMainDim /
+              (flexibleChildrenCount + nonFlexibleChildrenCount - 1);
+          } else {
+            betweenMainDim = 0;
+          }
+        } else if (justifyContent === CSS_JUSTIFY_SPACE_AROUND) {
+          // Space on the edges is half of the space between elements
+          betweenMainDim = remainingMainDim /
+            (flexibleChildrenCount + nonFlexibleChildrenCount);
+          leadingMainDim = betweenMainDim / 2;
+        }
+      }
+
+      // <Loop C> Position elements in the main axis and compute dimensions
+
+      // At this point, all the children have their dimensions set. We need to
+      // find their position. In order to do that, we accumulate data in
+      // variables that are also useful to compute the total dimensions of the
+      // container!
+      var/*float*/ crossDim = 0;
+      var/*float*/ mainDim = leadingMainDim +
+        getPaddingAndBorder(node, leading[mainAxis]);
+
+      for (var/*int*/ i = startLine; i < endLine; ++i) {
+        var/*css_node_t**/ child = node.children[i];
+
+        if (getPositionType(child) === CSS_POSITION_ABSOLUTE &&
+            isPosDefined(child, leading[mainAxis])) {
+          // In case the child is position absolute and has left/top being
+          // defined, we override the position to whatever the user said
+          // (and margin/border).
+          child.layout[pos[mainAxis]] = getPosition(child, leading[mainAxis]) +
+            getBorder(node, leading[mainAxis]) +
+            getMargin(child, leading[mainAxis]);
+        } else {
+          // If the child is position absolute (without top/left) or relative,
+          // we put it at the current accumulated offset.
+          child.layout[pos[mainAxis]] += mainDim;
+        }
+
+        // Now that we placed the element, we need to update the variables
+        // We only need to do that for relative elements. Absolute elements
+        // do not take part in that phase.
+        if (getPositionType(child) === CSS_POSITION_RELATIVE) {
+          // The main dimension is the sum of all the elements dimension plus
+          // the spacing.
+          mainDim += betweenMainDim + getDimWithMargin(child, mainAxis);
+          // The cross dimension is the max of the elements dimension since there
+          // can only be one element in that cross dimension.
+          crossDim = fmaxf(crossDim, getDimWithMargin(child, crossAxis));
+        }
+      }
+
+      var/*float*/ containerMainAxis = node.layout[dim[mainAxis]];
+      // If the user didn't specify a width or height, and it has not been set
+      // by the container, then we set it via the children.
+      if (isUndefined(node.layout[dim[mainAxis]])) {
+        containerMainAxis = fmaxf(
+          // We're missing the last padding at this point to get the final
+          // dimension
+          mainDim + getPaddingAndBorder(node, trailing[mainAxis]),
+          // We can never assign a width smaller than the padding and borders
+          getPaddingAndBorderAxis(node, mainAxis)
+        );
+      }
+
+      var/*float*/ containerCrossAxis = node.layout[dim[crossAxis]];
+      if (isUndefined(node.layout[dim[crossAxis]])) {
+        containerCrossAxis = fmaxf(
+          // For the cross dim, we add both sides at the end because the value
+          // is aggregate via a max function. Intermediate negative values
+          // can mess this computation otherwise
+          crossDim + getPaddingAndBorderAxis(node, crossAxis),
+          getPaddingAndBorderAxis(node, crossAxis)
+        );
+      }
+
+      // <Loop D> Position elements in the cross axis
+
+      for (var/*int*/ i = startLine; i < endLine; ++i) {
+        var/*css_node_t**/ child = node.children[i];
+
+        if (getPositionType(child) === CSS_POSITION_ABSOLUTE &&
+            isPosDefined(child, leading[crossAxis])) {
+          // In case the child is absolutely positionned and has a
+          // top/left/bottom/right being set, we override all the previously
+          // computed positions to set it correctly.
+          child.layout[pos[crossAxis]] = getPosition(child, leading[crossAxis]) +
+            getBorder(node, leading[crossAxis]) +
+            getMargin(child, leading[crossAxis]);
+
+        } else {
+          var/*float*/ leadingCrossDim = getPaddingAndBorder(node, leading[crossAxis]);
+
+          // For a relative children, we're either using alignItems (parent) or
+          // alignSelf (child) in order to determine the position in the cross axis
+          if (getPositionType(child) === CSS_POSITION_RELATIVE) {
+            var/*css_align_t*/ alignItem = getAlignItem(node, child);
+            if (alignItem === CSS_ALIGN_FLEX_START) {
+              // Do nothing
+            } else if (alignItem === CSS_ALIGN_STRETCH) {
+              // You can only stretch if the dimension has not already been set
+              // previously.
+              if (!isDimDefined(child, crossAxis)) {
+                child.layout[dim[crossAxis]] = fmaxf(
+                  containerCrossAxis -
+                    getPaddingAndBorderAxis(node, crossAxis) -
+                    getMarginAxis(child, crossAxis),
+                  // You never want to go smaller than padding
+                  getPaddingAndBorderAxis(child, crossAxis)
+                );
+              }
+            } else {
+              // The remaining space between the parent dimensions+padding and child
+              // dimensions+margin.
+              var/*float*/ remainingCrossDim = containerCrossAxis -
+                getPaddingAndBorderAxis(node, crossAxis) -
+                getDimWithMargin(child, crossAxis);
+
+              if (alignItem === CSS_ALIGN_CENTER) {
+                leadingCrossDim += remainingCrossDim / 2;
+              } else { // CSS_ALIGN_FLEX_END
+                leadingCrossDim += remainingCrossDim;
+              }
+            }
+          }
+
+          // And we apply the position
+          child.layout[pos[crossAxis]] += linesCrossDim + leadingCrossDim;
+        }
+      }
+
+      linesCrossDim += crossDim;
+      linesMainDim = fmaxf(linesMainDim, mainDim);
+      startLine = endLine;
+    }
+
+    // If the user didn't specify a width or height, and it has not been set
+    // by the container, then we set it via the children.
+    if (isUndefined(node.layout[dim[mainAxis]])) {
+      node.layout[dim[mainAxis]] = fmaxf(
+        // We're missing the last padding at this point to get the final
+        // dimension
+        linesMainDim + getPaddingAndBorder(node, trailing[mainAxis]),
+        // We can never assign a width smaller than the padding and borders
+        getPaddingAndBorderAxis(node, mainAxis)
+      );
+    }
+
+    if (isUndefined(node.layout[dim[crossAxis]])) {
+      node.layout[dim[crossAxis]] = fmaxf(
+        // For the cross dim, we add both sides at the end because the value
+        // is aggregate via a max function. Intermediate negative values
+        // can mess this computation otherwise
+        linesCrossDim + getPaddingAndBorderAxis(node, crossAxis),
+        getPaddingAndBorderAxis(node, crossAxis)
+      );
+    }
+
+    // <Loop E> Calculate dimensions for absolutely positioned elements
+
+    for (var/*int*/ i = 0; i < node.children.length; ++i) {
+      var/*css_node_t**/ child = node.children[i];
+      if (getPositionType(child) == CSS_POSITION_ABSOLUTE) {
+        // Pre-fill dimensions when using absolute position and both offsets for the axis are defined (either both
+        // left and right or top and bottom).
+        for (var/*int*/ ii = 0; ii < 2; ii++) {
+          var/*css_flex_direction_t*/ axis = (ii !== 0) ? CSS_FLEX_DIRECTION_ROW : CSS_FLEX_DIRECTION_COLUMN;
+          if (!isUndefined(node.layout[dim[axis]]) &&
+              !isDimDefined(child, axis) &&
+              isPosDefined(child, leading[axis]) &&
+              isPosDefined(child, trailing[axis])) {
+            child.layout[dim[axis]] = fmaxf(
+              node.layout[dim[axis]] -
+              getPaddingAndBorderAxis(node, axis) -
+              getMarginAxis(child, axis) -
+              getPosition(child, leading[axis]) -
+              getPosition(child, trailing[axis]),
+              // You never want to go smaller than padding
+              getPaddingAndBorderAxis(child, axis)
+            );
+          }
+        }
+        for (var/*int*/ ii = 0; ii < 2; ii++) {
+          var/*css_flex_direction_t*/ axis = (ii !== 0) ? CSS_FLEX_DIRECTION_ROW : CSS_FLEX_DIRECTION_COLUMN;
+          if (isPosDefined(child, trailing[axis]) &&
+              !isPosDefined(child, leading[axis])) {
+            child.layout[leading[axis]] =
+              node.layout[dim[axis]] -
+              child.layout[dim[axis]] -
+              getPosition(child, trailing[axis]);
+          }
+        }
+      }
+    }
+  };
+})();
+
+if (typeof module === 'object') {
+  module.exports = computeLayout;
+}
+
+},{}],20:[function(require,module,exports){
+'use strict';
+
+var React = require('react');
+var assign = require('react/lib/Object.assign');
+var Scroller = require('scroller');
+var Group = require('./Group');
+var clamp = require('./clamp');
+
+var ListView = React.createClass({
+
+  propTypes: {
+    style: React.PropTypes.object,
+    numberOfItemsGetter: React.PropTypes.func.isRequired,
+    itemHeightGetter: React.PropTypes.func.isRequired,
+    itemGetter: React.PropTypes.func.isRequired,
+    snapping: React.PropTypes.bool,
+    scrollingDeceleration: React.PropTypes.number,
+    scrollingPenetrationAcceleration: React.PropTypes.number,
+    onScroll: React.PropTypes.func
+  },
+
+  getDefaultProps: function () {
+    return {
+      style: { left: 0, top: 0, width: 0, height: 0 },
+      snapping: false,
+      scrollingDeceleration: 0.95,
+      scrollingPenetrationAcceleration: 0.08
+    };
+  },
+
+  getInitialState: function () {
+    return {
+      scrollTop: 0
+    };
+  },
+
+  componentDidMount: function () {
+    this.createScroller();
+    this.updateScrollingDimensions();
+  },
+
+  render: function () {
+    var items = this.getVisibleItemIndexes().map(this.renderItem);
+    return (
+      React.createElement(Group, {
+        style: this.props.style,
+        onTouchStart: this.handleTouchStart,
+        onTouchMove: this.handleTouchMove,
+        onTouchEnd: this.handleTouchEnd,
+        onTouchCancel: this.handleTouchEnd},
+        items
+      )
+    );
+  },
+
+  renderItem: function (itemIndex) {
+    var item = this.props.itemGetter(itemIndex, this.state.scrollTop);
+    var itemHeight = this.props.itemHeightGetter();
+    var style = {
+      top: 0,
+      left: 0,
+      width: this.props.style.width,
+      height: itemHeight,
+      translateY: (itemIndex * itemHeight) - this.state.scrollTop,
+      zIndex: itemIndex
+    };
+
+    return (
+      React.createElement(Group, {style: style, key: itemIndex},
+        item
+      )
+    );
+  },
+
+  // Events
+  // ======
+
+  handleTouchStart: function (e) {
+    if (this.scroller) {
+      this.scroller.doTouchStart(e.touches, e.timeStamp);
+    }
+  },
+
+  handleTouchMove: function (e) {
+    if (this.scroller) {
+      e.preventDefault();
+      this.scroller.doTouchMove(e.touches, e.timeStamp, e.scale);
+    }
+  },
+
+  handleTouchEnd: function (e) {
+    if (this.scroller) {
+      this.scroller.doTouchEnd(e.timeStamp);
+      if (this.props.snapping) {
+        this.updateScrollingDeceleration();
+      }
+    }
+  },
+
+  handleScroll: function (left, top) {
+    this.setState({ scrollTop: top });
+    if (this.props.onScroll) {
+      this.props.onScroll(top);
+    }
+  },
+
+  // Scrolling
+  // =========
+
+  createScroller: function () {
+    var options = {
+      scrollingX: false,
+      scrollingY: true,
+      decelerationRate: this.props.scrollingDeceleration,
+      penetrationAcceleration: this.props.scrollingPenetrationAcceleration,
+    };
+    this.scroller = new Scroller(this.handleScroll, options);
+  },
+
+  updateScrollingDimensions: function () {
+    var width = this.props.style.width;
+    var height = this.props.style.height;
+    var scrollWidth = width;
+    var scrollHeight = this.props.numberOfItemsGetter() * this.props.itemHeightGetter();
+    this.scroller.setDimensions(width, height, scrollWidth, scrollHeight);
+  },
+
+  getVisibleItemIndexes: function () {
+    var itemIndexes = [];
+    var itemHeight = this.props.itemHeightGetter();
+    var itemCount = this.props.numberOfItemsGetter();
+    var scrollTop = this.state.scrollTop;
+    var itemScrollTop = 0;
+
+    for (var index=0; index < itemCount; index++) {
+      itemScrollTop = (index * itemHeight) - scrollTop;
+
+      // Item is completely off-screen bottom
+      if (itemScrollTop >= this.props.style.height) {
+        continue;
+      }
+
+      // Item is completely off-screen top
+      if (itemScrollTop <= -this.props.style.height) {
+        continue;
+      }
+
+      // Part of item is on-screen.
+      itemIndexes.push(index);
+    }
+
+    return itemIndexes;
+  },
+
+  updateScrollingDeceleration: function () {
+    var currVelocity = this.scroller.__decelerationVelocityY;
+    var currScrollTop = this.state.scrollTop;
+    var targetScrollTop = 0;
+    var estimatedEndScrollTop = currScrollTop;
+
+    while (Math.abs(currVelocity).toFixed(6) > 0) {
+      estimatedEndScrollTop += currVelocity;
+      currVelocity *= this.props.scrollingDeceleration;
+    }
+
+    // Find the page whose estimated end scrollTop is closest to 0.
+    var closestZeroDelta = Infinity;
+    var pageHeight = this.props.itemHeightGetter();
+    var pageCount = this.props.numberOfItemsGetter();
+    var pageScrollTop;
+
+    for (var pageIndex=0, len=pageCount; pageIndex < len; pageIndex++) {
+      pageScrollTop = (pageHeight * pageIndex) - estimatedEndScrollTop;
+      if (Math.abs(pageScrollTop) < closestZeroDelta) {
+        closestZeroDelta = Math.abs(pageScrollTop);
+        targetScrollTop = pageHeight * pageIndex;
+      }
+    }
+
+    this.scroller.__minDecelerationScrollTop = targetScrollTop;
+    this.scroller.__maxDecelerationScrollTop = targetScrollTop;
+  }
+
+});
+
+module.exports = ListView;
+
+},{"./Group":14,"./clamp":25,"react":188,"react/lib/Object.assign":59,"scroller":30}],21:[function(require,module,exports){
+'use strict';
+
+var ReactCanvas = {
+  Surface: require('./Surface'),
+
+  Layer: require('./Layer'),
+  Group: require('./Group'),
+  Image: require('./Image'),
+  Text: require('./Text'),
+  ListView: require('./ListView'),
+
+  FontFace: require('./FontFace'),
+  measureText: require('./measureText')
+};
+
+module.exports = ReactCanvas;
+
+},{"./FontFace":11,"./Group":14,"./Image":15,"./Layer":17,"./ListView":20,"./Surface":23,"./Text":24,"./measureText":29}],22:[function(require,module,exports){
+'use strict';
+
+var FrameUtils = require('./FrameUtils');
+var DrawingUtils = require('./DrawingUtils');
+var EventTypes = require('./EventTypes');
+
+function RenderLayer () {
+  this.children = [];
+  this.frame = FrameUtils.zero();
+}
+
+RenderLayer.prototype = {
+
+  /**
+   * Retrieve the root injection layer
+   *
+   * @return {RenderLayer}
+   */
+  getRootLayer: function () {
+    var root = this;
+    while (root.parentLayer) {
+      root = root.parentLayer;
+    }
+    return root;
+  },
+
+  /**
+   * RenderLayers are injected into a root owner layer whenever a Surface is
+   * mounted. This is the integration point with React internals.
+   *
+   * @param {RenderLayer} parentLayer
+   */
+  inject: function (parentLayer) {
+    if (this.parentLayer && this.parentLayer !== parentLayer) {
+      this.remove();
+    }
+    if (!this.parentLayer) {
+      parentLayer.addChild(this);
+    }
+  },
+
+  /**
+   * Inject a layer before a reference layer
+   *
+   * @param {RenderLayer} parentLayer
+   * @param {RenderLayer} referenceLayer
+   */
+  injectBefore: function (parentLayer, referenceLayer) {
+    // FIXME
+    this.inject(parentLayer);
+  },
+
+  /**
+   * Add a child to the render layer
+   *
+   * @param {RenderLayer} child
+   */
+  addChild: function (child) {
+    child.parentLayer = this;
+    this.children.push(child);
+  },
+
+  /**
+   * Remove a layer from it's parent layer
+   */
+  remove: function () {
+    if (this.parentLayer) {
+      this.parentLayer.children.splice(this.parentLayer.children.indexOf(this), 1);
+    }
+  },
+
+  /**
+   * Attach an event listener to a layer. Supported events are defined in
+   * lib/EventTypes.js
+   *
+   * @param {String} type
+   * @param {Function} callback
+   * @param {?Object} callbackScope
+   * @return {Function} invoke to unsubscribe the listener
+   */
+  subscribe: function (type, callback, callbackScope) {
+    // This is the integration point with React, called from LayerMixin.putEventListener().
+    // Enforce that only a single callbcak can be assigned per event type.
+    for (var eventType in EventTypes) {
+      if (EventTypes[eventType] === type) {
+        this[eventType] = callback;
+      }
+    }
+
+    // Return a function that can be called to unsubscribe from the event.
+    return this.removeEventListener.bind(this, type, callback, callbackScope);
+  },
+
+  /**
+   * @param {String} type
+   * @param {Function} callback
+   * @param {?Object} callbackScope
+   */
+  addEventListener: function (type, callback, callbackScope) {
+    for (var eventType in EventTypes) {
+      if (EventTypes[eventType] === type) {
+        delete this[eventType];
+      }
+    }
+  },
+
+  /**
+   * @param {String} type
+   * @param {Function} callback
+   * @param {?Object} callbackScope
+   */
+  removeEventListener: function (type, callback, callbackScope) {
+    var listeners = this.eventListeners[type];
+    var listener;
+    if (listeners) {
+      for (var index=0, len=listeners.length; index < len; index++) {
+        listener = listeners[index];
+        if (listener.callback === callback &&
+            listener.callbackScope === callbackScope) {
+          listeners.splice(index, 1);
+          break;
+        }
+      }
+    }
+  },
+
+  /**
+   * Translate a layer's frame
+   *
+   * @param {Number} x
+   * @param {Number} y
+   */
+  translate: function (x, y) {
+    if (this.frame) {
+      this.frame.x += x;
+      this.frame.y += y;
+    }
+
+    if (this.clipRect) {
+      this.clipRect.x += x;
+      this.clipRect.y += y;
+    }
+
+    if (this.children) {
+      this.children.forEach(function (child) {
+        child.translate(x, y);
+      });
+    }
+  },
+
+  /**
+   * Layers should call this method when they need to be redrawn. Note the
+   * difference here between `invalidateBackingStore`: updates that don't
+   * trigger layout should prefer `invalidateLayout`. For instance, an image
+   * component that is animating alpha level after the image loads would
+   * call `invalidateBackingStore` once after the image loads, and at each
+   * step in the animation would then call `invalidateRect`.
+   *
+   * @param {?Frame} frame Optional, if not passed the entire layer's frame
+   *   will be invalidated.
+   */
+  invalidateLayout: function () {
+    // Bubble all the way to the root layer.
+    this.getRootLayer().draw();
+  },
+
+  /**
+   * Layers should call this method when their backing <canvas> needs to be
+   * redrawn. For instance, an image component would call this once after the
+   * image loads.
+   */
+  invalidateBackingStore: function () {
+    if (this.backingStoreId) {
+      DrawingUtils.invalidateBackingStore(this.backingStoreId);
+    }
+    this.invalidateLayout();
+  },
+
+  /**
+   * Only the root owning layer should implement this function.
+   */
+  draw: function () {
+    // Placeholer
+  }
+
+};
+
+module.exports = RenderLayer;
+
+},{"./DrawingUtils":8,"./EventTypes":10,"./FrameUtils":13}],23:[function(require,module,exports){
+(function (process){
+'use strict';
+
+var React = require('react');
+var ReactUpdates = require('react/lib/ReactUpdates');
+var invariant = require('react/lib/invariant');
+var ContainerMixin = require('./ContainerMixin');
+var RenderLayer = require('./RenderLayer');
+var FrameUtils = require('./FrameUtils');
+var DrawingUtils = require('./DrawingUtils');
+var hitTest = require('./hitTest');
+var layoutNode = require('./layoutNode');
+
+/**
+ * Surface is a standard React component and acts as the main drawing canvas.
+ * ReactCanvas components cannot be rendered outside a Surface.
+ */
+
+var Surface = React.createClass({
+
+  mixins: [ContainerMixin],
+
+  propTypes: {
+    top: React.PropTypes.number.isRequired,
+    left: React.PropTypes.number.isRequired,
+    width: React.PropTypes.number.isRequired,
+    height: React.PropTypes.number.isRequired,
+    scale: React.PropTypes.number.isRequired,
+    enableCSSLayout: React.PropTypes.bool
+  },
+
+  getDefaultProps: function () {
+    return {
+      scale: window.devicePixelRatio || 1
+    };
+  },
+
+  componentDidMount: function () {
+    // Prepare the <canvas> for drawing.
+    this.scale();
+
+    // ContainerMixin expects `this.node` to be set prior to mounting children.
+    // `this.node` is injected into child components and represents the current
+    // render tree.
+    this.node = new RenderLayer();
+    this.node.frame = FrameUtils.make(this.props.left, this.props.top, this.props.width, this.props.height);
+    this.node.draw = this.batchedTick;
+
+    // This is the integration point between custom canvas components and React
+    var transaction = ReactUpdates.ReactReconcileTransaction.getPooled();
+    transaction.perform(
+      this.mountAndInjectChildrenAtRoot,
+      this,
+      this.props.children,
+      transaction
+    );
+    ReactUpdates.ReactReconcileTransaction.release(transaction);
+
+    // Execute initial draw on mount.
+    this.node.draw();
+  },
+
+  componentWillUnmount: function () {
+    // Implemented in ReactMultiChild.Mixin
+    this.unmountChildren();
+  },
+
+  componentDidUpdate: function (prevProps, prevState) {
+    // We have to manually apply child reconciliation since child are not
+    // declared in render().
+    var transaction = ReactUpdates.ReactReconcileTransaction.getPooled();
+    transaction.perform(
+      this.updateChildrenAtRoot,
+      this,
+      this.props.children,
+      transaction
+    );
+    ReactUpdates.ReactReconcileTransaction.release(transaction);
+
+    // Re-scale the <canvas> when changing size.
+    if (prevProps.width !== this.props.width || prevProps.height !== this.props.height) {
+      this.scale();
+    }
+
+    // Redraw updated render tree to <canvas>.
+    if (this.node) {
+      this.node.draw();
+    }
+  },
+
+  render: function () {
+    // Scale the drawing area to match DPI.
+    var width = this.props.width * this.props.scale;
+    var height = this.props.height * this.props.scale;
+    var style = {
+      width: this.props.width,
+      height: this.props.height
+    };
+
+    return (
+      React.createElement('canvas', {
+        ref: 'canvas',
+        width: width,
+        height: height,
+        style: style,
+        onTouchStart: this.handleTouchStart,
+        onTouchMove: this.handleTouchMove,
+        onTouchEnd: this.handleTouchEnd,
+        onTouchCancel: this.handleTouchEnd,
+        onClick: this.handleClick})
+    );
+  },
+
+  // Drawing
+  // =======
+
+  getContext: function () {
+    ('production' !== process.env.NODE_ENV ? invariant(
+      this.isMounted(),
+      'Tried to access drawing context on an unmounted Surface.'
+    ) : invariant(this.isMounted()));
+    return this.refs.canvas.getDOMNode().getContext('2d');
+  },
+
+  scale: function () {
+    this.getContext().scale(this.props.scale, this.props.scale);
+  },
+
+  batchedTick: function () {
+    if (this._frameReady === false) {
+      this._pendingTick = true;
+      return;
+    }
+    this.tick();
+  },
+
+  tick: function () {
+    // Block updates until next animation frame.
+    this._frameReady = false;
+    this.clear();
+    this.draw();
+    requestAnimationFrame(this.afterTick);
+  },
+
+  afterTick: function () {
+    // Execute pending draw that may have been scheduled during previous frame
+    this._frameReady = true;
+    if (this._pendingTick) {
+      this.tick();
+      this._pendingTick = false;
+    }
+  },
+
+  clear: function () {
+    this.getContext().clearRect(0, 0, this.props.width, this.props.height);
+  },
+
+  draw: function () {
+    var layout;
+    if (this.node) {
+      if (this.props.enableCSSLayout) {
+        layout = layoutNode(this.node);
+      }
+      DrawingUtils.drawRenderLayer(this.getContext(), this.node);
+    }
+  },
+
+  // Events
+  // ======
+
+  hitTest: function (e) {
+    var hitTarget = hitTest(e, this.node, this.getDOMNode());
+    if (hitTarget) {
+      hitTarget[hitTest.getHitHandle(e.type)](e);
+    }
+  },
+
+  handleTouchStart: function (e) {
+    var hitTarget = hitTest(e, this.node, this.getDOMNode());
+    var touch;
+    if (hitTarget) {
+      // On touchstart: capture the current hit target for the given touch.
+      this._touches = this._touches || {};
+      for (var i=0, len=e.touches.length; i < len; i++) {
+        touch = e.touches[i];
+        this._touches[touch.identifier] = hitTarget;
+      }
+      hitTarget[hitTest.getHitHandle(e.type)](e);
+    }
+  },
+
+  handleTouchMove: function (e) {
+    this.hitTest(e);
+  },
+
+  handleTouchEnd: function (e) {
+    // touchend events do not generate a pageX/pageY so we rely
+    // on the currently captured touch targets.
+    if (!this._touches) {
+      return;
+    }
+
+    var hitTarget;
+    var hitHandle = hitTest.getHitHandle(e.type);
+    for (var i=0, len=e.changedTouches.length; i < len; i++) {
+      hitTarget = this._touches[e.changedTouches[i].identifier];
+      if (hitTarget && hitTarget[hitHandle]) {
+        hitTarget[hitHandle](e);
+      }
+      delete this._touches[e.changedTouches[i].identifier];
+    }
+  },
+
+  handleClick: function (e) {
+    this.hitTest(e);
+  }
+
+});
+
+module.exports = Surface;
+
+}).call(this,require('_process'))
+},{"./ContainerMixin":7,"./DrawingUtils":8,"./FrameUtils":13,"./RenderLayer":22,"./hitTest":27,"./layoutNode":28,"_process":3,"react":188,"react/lib/ReactUpdates":120,"react/lib/invariant":168}],24:[function(require,module,exports){
+'use strict';
+
+var createComponent = require('./createComponent');
+var LayerMixin = require('./LayerMixin');
+
+var Text = createComponent('Text', LayerMixin, {
+
+  applyTextProps: function (prevProps, props) {
+    var style = (props && props.style) ? props.style : {};
+    var layer = this.node;
+
+    layer.type = 'text';
+    layer.text = childrenAsString(props.children);
+
+    layer.color = style.color;
+    layer.fontFace = style.fontFace;
+    layer.fontSize = style.fontSize;
+    layer.lineHeight = style.lineHeight;
+    layer.textAlign = style.textAlign;
+  },
+
+  mountComponent: function (rootID, transaction, context) {
+    var props = this._currentElement.props;
+    var layer = this.node;
+    this.applyLayerProps({}, props);
+    this.applyTextProps({}, props);
+    return layer;
+  },
+
+  receiveComponent: function (nextComponent, transaction, context) {
+    var props = nextComponent.props;
+    var prevProps = this._currentElement.props;
+    this.applyLayerProps(prevProps, props);
+    this.applyTextProps(prevProps, props);
+    this._currentElement = nextComponent;
+  }
+
+});
+
+function childrenAsString(children) {
+  if (!children) {
+    return '';
+  }
+  if (typeof children === 'string') {
+    return children;
+  }
+  if (children.length) {
+    return children.join('\n');
+  }
+  return '';
+}
+
+module.exports = Text;
+},{"./LayerMixin":18,"./createComponent":26}],25:[function(require,module,exports){
+'use strict';
+
+/**
+ * Clamp a number between a minimum and maximum value.
+ * @param {Number} number
+ * @param {Number} min
+ * @param {Number} max
+ * @return {Number}
+*/
+module.exports = function (number, min, max) {
+  return Math.min(Math.max(number, min), max);
+};
+
+
+},{}],26:[function(require,module,exports){
+'use strict';
+
+// Adapted from ReactART:
+// https://github.com/reactjs/react-art
+
+var assign = require('react/lib/Object.assign');
+var RenderLayer = require('./RenderLayer');
+
+function createComponent (name) {
+  var ReactCanvasComponent = function (props) {
+    this.node = null;
+    this.subscriptions = null;
+    this.listeners = null;
+    this.node = new RenderLayer();
+    this._mountImage = null;
+    this._renderedChildren = null;
+    this._mostRecentlyPlacedChild = null;
+  };
+  ReactCanvasComponent.displayName = name;
+  for (var i = 1, l = arguments.length; i < l; i++) {
+    assign(ReactCanvasComponent.prototype, arguments[i]);
+  }
+
+  return ReactCanvasComponent;
+}
+
+module.exports = createComponent;
+
+},{"./RenderLayer":22,"react/lib/Object.assign":59}],27:[function(require,module,exports){
+'use strict';
+
+var FrameUtils = require('./FrameUtils');
+var EventTypes = require('./EventTypes');
+
+/**
+ * RenderLayer hit testing
+ *
+ * @param {Event} e
+ * @param {RenderLayer} rootLayer
+ * @param {?HTMLElement} rootNode
+ * @return {RenderLayer}
+ */
+function hitTest (e, rootLayer, rootNode) {
+  var touch = e.touches ? e.touches[0] : e;
+  var touchX = touch.pageX;
+  var touchY = touch.pageY;
+  var rootNodeBox;
+  if (rootNode) {
+    rootNodeBox = rootNode.getBoundingClientRect();
+    touchX -= rootNodeBox.left;
+    touchY -= rootNodeBox.top;
+  }
+  return getLayerAtPoint(rootLayer, e.type, FrameUtils.make(touchX, touchY, 1, 1));
+}
+
+/**
+ * @private
+ */
+function sortByZIndexDescending (layer, otherLayer) {
+  return (otherLayer.zIndex || 0) - (layer.zIndex || 0);
+}
+
+/**
+ * @private
+ */
+function getHitHandle (type) {
+  var hitHandle;
+  for (var tryHandle in EventTypes) {
+    if (EventTypes[tryHandle] === type) {
+      hitHandle = tryHandle;
+      break;
+    }
+  }
+  return hitHandle;
+}
+
+/**
+ * @private
+ */
+function getLayerAtPoint (root, type, point) {
+  var layer = null;
+  var hitHandle = getHitHandle(type);
+  var sortedChildren;
+  var hitFrame = root.frame;
+
+  // Early bail for non-visible layers
+  if (typeof root.alpha === 'number' && root.alpha < 0.01) {
+    return null;
+  }
+
+  // Child-first search
+  if (root.children) {
+    sortedChildren = root.children.slice().reverse().sort(sortByZIndexDescending);
+    for (var i=0, len=sortedChildren.length; i < len; i++) {
+      layer = getLayerAtPoint(sortedChildren[i], type, point);
+      if (layer) {
+        break;
+      }
+    }
+  }
+
+  // Check for hit outsets
+  if (root.hitOutsets) {
+    hitFrame = FrameUtils.inset(FrameUtils.clone(hitFrame),
+      -root.hitOutsets[0], -root.hitOutsets[1],
+      -root.hitOutsets[2], -root.hitOutsets[3]
+    );
+  }
+
+  // No child layer at the given point. Try the parent layer.
+  if (!layer && root[hitHandle] && FrameUtils.intersects(hitFrame, point)) {
+    layer = root;
+  }
+
+  return layer;
+}
+
+module.exports = hitTest;
+module.exports.getHitHandle = getHitHandle;
+
+
+},{"./EventTypes":10,"./FrameUtils":13}],28:[function(require,module,exports){
+'use strict';
+
+var computeLayout = require('./Layout');
+
+/**
+ * This computes the CSS layout for a RenderLayer tree and mutates the frame
+ * objects at each node.
+ *
+ * @param {Renderlayer} root
+ * @return {Object}
+ */
+function layoutNode (root) {
+  var rootNode = createNode(root);
+  computeLayout(rootNode);
+  walkNode(rootNode);
+  return rootNode;
+}
+
+function createNode (layer) {
+  return {
+    layer: layer,
+    layout: {
+      width: undefined, // computeLayout will mutate
+      height: undefined, // computeLayout will mutate
+      top: 0,
+      left: 0,
+    },
+    style: layer._originalStyle || {},
+    children: (layer.children || []).map(createNode)
+  };
+}
+
+function walkNode (node, parentLeft, parentTop) {
+  node.layer.frame.x = node.layout.left + (parentLeft || 0);
+  node.layer.frame.y = node.layout.top + (parentTop || 0);
+  node.layer.frame.width = node.layout.width;
+  node.layer.frame.height = node.layout.height;
+  if (node.children && node.children.length > 0) {
+    node.children.forEach(function (child) {
+      walkNode(child, node.layout.left, node.layout.top);
+    });
+  }
+}
+
+module.exports = layoutNode;
+
+},{"./Layout":19}],29:[function(require,module,exports){
+'use strict';
+
+var FontFace = require('./FontFace');
+var FontUtils = require('./FontUtils');
+
+var canvas = document.createElement('canvas');
+var ctx = canvas.getContext('2d');
+
+var _cache = {};
+var _zeroMetrics = {
+  width: 0,
+  height: 0,
+  lines: []
+};
+
+function splitText (text) {
+  return text.split(' ');
+}
+
+function getCacheKey (text, width, fontFace, fontSize, lineHeight) {
+  return text + width + fontFace.id + fontSize + lineHeight;
+}
+
+/**
+ * Given a string of text, available width, and font return the measured width
+ * and height.
+ * @param {String} text The input string
+ * @param {Number} width The available width
+ * @param {FontFace} fontFace The FontFace to use
+ * @param {Number} fontSize The font size in CSS pixels
+ * @param {Number} lineHeight The line height in CSS pixels
+ * @return {Object} Measured text size with `width` and `height` members.
+ */
+module.exports = function measureText (text, width, fontFace, fontSize, lineHeight) {
+  var cacheKey = getCacheKey(text, width, fontFace, fontSize, lineHeight);
+  var cached = _cache[cacheKey];
+  if (cached) {
+    return cached;
+  }
+
+  // Bail and return zero unless we're sure the font is ready.
+  if (!FontUtils.isFontLoaded(fontFace)) {
+    return _zeroMetrics;
+  }
+
+  var measuredSize = {};
+  var textMetrics;
+  var lastMeasuredWidth;
+  var words;
+  var tryLine;
+  var currentLine;
+
+  ctx.font = fontFace.attributes.style + ' normal ' + fontFace.attributes.weight + ' ' + fontSize + 'pt ' + fontFace.family;
+  textMetrics = ctx.measureText(text);
+
+  measuredSize.width = textMetrics.width;
+  measuredSize.height = lineHeight;
+  measuredSize.lines = [];
+
+  if (measuredSize.width <= width) {
+    // The entire text string fits.
+    measuredSize.lines.push({width: measuredSize.width, text: text});
+  } else {
+    // Break into multiple lines.
+    measuredSize.width = width;
+    words = splitText(text);
+    currentLine = '';
+
+    // This needs to be optimized!
+    while (words.length) {
+      tryLine = currentLine + words[0] + ' ';
+      textMetrics = ctx.measureText(tryLine);
+      if (textMetrics.width > width) {
+        measuredSize.height += lineHeight;
+        measuredSize.lines.push({width: lastMeasuredWidth, text: currentLine.trim()});
+        currentLine = words[0] + ' ';
+        lastMeasuredWidth = ctx.measureText(currentLine.trim()).width;
+      } else {
+        currentLine = tryLine;
+        lastMeasuredWidth = textMetrics.width;
+      }
+      if (words.length === 1) {
+        textMetrics = ctx.measureText(currentLine.trim());
+        measuredSize.lines.push({width: textMetrics.width, text: currentLine.trim()});
+      }
+      words.shift();
+    }
+  }
+
+  _cache[cacheKey] = measuredSize;
+
+  return measuredSize;
+};
+
+},{"./FontFace":11,"./FontUtils":12}],30:[function(require,module,exports){
+module.exports = require('./src/Scroller');
+},{"./src/Scroller":32}],31:[function(require,module,exports){
+/*
+ * Scroller
+ * http://github.com/zynga/scroller
+ *
+ * Copyright 2011, Zynga Inc.
+ * Licensed under the MIT License.
+ * https://raw.github.com/zynga/scroller/master/MIT-LICENSE.txt
+ *
+ * Based on the work of: Unify Project (unify-project.org)
+ * http://unify-project.org
+ * Copyright 2011, Deutsche Telekom AG
+ * License: MIT + Apache (V2)
+ */
+
+/**
+ * Generic animation class with support for dropped frames both optional easing and duration.
+ *
+ * Optional duration is useful when the lifetime is defined by another condition than time
+ * e.g. speed of an animating object, etc.
+ *
+ * Dropped frame logic allows to keep using the same updater logic independent from the actual
+ * rendering. This eases a lot of cases where it might be pretty complex to break down a state
+ * based on the pure time difference.
+ */
+(function(global) {
+	var time = Date.now || function() {
+		return +new Date();
+	};
+	var desiredFrames = 60;
+	var millisecondsPerSecond = 1000;
+	var running = {};
+	var counter = 1;
+
+	// Create namespaces
+	var core = {
+		effect: {}
+	};
+
+	core.effect.Animate = {
+
+		/**
+		 * A requestAnimationFrame wrapper / polyfill.
+		 *
+		 * @param callback {Function} The callback to be invoked before the next repaint.
+		 * @param root {HTMLElement} The root element for the repaint
+		 */
+		requestAnimationFrame: (function() {
+
+			// Check for request animation Frame support
+			var requestFrame = global.requestAnimationFrame || global.webkitRequestAnimationFrame || global.mozRequestAnimationFrame || global.oRequestAnimationFrame;
+			var isNative = !!requestFrame;
+
+			if (requestFrame && !/requestAnimationFrame\(\)\s*\{\s*\[native code\]\s*\}/i.test(requestFrame.toString())) {
+				isNative = false;
+			}
+
+			if (isNative) {
+				return function(callback, root) {
+					requestFrame(callback, root)
+				};
+			}
+
+			var TARGET_FPS = 60;
+			var requests = {};
+			var requestCount = 0;
+			var rafHandle = 1;
+			var intervalHandle = null;
+			var lastActive = +new Date();
+
+			return function(callback, root) {
+				var callbackHandle = rafHandle++;
+
+				// Store callback
+				requests[callbackHandle] = callback;
+				requestCount++;
+
+				// Create timeout at first request
+				if (intervalHandle === null) {
+
+					intervalHandle = setInterval(function() {
+
+						var time = +new Date();
+						var currentRequests = requests;
+
+						// Reset data structure before executing callbacks
+						requests = {};
+						requestCount = 0;
+
+						for(var key in currentRequests) {
+							if (currentRequests.hasOwnProperty(key)) {
+								currentRequests[key](time);
+								lastActive = time;
+							}
+						}
+
+						// Disable the timeout when nothing happens for a certain
+						// period of time
+						if (time - lastActive > 2500) {
+							clearInterval(intervalHandle);
+							intervalHandle = null;
+						}
+
+					}, 1000 / TARGET_FPS);
+				}
+
+				return callbackHandle;
+			};
+
+		})(),
+
+
+		/**
+		 * Stops the given animation.
+		 *
+		 * @param id {Integer} Unique animation ID
+		 * @return {Boolean} Whether the animation was stopped (aka, was running before)
+		 */
+		stop: function(id) {
+			var cleared = running[id] != null;
+			if (cleared) {
+				running[id] = null;
+			}
+
+			return cleared;
+		},
+
+
+		/**
+		 * Whether the given animation is still running.
+		 *
+		 * @param id {Integer} Unique animation ID
+		 * @return {Boolean} Whether the animation is still running
+		 */
+		isRunning: function(id) {
+			return running[id] != null;
+		},
+
+
+		/**
+		 * Start the animation.
+		 *
+		 * @param stepCallback {Function} Pointer to function which is executed on every step.
+		 *   Signature of the method should be `function(percent, now, virtual) { return continueWithAnimation; }`
+		 * @param verifyCallback {Function} Executed before every animation step.
+		 *   Signature of the method should be `function() { return continueWithAnimation; }`
+		 * @param completedCallback {Function}
+		 *   Signature of the method should be `function(droppedFrames, finishedAnimation) {}`
+		 * @param duration {Integer} Milliseconds to run the animation
+		 * @param easingMethod {Function} Pointer to easing function
+		 *   Signature of the method should be `function(percent) { return modifiedValue; }`
+		 * @param root {Element ? document.body} Render root, when available. Used for internal
+		 *   usage of requestAnimationFrame.
+		 * @return {Integer} Identifier of animation. Can be used to stop it any time.
+		 */
+		start: function(stepCallback, verifyCallback, completedCallback, duration, easingMethod, root) {
+
+			var start = time();
+			var lastFrame = start;
+			var percent = 0;
+			var dropCounter = 0;
+			var id = counter++;
+
+			if (!root) {
+				root = document.body;
+			}
+
+			// Compacting running db automatically every few new animations
+			if (id % 20 === 0) {
+				var newRunning = {};
+				for (var usedId in running) {
+					newRunning[usedId] = true;
+				}
+				running = newRunning;
+			}
+
+			// This is the internal step method which is called every few milliseconds
+			var step = function(virtual) {
+
+				// Normalize virtual value
+				var render = virtual !== true;
+
+				// Get current time
+				var now = time();
+
+				// Verification is executed before next animation step
+				if (!running[id] || (verifyCallback && !verifyCallback(id))) {
+
+					running[id] = null;
+					completedCallback && completedCallback(desiredFrames - (dropCounter / ((now - start) / millisecondsPerSecond)), id, false);
+					return;
+
+				}
+
+				// For the current rendering to apply let's update omitted steps in memory.
+				// This is important to bring internal state variables up-to-date with progress in time.
+				if (render) {
+
+					var droppedFrames = Math.round((now - lastFrame) / (millisecondsPerSecond / desiredFrames)) - 1;
+					for (var j = 0; j < Math.min(droppedFrames, 4); j++) {
+						step(true);
+						dropCounter++;
+					}
+
+				}
+
+				// Compute percent value
+				if (duration) {
+					percent = (now - start) / duration;
+					if (percent > 1) {
+						percent = 1;
+					}
+				}
+
+				// Execute step callback, then...
+				var value = easingMethod ? easingMethod(percent) : percent;
+				if ((stepCallback(value, now, render) === false || percent === 1) && render) {
+					running[id] = null;
+					completedCallback && completedCallback(desiredFrames - (dropCounter / ((now - start) / millisecondsPerSecond)), id, percent === 1 || duration == null);
+				} else if (render) {
+					lastFrame = now;
+					core.effect.Animate.requestAnimationFrame(step, root);
+				}
+			};
+
+			// Mark as running
+			running[id] = true;
+
+			// Init first step
+			core.effect.Animate.requestAnimationFrame(step, root);
+
+			// Return unique animation ID
+			return id;
+		}
+	};
+
+	module.exports = core;
+
+})(typeof window !== 'undefined' ? window : this);
+
+
+},{}],32:[function(require,module,exports){
+/*
+ * Scroller
+ * http://github.com/zynga/scroller
+ *
+ * Copyright 2011, Zynga Inc.
+ * Licensed under the MIT License.
+ * https://raw.github.com/zynga/scroller/master/MIT-LICENSE.txt
+ *
+ * Based on the work of: Unify Project (unify-project.org)
+ * http://unify-project.org
+ * Copyright 2011, Deutsche Telekom AG
+ * License: MIT + Apache (V2)
+ */
+
+var core = require('./Animate');
+var Scroller;
+
+(function() {
+	var NOOP = function(){};
+
+	/**
+	 * A pure logic 'component' for 'virtual' scrolling/zooming.
+	 */
+	Scroller = function(callback, options) {
+
+		this.__callback = callback;
+
+		this.options = {
+
+			/** Enable scrolling on x-axis */
+			scrollingX: true,
+
+			/** Enable scrolling on y-axis */
+			scrollingY: true,
+
+			/** Enable animations for deceleration, snap back, zooming and scrolling */
+			animating: true,
+
+			/** duration for animations triggered by scrollTo/zoomTo */
+			animationDuration: 250,
+
+			/** Enable bouncing (content can be slowly moved outside and jumps back after releasing) */
+			bouncing: true,
+
+			/** Enable locking to the main axis if user moves only slightly on one of them at start */
+			locking: true,
+
+			/** Enable pagination mode (switching between full page content panes) */
+			paging: false,
+
+			/** Enable snapping of content to a configured pixel grid */
+			snapping: false,
+
+			/** Enable zooming of content via API, fingers and mouse wheel */
+			zooming: false,
+
+			/** Minimum zoom level */
+			minZoom: 0.5,
+
+			/** Maximum zoom level */
+			maxZoom: 3,
+
+			/** Multiply or decrease scrolling speed **/
+			speedMultiplier: 1,
+
+			/** Callback that is fired on the later of touch end or deceleration end,
+				provided that another scrolling action has not begun. Used to know
+				when to fade out a scrollbar. */
+			scrollingComplete: NOOP,
+
+			/** Increase or decrease the amount of friction applied to deceleration **/
+			decelerationRate: 0.95,
+			
+			/** This configures the amount of change applied to deceleration when reaching boundaries  **/
+            penetrationDeceleration : 0.03,
+
+            /** This configures the amount of change applied to acceleration when reaching boundaries  **/
+            penetrationAcceleration : 0.08
+
+		};
+
+		for (var key in options) {
+			this.options[key] = options[key];
+		}
+
+	};
+
+
+	// Easing Equations (c) 2003 Robert Penner, all rights reserved.
+	// Open source under the BSD License.
+
+	/**
+	 * @param pos {Number} position between 0 (start of effect) and 1 (end of effect)
+	**/
+	var easeOutCubic = function(pos) {
+		return (Math.pow((pos - 1), 3) + 1);
+	};
+
+	/**
+	 * @param pos {Number} position between 0 (start of effect) and 1 (end of effect)
+	**/
+	var easeInOutCubic = function(pos) {
+		if ((pos /= 0.5) < 1) {
+			return 0.5 * Math.pow(pos, 3);
+		}
+
+		return 0.5 * (Math.pow((pos - 2), 3) + 2);
+	};
+
+
+	var members = {
+
+		/*
+		---------------------------------------------------------------------------
+			INTERNAL FIELDS :: STATUS
+		---------------------------------------------------------------------------
+		*/
+
+		/** {Boolean} Whether only a single finger is used in touch handling */
+		__isSingleTouch: false,
+
+		/** {Boolean} Whether a touch event sequence is in progress */
+		__isTracking: false,
+
+		/** {Boolean} Whether a deceleration animation went to completion. */
+		__didDecelerationComplete: false,
+
+		/**
+		 * {Boolean} Whether a gesture zoom/rotate event is in progress. Activates when
+		 * a gesturestart event happens. This has higher priority than dragging.
+		 */
+		__isGesturing: false,
+
+		/**
+		 * {Boolean} Whether the user has moved by such a distance that we have enabled
+		 * dragging mode. Hint: It's only enabled after some pixels of movement to
+		 * not interrupt with clicks etc.
+		 */
+		__isDragging: false,
+
+		/**
+		 * {Boolean} Not touching and dragging anymore, and smoothly animating the
+		 * touch sequence using deceleration.
+		 */
+		__isDecelerating: false,
+
+		/**
+		 * {Boolean} Smoothly animating the currently configured change
+		 */
+		__isAnimating: false,
+
+
+
+		/*
+		---------------------------------------------------------------------------
+			INTERNAL FIELDS :: DIMENSIONS
+		---------------------------------------------------------------------------
+		*/
+
+		/** {Integer} Available outer left position (from document perspective) */
+		__clientLeft: 0,
+
+		/** {Integer} Available outer top position (from document perspective) */
+		__clientTop: 0,
+
+		/** {Integer} Available outer width */
+		__clientWidth: 0,
+
+		/** {Integer} Available outer height */
+		__clientHeight: 0,
+
+		/** {Integer} Outer width of content */
+		__contentWidth: 0,
+
+		/** {Integer} Outer height of content */
+		__contentHeight: 0,
+
+		/** {Integer} Snapping width for content */
+		__snapWidth: 100,
+
+		/** {Integer} Snapping height for content */
+		__snapHeight: 100,
+
+		/** {Integer} Height to assign to refresh area */
+		__refreshHeight: null,
+
+		/** {Boolean} Whether the refresh process is enabled when the event is released now */
+		__refreshActive: false,
+
+		/** {Function} Callback to execute on activation. This is for signalling the user about a refresh is about to happen when he release */
+		__refreshActivate: null,
+
+		/** {Function} Callback to execute on deactivation. This is for signalling the user about the refresh being cancelled */
+		__refreshDeactivate: null,
+
+		/** {Function} Callback to execute to start the actual refresh. Call {@link #refreshFinish} when done */
+		__refreshStart: null,
+
+		/** {Number} Zoom level */
+		__zoomLevel: 1,
+
+		/** {Number} Scroll position on x-axis */
+		__scrollLeft: 0,
+
+		/** {Number} Scroll position on y-axis */
+		__scrollTop: 0,
+
+		/** {Integer} Maximum allowed scroll position on x-axis */
+		__maxScrollLeft: 0,
+
+		/** {Integer} Maximum allowed scroll position on y-axis */
+		__maxScrollTop: 0,
+
+		/* {Number} Scheduled left position (final position when animating) */
+		__scheduledLeft: 0,
+
+		/* {Number} Scheduled top position (final position when animating) */
+		__scheduledTop: 0,
+
+		/* {Number} Scheduled zoom level (final scale when animating) */
+		__scheduledZoom: 0,
+
+
+
+		/*
+		---------------------------------------------------------------------------
+			INTERNAL FIELDS :: LAST POSITIONS
+		---------------------------------------------------------------------------
+		*/
+
+		/** {Number} Left position of finger at start */
+		__lastTouchLeft: null,
+
+		/** {Number} Top position of finger at start */
+		__lastTouchTop: null,
+
+		/** {Date} Timestamp of last move of finger. Used to limit tracking range for deceleration speed. */
+		__lastTouchMove: null,
+
+		/** {Array} List of positions, uses three indexes for each state: left, top, timestamp */
+		__positions: null,
+
+
+
+		/*
+		---------------------------------------------------------------------------
+			INTERNAL FIELDS :: DECELERATION SUPPORT
+		---------------------------------------------------------------------------
+		*/
+
+		/** {Integer} Minimum left scroll position during deceleration */
+		__minDecelerationScrollLeft: null,
+
+		/** {Integer} Minimum top scroll position during deceleration */
+		__minDecelerationScrollTop: null,
+
+		/** {Integer} Maximum left scroll position during deceleration */
+		__maxDecelerationScrollLeft: null,
+
+		/** {Integer} Maximum top scroll position during deceleration */
+		__maxDecelerationScrollTop: null,
+
+		/** {Number} Current factor to modify horizontal scroll position with on every step */
+		__decelerationVelocityX: null,
+
+		/** {Number} Current factor to modify vertical scroll position with on every step */
+		__decelerationVelocityY: null,
+
+
+
+		/*
+		---------------------------------------------------------------------------
+			PUBLIC API
+		---------------------------------------------------------------------------
+		*/
+
+		/**
+		 * Configures the dimensions of the client (outer) and content (inner) elements.
+		 * Requires the available space for the outer element and the outer size of the inner element.
+		 * All values which are falsy (null or zero etc.) are ignored and the old value is kept.
+		 *
+		 * @param clientWidth {Integer ? null} Inner width of outer element
+		 * @param clientHeight {Integer ? null} Inner height of outer element
+		 * @param contentWidth {Integer ? null} Outer width of inner element
+		 * @param contentHeight {Integer ? null} Outer height of inner element
+		 */
+		setDimensions: function(clientWidth, clientHeight, contentWidth, contentHeight) {
+
+			var self = this;
+
+			// Only update values which are defined
+			if (clientWidth === +clientWidth) {
+				self.__clientWidth = clientWidth;
+			}
+
+			if (clientHeight === +clientHeight) {
+				self.__clientHeight = clientHeight;
+			}
+
+			if (contentWidth === +contentWidth) {
+				self.__contentWidth = contentWidth;
+			}
+
+			if (contentHeight === +contentHeight) {
+				self.__contentHeight = contentHeight;
+			}
+
+			// Refresh maximums
+			self.__computeScrollMax();
+
+			// Refresh scroll position
+			self.scrollTo(self.__scrollLeft, self.__scrollTop, true);
+
+		},
+
+
+		/**
+		 * Sets the client coordinates in relation to the document.
+		 *
+		 * @param left {Integer ? 0} Left position of outer element
+		 * @param top {Integer ? 0} Top position of outer element
+		 */
+		setPosition: function(left, top) {
+
+			var self = this;
+
+			self.__clientLeft = left || 0;
+			self.__clientTop = top || 0;
+
+		},
+
+
+		/**
+		 * Configures the snapping (when snapping is active)
+		 *
+		 * @param width {Integer} Snapping width
+		 * @param height {Integer} Snapping height
+		 */
+		setSnapSize: function(width, height) {
+
+			var self = this;
+
+			self.__snapWidth = width;
+			self.__snapHeight = height;
+
+		},
+
+
+		/**
+		 * Activates pull-to-refresh. A special zone on the top of the list to start a list refresh whenever
+		 * the user event is released during visibility of this zone. This was introduced by some apps on iOS like
+		 * the official Twitter client.
+		 *
+		 * @param height {Integer} Height of pull-to-refresh zone on top of rendered list
+		 * @param activateCallback {Function} Callback to execute on activation. This is for signalling the user about a refresh is about to happen when he release.
+		 * @param deactivateCallback {Function} Callback to execute on deactivation. This is for signalling the user about the refresh being cancelled.
+		 * @param startCallback {Function} Callback to execute to start the real async refresh action. Call {@link #finishPullToRefresh} after finish of refresh.
+		 */
+		activatePullToRefresh: function(height, activateCallback, deactivateCallback, startCallback) {
+
+			var self = this;
+
+			self.__refreshHeight = height;
+			self.__refreshActivate = activateCallback;
+			self.__refreshDeactivate = deactivateCallback;
+			self.__refreshStart = startCallback;
+
+		},
+
+
+		/**
+		 * Starts pull-to-refresh manually.
+		 */
+		triggerPullToRefresh: function() {
+			// Use publish instead of scrollTo to allow scrolling to out of boundary position
+			// We don't need to normalize scrollLeft, zoomLevel, etc. here because we only y-scrolling when pull-to-refresh is enabled
+			this.__publish(this.__scrollLeft, -this.__refreshHeight, this.__zoomLevel, true);
+
+			if (this.__refreshStart) {
+				this.__refreshStart();
+			}
+		},
+
+
+		/**
+		 * Signalizes that pull-to-refresh is finished.
+		 */
+		finishPullToRefresh: function() {
+
+			var self = this;
+
+			self.__refreshActive = false;
+			if (self.__refreshDeactivate) {
+				self.__refreshDeactivate();
+			}
+
+			self.scrollTo(self.__scrollLeft, self.__scrollTop, true);
+
+		},
+
+
+		/**
+		 * Returns the scroll position and zooming values
+		 *
+		 * @return {Map} `left` and `top` scroll position and `zoom` level
+		 */
+		getValues: function() {
+
+			var self = this;
+
+			return {
+				left: self.__scrollLeft,
+				top: self.__scrollTop,
+				zoom: self.__zoomLevel
+			};
+
+		},
+
+
+		/**
+		 * Returns the maximum scroll values
+		 *
+		 * @return {Map} `left` and `top` maximum scroll values
+		 */
+		getScrollMax: function() {
+
+			var self = this;
+
+			return {
+				left: self.__maxScrollLeft,
+				top: self.__maxScrollTop
+			};
+
+		},
+
+
+		/**
+		 * Zooms to the given level. Supports optional animation. Zooms
+		 * the center when no coordinates are given.
+		 *
+		 * @param level {Number} Level to zoom to
+		 * @param animate {Boolean ? false} Whether to use animation
+		 * @param originLeft {Number ? null} Zoom in at given left coordinate
+		 * @param originTop {Number ? null} Zoom in at given top coordinate
+		 * @param callback {Function ? null} A callback that gets fired when the zoom is complete.
+		 */
+		zoomTo: function(level, animate, originLeft, originTop, callback) {
+
+			var self = this;
+
+			if (!self.options.zooming) {
+				throw new Error("Zooming is not enabled!");
+			}
+
+			// Add callback if exists
+			if(callback) {
+				self.__zoomComplete = callback;
+			}
+
+			// Stop deceleration
+			if (self.__isDecelerating) {
+				core.effect.Animate.stop(self.__isDecelerating);
+				self.__isDecelerating = false;
+			}
+
+			var oldLevel = self.__zoomLevel;
+
+			// Normalize input origin to center of viewport if not defined
+			if (originLeft == null) {
+				originLeft = self.__clientWidth / 2;
+			}
+
+			if (originTop == null) {
+				originTop = self.__clientHeight / 2;
+			}
+
+			// Limit level according to configuration
+			level = Math.max(Math.min(level, self.options.maxZoom), self.options.minZoom);
+
+			// Recompute maximum values while temporary tweaking maximum scroll ranges
+			self.__computeScrollMax(level);
+
+			// Recompute left and top coordinates based on new zoom level
+			var left = ((originLeft + self.__scrollLeft) * level / oldLevel) - originLeft;
+			var top = ((originTop + self.__scrollTop) * level / oldLevel) - originTop;
+
+			// Limit x-axis
+			if (left > self.__maxScrollLeft) {
+				left = self.__maxScrollLeft;
+			} else if (left < 0) {
+				left = 0;
+			}
+
+			// Limit y-axis
+			if (top > self.__maxScrollTop) {
+				top = self.__maxScrollTop;
+			} else if (top < 0) {
+				top = 0;
+			}
+
+			// Push values out
+			self.__publish(left, top, level, animate);
+
+		},
+
+
+		/**
+		 * Zooms the content by the given factor.
+		 *
+		 * @param factor {Number} Zoom by given factor
+		 * @param animate {Boolean ? false} Whether to use animation
+		 * @param originLeft {Number ? 0} Zoom in at given left coordinate
+		 * @param originTop {Number ? 0} Zoom in at given top coordinate
+		 * @param callback {Function ? null} A callback that gets fired when the zoom is complete.
+		 */
+		zoomBy: function(factor, animate, originLeft, originTop, callback) {
+
+			var self = this;
+
+			self.zoomTo(self.__zoomLevel * factor, animate, originLeft, originTop, callback);
+
+		},
+
+
+		/**
+		 * Scrolls to the given position. Respect limitations and snapping automatically.
+		 *
+		 * @param left {Number?null} Horizontal scroll position, keeps current if value is <code>null</code>
+		 * @param top {Number?null} Vertical scroll position, keeps current if value is <code>null</code>
+		 * @param animate {Boolean?false} Whether the scrolling should happen using an animation
+		 * @param zoom {Number?null} Zoom level to go to
+		 */
+		scrollTo: function(left, top, animate, zoom) {
+
+			var self = this;
+
+			// Stop deceleration
+			if (self.__isDecelerating) {
+				core.effect.Animate.stop(self.__isDecelerating);
+				self.__isDecelerating = false;
+			}
+
+			// Correct coordinates based on new zoom level
+			if (zoom != null && zoom !== self.__zoomLevel) {
+
+				if (!self.options.zooming) {
+					throw new Error("Zooming is not enabled!");
+				}
+
+				left *= zoom;
+				top *= zoom;
+
+				// Recompute maximum values while temporary tweaking maximum scroll ranges
+				self.__computeScrollMax(zoom);
+
+			} else {
+
+				// Keep zoom when not defined
+				zoom = self.__zoomLevel;
+
+			}
+
+			if (!self.options.scrollingX) {
+
+				left = self.__scrollLeft;
+
+			} else {
+
+				if (self.options.paging) {
+					left = Math.round(left / self.__clientWidth) * self.__clientWidth;
+				} else if (self.options.snapping) {
+					left = Math.round(left / self.__snapWidth) * self.__snapWidth;
+				}
+
+			}
+
+			if (!self.options.scrollingY) {
+
+				top = self.__scrollTop;
+
+			} else {
+
+				if (self.options.paging) {
+					top = Math.round(top / self.__clientHeight) * self.__clientHeight;
+				} else if (self.options.snapping) {
+					top = Math.round(top / self.__snapHeight) * self.__snapHeight;
+				}
+
+			}
+
+			// Limit for allowed ranges
+			left = Math.max(Math.min(self.__maxScrollLeft, left), 0);
+			top = Math.max(Math.min(self.__maxScrollTop, top), 0);
+
+			// Don't animate when no change detected, still call publish to make sure
+			// that rendered position is really in-sync with internal data
+			if (left === self.__scrollLeft && top === self.__scrollTop) {
+				animate = false;
+			}
+
+			// Publish new values
+			self.__publish(left, top, zoom, animate);
+
+		},
+
+
+		/**
+		 * Scroll by the given offset
+		 *
+		 * @param left {Number ? 0} Scroll x-axis by given offset
+		 * @param top {Number ? 0} Scroll x-axis by given offset
+		 * @param animate {Boolean ? false} Whether to animate the given change
+		 */
+		scrollBy: function(left, top, animate) {
+
+			var self = this;
+
+			var startLeft = self.__isAnimating ? self.__scheduledLeft : self.__scrollLeft;
+			var startTop = self.__isAnimating ? self.__scheduledTop : self.__scrollTop;
+
+			self.scrollTo(startLeft + (left || 0), startTop + (top || 0), animate);
+
+		},
+
+
+
+		/*
+		---------------------------------------------------------------------------
+			EVENT CALLBACKS
+		---------------------------------------------------------------------------
+		*/
+
+		/**
+		 * Mouse wheel handler for zooming support
+		 */
+		doMouseZoom: function(wheelDelta, timeStamp, pageX, pageY) {
+
+			var self = this;
+			var change = wheelDelta > 0 ? 0.97 : 1.03;
+
+			return self.zoomTo(self.__zoomLevel * change, false, pageX - self.__clientLeft, pageY - self.__clientTop);
+
+		},
+
+
+		/**
+		 * Touch start handler for scrolling support
+		 */
+		doTouchStart: function(touches, timeStamp) {
+
+			// Array-like check is enough here
+			if (touches.length == null) {
+				throw new Error("Invalid touch list: " + touches);
+			}
+
+			if (timeStamp instanceof Date) {
+				timeStamp = timeStamp.valueOf();
+			}
+			if (typeof timeStamp !== "number") {
+				throw new Error("Invalid timestamp value: " + timeStamp);
+			}
+
+			var self = this;
+
+			// Reset interruptedAnimation flag
+			self.__interruptedAnimation = true;
+
+			// Stop deceleration
+			if (self.__isDecelerating) {
+				core.effect.Animate.stop(self.__isDecelerating);
+				self.__isDecelerating = false;
+				self.__interruptedAnimation = true;
+			}
+
+			// Stop animation
+			if (self.__isAnimating) {
+				core.effect.Animate.stop(self.__isAnimating);
+				self.__isAnimating = false;
+				self.__interruptedAnimation = true;
+			}
+
+			// Use center point when dealing with two fingers
+			var currentTouchLeft, currentTouchTop;
+			var isSingleTouch = touches.length === 1;
+			if (isSingleTouch) {
+				currentTouchLeft = touches[0].pageX;
+				currentTouchTop = touches[0].pageY;
+			} else {
+				currentTouchLeft = Math.abs(touches[0].pageX + touches[1].pageX) / 2;
+				currentTouchTop = Math.abs(touches[0].pageY + touches[1].pageY) / 2;
+			}
+
+			// Store initial positions
+			self.__initialTouchLeft = currentTouchLeft;
+			self.__initialTouchTop = currentTouchTop;
+
+			// Store current zoom level
+			self.__zoomLevelStart = self.__zoomLevel;
+
+			// Store initial touch positions
+			self.__lastTouchLeft = currentTouchLeft;
+			self.__lastTouchTop = currentTouchTop;
+
+			// Store initial move time stamp
+			self.__lastTouchMove = timeStamp;
+
+			// Reset initial scale
+			self.__lastScale = 1;
+
+			// Reset locking flags
+			self.__enableScrollX = !isSingleTouch && self.options.scrollingX;
+			self.__enableScrollY = !isSingleTouch && self.options.scrollingY;
+
+			// Reset tracking flag
+			self.__isTracking = true;
+
+			// Reset deceleration complete flag
+			self.__didDecelerationComplete = false;
+
+			// Dragging starts directly with two fingers, otherwise lazy with an offset
+			self.__isDragging = !isSingleTouch;
+
+			// Some features are disabled in multi touch scenarios
+			self.__isSingleTouch = isSingleTouch;
+
+			// Clearing data structure
+			self.__positions = [];
+
+		},
+
+
+		/**
+		 * Touch move handler for scrolling support
+		 */
+		doTouchMove: function(touches, timeStamp, scale) {
+
+			// Array-like check is enough here
+			if (touches.length == null) {
+				throw new Error("Invalid touch list: " + touches);
+			}
+
+			if (timeStamp instanceof Date) {
+				timeStamp = timeStamp.valueOf();
+			}
+			if (typeof timeStamp !== "number") {
+				throw new Error("Invalid timestamp value: " + timeStamp);
+			}
+
+			var self = this;
+
+			// Ignore event when tracking is not enabled (event might be outside of element)
+			if (!self.__isTracking) {
+				return;
+			}
+
+
+			var currentTouchLeft, currentTouchTop;
+
+			// Compute move based around of center of fingers
+			if (touches.length === 2) {
+				currentTouchLeft = Math.abs(touches[0].pageX + touches[1].pageX) / 2;
+				currentTouchTop = Math.abs(touches[0].pageY + touches[1].pageY) / 2;
+			} else {
+				currentTouchLeft = touches[0].pageX;
+				currentTouchTop = touches[0].pageY;
+			}
+
+			var positions = self.__positions;
+
+			// Are we already is dragging mode?
+			if (self.__isDragging) {
+
+				// Compute move distance
+				var moveX = currentTouchLeft - self.__lastTouchLeft;
+				var moveY = currentTouchTop - self.__lastTouchTop;
+
+				// Read previous scroll position and zooming
+				var scrollLeft = self.__scrollLeft;
+				var scrollTop = self.__scrollTop;
+				var level = self.__zoomLevel;
+
+				// Work with scaling
+				if (scale != null && self.options.zooming) {
+
+					var oldLevel = level;
+
+					// Recompute level based on previous scale and new scale
+					level = level / self.__lastScale * scale;
+
+					// Limit level according to configuration
+					level = Math.max(Math.min(level, self.options.maxZoom), self.options.minZoom);
+
+					// Only do further compution when change happened
+					if (oldLevel !== level) {
+
+						// Compute relative event position to container
+						var currentTouchLeftRel = currentTouchLeft - self.__clientLeft;
+						var currentTouchTopRel = currentTouchTop - self.__clientTop;
+
+						// Recompute left and top coordinates based on new zoom level
+						scrollLeft = ((currentTouchLeftRel + scrollLeft) * level / oldLevel) - currentTouchLeftRel;
+						scrollTop = ((currentTouchTopRel + scrollTop) * level / oldLevel) - currentTouchTopRel;
+
+						// Recompute max scroll values
+						self.__computeScrollMax(level);
+
+					}
+				}
+
+				if (self.__enableScrollX) {
+
+					scrollLeft -= moveX * this.options.speedMultiplier;
+					var maxScrollLeft = self.__maxScrollLeft;
+
+					if (scrollLeft > maxScrollLeft || scrollLeft < 0) {
+
+						// Slow down on the edges
+						if (self.options.bouncing) {
+
+							scrollLeft += (moveX / 2  * this.options.speedMultiplier);
+
+						} else if (scrollLeft > maxScrollLeft) {
+
+							scrollLeft = maxScrollLeft;
+
+						} else {
+
+							scrollLeft = 0;
+
+						}
+					}
+				}
+
+				// Compute new vertical scroll position
+				if (self.__enableScrollY) {
+
+					scrollTop -= moveY * this.options.speedMultiplier;
+					var maxScrollTop = self.__maxScrollTop;
+
+					if (scrollTop > maxScrollTop || scrollTop < 0) {
+
+						// Slow down on the edges
+						if (self.options.bouncing) {
+
+							scrollTop += (moveY / 2 * this.options.speedMultiplier);
+
+							// Support pull-to-refresh (only when only y is scrollable)
+							if (!self.__enableScrollX && self.__refreshHeight != null) {
+
+								if (!self.__refreshActive && scrollTop <= -self.__refreshHeight) {
+
+									self.__refreshActive = true;
+									if (self.__refreshActivate) {
+										self.__refreshActivate();
+									}
+
+								} else if (self.__refreshActive && scrollTop > -self.__refreshHeight) {
+
+									self.__refreshActive = false;
+									if (self.__refreshDeactivate) {
+										self.__refreshDeactivate();
+									}
+
+								}
+							}
+
+						} else if (scrollTop > maxScrollTop) {
+
+							scrollTop = maxScrollTop;
+
+						} else {
+
+							scrollTop = 0;
+
+						}
+					}
+				}
+
+				// Keep list from growing infinitely (holding min 10, max 20 measure points)
+				if (positions.length > 60) {
+					positions.splice(0, 30);
+				}
+
+				// Track scroll movement for decleration
+				positions.push(scrollLeft, scrollTop, timeStamp);
+
+				// Sync scroll position
+				self.__publish(scrollLeft, scrollTop, level);
+
+			// Otherwise figure out whether we are switching into dragging mode now.
+			} else {
+
+				var minimumTrackingForScroll = self.options.locking ? 3 : 0;
+				var minimumTrackingForDrag = 5;
+
+				var distanceX = Math.abs(currentTouchLeft - self.__initialTouchLeft);
+				var distanceY = Math.abs(currentTouchTop - self.__initialTouchTop);
+
+				self.__enableScrollX = self.options.scrollingX && distanceX >= minimumTrackingForScroll;
+				self.__enableScrollY = self.options.scrollingY && distanceY >= minimumTrackingForScroll;
+
+				positions.push(self.__scrollLeft, self.__scrollTop, timeStamp);
+
+				self.__isDragging = (self.__enableScrollX || self.__enableScrollY) && (distanceX >= minimumTrackingForDrag || distanceY >= minimumTrackingForDrag);
+				if (self.__isDragging) {
+					self.__interruptedAnimation = false;
+				}
+
+			}
+
+			// Update last touch positions and time stamp for next event
+			self.__lastTouchLeft = currentTouchLeft;
+			self.__lastTouchTop = currentTouchTop;
+			self.__lastTouchMove = timeStamp;
+			self.__lastScale = scale;
+
+		},
+
+
+		/**
+		 * Touch end handler for scrolling support
+		 */
+		doTouchEnd: function(timeStamp) {
+
+			if (timeStamp instanceof Date) {
+				timeStamp = timeStamp.valueOf();
+			}
+			if (typeof timeStamp !== "number") {
+				throw new Error("Invalid timestamp value: " + timeStamp);
+			}
+
+			var self = this;
+
+			// Ignore event when tracking is not enabled (no touchstart event on element)
+			// This is required as this listener ('touchmove') sits on the document and not on the element itself.
+			if (!self.__isTracking) {
+				return;
+			}
+
+			// Not touching anymore (when two finger hit the screen there are two touch end events)
+			self.__isTracking = false;
+
+			// Be sure to reset the dragging flag now. Here we also detect whether
+			// the finger has moved fast enough to switch into a deceleration animation.
+			if (self.__isDragging) {
+
+				// Reset dragging flag
+				self.__isDragging = false;
+
+				// Start deceleration
+				// Verify that the last move detected was in some relevant time frame
+				if (self.__isSingleTouch && self.options.animating && (timeStamp - self.__lastTouchMove) <= 100) {
+
+					// Then figure out what the scroll position was about 100ms ago
+					var positions = self.__positions;
+					var endPos = positions.length - 1;
+					var startPos = endPos;
+
+					// Move pointer to position measured 100ms ago
+					for (var i = endPos; i > 0 && positions[i] > (self.__lastTouchMove - 100); i -= 3) {
+						startPos = i;
+					}
+
+					// If we haven't received consecutive touchmove events within a 100ms
+					// timeframe, attempt a best-effort based on the first position. This
+					// typically happens when an expensive operation occurs on the main
+					// thread during scrolling, such as image decoding.
+					if (startPos === endPos && positions.length > 5) {
+						startPos = 2;
+					}
+
+					// If start and stop position is identical in a 100ms timeframe,
+					// we cannot compute any useful deceleration.
+					if (startPos !== endPos) {
+
+						// Compute relative movement between these two points
+						var timeOffset = positions[endPos] - positions[startPos];
+						var movedLeft = self.__scrollLeft - positions[startPos - 2];
+						var movedTop = self.__scrollTop - positions[startPos - 1];
+
+						// Based on 50ms compute the movement to apply for each render step
+						self.__decelerationVelocityX = movedLeft / timeOffset * (1000 / 60);
+						self.__decelerationVelocityY = movedTop / timeOffset * (1000 / 60);
+
+						// How much velocity is required to start the deceleration
+						var minVelocityToStartDeceleration = self.options.paging || self.options.snapping ? 4 : 1;
+
+						// Verify that we have enough velocity to start deceleration
+						if (Math.abs(self.__decelerationVelocityX) > minVelocityToStartDeceleration || Math.abs(self.__decelerationVelocityY) > minVelocityToStartDeceleration) {
+
+							// Deactivate pull-to-refresh when decelerating
+							if (!self.__refreshActive) {
+								self.__startDeceleration(timeStamp);
+							}
+						}
+					} else {
+						self.options.scrollingComplete();
+					}
+				} else if ((timeStamp - self.__lastTouchMove) > 100) {
+					self.options.scrollingComplete();
+	 			}
+			}
+
+			// If this was a slower move it is per default non decelerated, but this
+			// still means that we want snap back to the bounds which is done here.
+			// This is placed outside the condition above to improve edge case stability
+			// e.g. touchend fired without enabled dragging. This should normally do not
+			// have modified the scroll positions or even showed the scrollbars though.
+			if (!self.__isDecelerating) {
+
+				if (self.__refreshActive && self.__refreshStart) {
+
+					// Use publish instead of scrollTo to allow scrolling to out of boundary position
+					// We don't need to normalize scrollLeft, zoomLevel, etc. here because we only y-scrolling when pull-to-refresh is enabled
+					self.__publish(self.__scrollLeft, -self.__refreshHeight, self.__zoomLevel, true);
+
+					if (self.__refreshStart) {
+						self.__refreshStart();
+					}
+
+				} else {
+
+					if (self.__interruptedAnimation || self.__isDragging) {
+						self.options.scrollingComplete();
+					}
+					self.scrollTo(self.__scrollLeft, self.__scrollTop, true, self.__zoomLevel);
+
+					// Directly signalize deactivation (nothing todo on refresh?)
+					if (self.__refreshActive) {
+
+						self.__refreshActive = false;
+						if (self.__refreshDeactivate) {
+							self.__refreshDeactivate();
+						}
+
+					}
+				}
+			}
+
+			// Fully cleanup list
+			self.__positions.length = 0;
+
+		},
+
+
+
+		/*
+		---------------------------------------------------------------------------
+			PRIVATE API
+		---------------------------------------------------------------------------
+		*/
+
+		/**
+		 * Applies the scroll position to the content element
+		 *
+		 * @param left {Number} Left scroll position
+		 * @param top {Number} Top scroll position
+		 * @param animate {Boolean?false} Whether animation should be used to move to the new coordinates
+		 */
+		__publish: function(left, top, zoom, animate) {
+
+			var self = this;
+
+			// Remember whether we had an animation, then we try to continue based on the current "drive" of the animation
+			var wasAnimating = self.__isAnimating;
+			if (wasAnimating) {
+				core.effect.Animate.stop(wasAnimating);
+				self.__isAnimating = false;
+			}
+
+			if (animate && self.options.animating) {
+
+				// Keep scheduled positions for scrollBy/zoomBy functionality
+				self.__scheduledLeft = left;
+				self.__scheduledTop = top;
+				self.__scheduledZoom = zoom;
+
+				var oldLeft = self.__scrollLeft;
+				var oldTop = self.__scrollTop;
+				var oldZoom = self.__zoomLevel;
+
+				var diffLeft = left - oldLeft;
+				var diffTop = top - oldTop;
+				var diffZoom = zoom - oldZoom;
+
+				var step = function(percent, now, render) {
+
+					if (render) {
+
+						self.__scrollLeft = oldLeft + (diffLeft * percent);
+						self.__scrollTop = oldTop + (diffTop * percent);
+						self.__zoomLevel = oldZoom + (diffZoom * percent);
+
+						// Push values out
+						if (self.__callback) {
+							self.__callback(self.__scrollLeft, self.__scrollTop, self.__zoomLevel);
+						}
+
+					}
+				};
+
+				var verify = function(id) {
+					return self.__isAnimating === id;
+				};
+
+				var completed = function(renderedFramesPerSecond, animationId, wasFinished) {
+					if (animationId === self.__isAnimating) {
+						self.__isAnimating = false;
+					}
+					if (self.__didDecelerationComplete || wasFinished) {
+						self.options.scrollingComplete();
+					}
+
+					if (self.options.zooming) {
+						self.__computeScrollMax();
+						if(self.__zoomComplete) {
+							self.__zoomComplete();
+							self.__zoomComplete = null;
+						}
+					}
+				};
+
+				// When continuing based on previous animation we choose an ease-out animation instead of ease-in-out
+				self.__isAnimating = core.effect.Animate.start(step, verify, completed, self.options.animationDuration, wasAnimating ? easeOutCubic : easeInOutCubic);
+
+			} else {
+
+				self.__scheduledLeft = self.__scrollLeft = left;
+				self.__scheduledTop = self.__scrollTop = top;
+				self.__scheduledZoom = self.__zoomLevel = zoom;
+
+				// Push values out
+				if (self.__callback) {
+					self.__callback(left, top, zoom);
+				}
+
+				// Fix max scroll ranges
+				if (self.options.zooming) {
+					self.__computeScrollMax();
+					if(self.__zoomComplete) {
+						self.__zoomComplete();
+						self.__zoomComplete = null;
+					}
+				}
+			}
+		},
+
+
+		/**
+		 * Recomputes scroll minimum values based on client dimensions and content dimensions.
+		 */
+		__computeScrollMax: function(zoomLevel) {
+
+			var self = this;
+
+			if (zoomLevel == null) {
+				zoomLevel = self.__zoomLevel;
+			}
+
+			self.__maxScrollLeft = Math.max((self.__contentWidth * zoomLevel) - self.__clientWidth, 0);
+			self.__maxScrollTop = Math.max((self.__contentHeight * zoomLevel) - self.__clientHeight, 0);
+
+		},
+
+
+
+		/*
+		---------------------------------------------------------------------------
+			ANIMATION (DECELERATION) SUPPORT
+		---------------------------------------------------------------------------
+		*/
+
+		/**
+		 * Called when a touch sequence end and the speed of the finger was high enough
+		 * to switch into deceleration mode.
+		 */
+		__startDeceleration: function(timeStamp) {
+
+			var self = this;
+
+			if (self.options.paging) {
+
+				var scrollLeft = Math.max(Math.min(self.__scrollLeft, self.__maxScrollLeft), 0);
+				var scrollTop = Math.max(Math.min(self.__scrollTop, self.__maxScrollTop), 0);
+				var clientWidth = self.__clientWidth;
+				var clientHeight = self.__clientHeight;
+
+				// We limit deceleration not to the min/max values of the allowed range, but to the size of the visible client area.
+				// Each page should have exactly the size of the client area.
+				self.__minDecelerationScrollLeft = Math.floor(scrollLeft / clientWidth) * clientWidth;
+				self.__minDecelerationScrollTop = Math.floor(scrollTop / clientHeight) * clientHeight;
+				self.__maxDecelerationScrollLeft = Math.ceil(scrollLeft / clientWidth) * clientWidth;
+				self.__maxDecelerationScrollTop = Math.ceil(scrollTop / clientHeight) * clientHeight;
+
+			} else {
+
+				self.__minDecelerationScrollLeft = 0;
+				self.__minDecelerationScrollTop = 0;
+				self.__maxDecelerationScrollLeft = self.__maxScrollLeft;
+				self.__maxDecelerationScrollTop = self.__maxScrollTop;
+
+			}
+
+			// Wrap class method
+			var step = function(percent, now, render) {
+				self.__stepThroughDeceleration(render);
+			};
+
+			// How much velocity is required to keep the deceleration running
+			var minVelocityToKeepDecelerating = self.options.snapping ? 4 : 0.1;
+
+			// Detect whether it's still worth to continue animating steps
+			// If we are already slow enough to not being user perceivable anymore, we stop the whole process here.
+			var verify = function() {
+				var shouldContinue = Math.abs(self.__decelerationVelocityX) >= minVelocityToKeepDecelerating || Math.abs(self.__decelerationVelocityY) >= minVelocityToKeepDecelerating;
+				if (!shouldContinue) {
+					self.__didDecelerationComplete = true;
+				}
+				return shouldContinue;
+			};
+
+			var completed = function(renderedFramesPerSecond, animationId, wasFinished) {
+				self.__isDecelerating = false;
+				if (self.__didDecelerationComplete) {
+					self.options.scrollingComplete();
+				}
+
+				// Animate to grid when snapping is active, otherwise just fix out-of-boundary positions
+				self.scrollTo(self.__scrollLeft, self.__scrollTop, self.options.snapping);
+			};
+
+			// Start animation and switch on flag
+			self.__isDecelerating = core.effect.Animate.start(step, verify, completed);
+
+		},
+
+
+		/**
+		 * Called on every step of the animation
+		 *
+		 * @param inMemory {Boolean?false} Whether to not render the current step, but keep it in memory only. Used internally only!
+		 */
+		__stepThroughDeceleration: function(render) {
+
+			var self = this;
+
+
+			//
+			// COMPUTE NEXT SCROLL POSITION
+			//
+
+			// Add deceleration to scroll position
+			var scrollLeft = self.__scrollLeft + self.__decelerationVelocityX;
+			var scrollTop = self.__scrollTop + self.__decelerationVelocityY;
+
+
+			//
+			// HARD LIMIT SCROLL POSITION FOR NON BOUNCING MODE
+			//
+
+			if (!self.options.bouncing) {
+
+				var scrollLeftFixed = Math.max(Math.min(self.__maxDecelerationScrollLeft, scrollLeft), self.__minDecelerationScrollLeft);
+				if (scrollLeftFixed !== scrollLeft) {
+					scrollLeft = scrollLeftFixed;
+					self.__decelerationVelocityX = 0;
+				}
+
+				var scrollTopFixed = Math.max(Math.min(self.__maxDecelerationScrollTop, scrollTop), self.__minDecelerationScrollTop);
+				if (scrollTopFixed !== scrollTop) {
+					scrollTop = scrollTopFixed;
+					self.__decelerationVelocityY = 0;
+				}
+
+			}
+
+
+			//
+			// UPDATE SCROLL POSITION
+			//
+
+			if (render) {
+
+				self.__publish(scrollLeft, scrollTop, self.__zoomLevel);
+
+			} else {
+
+				self.__scrollLeft = scrollLeft;
+				self.__scrollTop = scrollTop;
+
+			}
+
+
+			//
+			// SLOW DOWN
+			//
+
+			// Slow down velocity on every iteration
+			if (!self.options.paging) {
+
+				// This is the factor applied to every iteration of the animation
+				// to slow down the process. This should emulate natural behavior where
+				// objects slow down when the initiator of the movement is removed
+				var frictionFactor = self.options.decelerationRate;
+
+				self.__decelerationVelocityX *= frictionFactor;
+				self.__decelerationVelocityY *= frictionFactor;
+
+			}
+
+
+			//
+			// BOUNCING SUPPORT
+			//
+
+			if (self.options.bouncing) {
+
+				var scrollOutsideX = 0;
+				var scrollOutsideY = 0;
+
+				// This configures the amount of change applied to deceleration/acceleration when reaching boundaries
+				var penetrationDeceleration = self.options.penetrationDeceleration; 
+				var penetrationAcceleration = self.options.penetrationAcceleration; 
+
+				// Check limits
+				if (scrollLeft < self.__minDecelerationScrollLeft) {
+					scrollOutsideX = self.__minDecelerationScrollLeft - scrollLeft;
+				} else if (scrollLeft > self.__maxDecelerationScrollLeft) {
+					scrollOutsideX = self.__maxDecelerationScrollLeft - scrollLeft;
+				}
+
+				if (scrollTop < self.__minDecelerationScrollTop) {
+					scrollOutsideY = self.__minDecelerationScrollTop - scrollTop;
+				} else if (scrollTop > self.__maxDecelerationScrollTop) {
+					scrollOutsideY = self.__maxDecelerationScrollTop - scrollTop;
+				}
+
+				// Slow down until slow enough, then flip back to snap position
+				if (scrollOutsideX !== 0) {
+					if (scrollOutsideX * self.__decelerationVelocityX <= 0) {
+						self.__decelerationVelocityX += scrollOutsideX * penetrationDeceleration;
+					} else {
+						self.__decelerationVelocityX = scrollOutsideX * penetrationAcceleration;
+					}
+				}
+
+				if (scrollOutsideY !== 0) {
+					if (scrollOutsideY * self.__decelerationVelocityY <= 0) {
+						self.__decelerationVelocityY += scrollOutsideY * penetrationDeceleration;
+					} else {
+						self.__decelerationVelocityY = scrollOutsideY * penetrationAcceleration;
+					}
+				}
+			}
+		}
+	};
+
+	// Copy over members to prototype
+	for (var key in members) {
+		Scroller.prototype[key] = members[key];
+	}
+
+	module.exports = Scroller;
+})();
+
+},{"./Animate":31}],33:[function(require,module,exports){
 (function(root, factory) {
     if (typeof exports === 'object') {
         // CommonJS
@@ -12897,7 +16488,7 @@ return jQuery;
     return React;
 }));
 
-},{"backbone":1,"react":160,"underscore":161}],6:[function(require,module,exports){
+},{"backbone":1,"react":188,"underscore":189}],34:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -12924,7 +16515,7 @@ var AutoFocusMixin = {
 
 module.exports = AutoFocusMixin;
 
-},{"./focusNode":124}],7:[function(require,module,exports){
+},{"./focusNode":152}],35:[function(require,module,exports){
 /**
  * Copyright 2013-2015 Facebook, Inc.
  * All rights reserved.
@@ -13419,7 +17010,7 @@ var BeforeInputEventPlugin = {
 
 module.exports = BeforeInputEventPlugin;
 
-},{"./EventConstants":19,"./EventPropagators":24,"./ExecutionEnvironment":25,"./FallbackCompositionState":26,"./SyntheticCompositionEvent":98,"./SyntheticInputEvent":102,"./keyOf":146}],8:[function(require,module,exports){
+},{"./EventConstants":47,"./EventPropagators":52,"./ExecutionEnvironment":53,"./FallbackCompositionState":54,"./SyntheticCompositionEvent":126,"./SyntheticInputEvent":130,"./keyOf":174}],36:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -13544,7 +17135,7 @@ var CSSProperty = {
 
 module.exports = CSSProperty;
 
-},{}],9:[function(require,module,exports){
+},{}],37:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -13726,7 +17317,7 @@ var CSSPropertyOperations = {
 module.exports = CSSPropertyOperations;
 
 }).call(this,require('_process'))
-},{"./CSSProperty":8,"./ExecutionEnvironment":25,"./camelizeStyleName":113,"./dangerousStyleValue":118,"./hyphenateStyleName":138,"./memoizeStringOnly":148,"./warning":159,"_process":3}],10:[function(require,module,exports){
+},{"./CSSProperty":36,"./ExecutionEnvironment":53,"./camelizeStyleName":141,"./dangerousStyleValue":146,"./hyphenateStyleName":166,"./memoizeStringOnly":176,"./warning":187,"_process":3}],38:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -13826,7 +17417,7 @@ PooledClass.addPoolingTo(CallbackQueue);
 module.exports = CallbackQueue;
 
 }).call(this,require('_process'))
-},{"./Object.assign":31,"./PooledClass":32,"./invariant":140,"_process":3}],11:[function(require,module,exports){
+},{"./Object.assign":59,"./PooledClass":60,"./invariant":168,"_process":3}],39:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -14208,7 +17799,7 @@ var ChangeEventPlugin = {
 
 module.exports = ChangeEventPlugin;
 
-},{"./EventConstants":19,"./EventPluginHub":21,"./EventPropagators":24,"./ExecutionEnvironment":25,"./ReactUpdates":92,"./SyntheticEvent":100,"./isEventSupported":141,"./isTextInputElement":143,"./keyOf":146}],12:[function(require,module,exports){
+},{"./EventConstants":47,"./EventPluginHub":49,"./EventPropagators":52,"./ExecutionEnvironment":53,"./ReactUpdates":120,"./SyntheticEvent":128,"./isEventSupported":169,"./isTextInputElement":171,"./keyOf":174}],40:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -14233,7 +17824,7 @@ var ClientReactRootIndex = {
 
 module.exports = ClientReactRootIndex;
 
-},{}],13:[function(require,module,exports){
+},{}],41:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -14371,7 +17962,7 @@ var DOMChildrenOperations = {
 module.exports = DOMChildrenOperations;
 
 }).call(this,require('_process'))
-},{"./Danger":16,"./ReactMultiChildUpdateTypes":77,"./invariant":140,"./setTextContent":154,"_process":3}],14:[function(require,module,exports){
+},{"./Danger":44,"./ReactMultiChildUpdateTypes":105,"./invariant":168,"./setTextContent":182,"_process":3}],42:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -14670,7 +18261,7 @@ var DOMProperty = {
 module.exports = DOMProperty;
 
 }).call(this,require('_process'))
-},{"./invariant":140,"_process":3}],15:[function(require,module,exports){
+},{"./invariant":168,"_process":3}],43:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -14862,7 +18453,7 @@ var DOMPropertyOperations = {
 module.exports = DOMPropertyOperations;
 
 }).call(this,require('_process'))
-},{"./DOMProperty":14,"./quoteAttributeValueForBrowser":152,"./warning":159,"_process":3}],16:[function(require,module,exports){
+},{"./DOMProperty":42,"./quoteAttributeValueForBrowser":180,"./warning":187,"_process":3}],44:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -15049,7 +18640,7 @@ var Danger = {
 module.exports = Danger;
 
 }).call(this,require('_process'))
-},{"./ExecutionEnvironment":25,"./createNodesFromMarkup":117,"./emptyFunction":119,"./getMarkupWrap":132,"./invariant":140,"_process":3}],17:[function(require,module,exports){
+},{"./ExecutionEnvironment":53,"./createNodesFromMarkup":145,"./emptyFunction":147,"./getMarkupWrap":160,"./invariant":168,"_process":3}],45:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -15088,7 +18679,7 @@ var DefaultEventPluginOrder = [
 
 module.exports = DefaultEventPluginOrder;
 
-},{"./keyOf":146}],18:[function(require,module,exports){
+},{"./keyOf":174}],46:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -15228,7 +18819,7 @@ var EnterLeaveEventPlugin = {
 
 module.exports = EnterLeaveEventPlugin;
 
-},{"./EventConstants":19,"./EventPropagators":24,"./ReactMount":75,"./SyntheticMouseEvent":104,"./keyOf":146}],19:[function(require,module,exports){
+},{"./EventConstants":47,"./EventPropagators":52,"./ReactMount":103,"./SyntheticMouseEvent":132,"./keyOf":174}],47:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -15300,7 +18891,7 @@ var EventConstants = {
 
 module.exports = EventConstants;
 
-},{"./keyMirror":145}],20:[function(require,module,exports){
+},{"./keyMirror":173}],48:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -15390,7 +18981,7 @@ var EventListener = {
 module.exports = EventListener;
 
 }).call(this,require('_process'))
-},{"./emptyFunction":119,"_process":3}],21:[function(require,module,exports){
+},{"./emptyFunction":147,"_process":3}],49:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -15668,7 +19259,7 @@ var EventPluginHub = {
 module.exports = EventPluginHub;
 
 }).call(this,require('_process'))
-},{"./EventPluginRegistry":22,"./EventPluginUtils":23,"./accumulateInto":110,"./forEachAccumulated":125,"./invariant":140,"_process":3}],22:[function(require,module,exports){
+},{"./EventPluginRegistry":50,"./EventPluginUtils":51,"./accumulateInto":138,"./forEachAccumulated":153,"./invariant":168,"_process":3}],50:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -15948,7 +19539,7 @@ var EventPluginRegistry = {
 module.exports = EventPluginRegistry;
 
 }).call(this,require('_process'))
-},{"./invariant":140,"_process":3}],23:[function(require,module,exports){
+},{"./invariant":168,"_process":3}],51:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -16169,7 +19760,7 @@ var EventPluginUtils = {
 module.exports = EventPluginUtils;
 
 }).call(this,require('_process'))
-},{"./EventConstants":19,"./invariant":140,"_process":3}],24:[function(require,module,exports){
+},{"./EventConstants":47,"./invariant":168,"_process":3}],52:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -16311,7 +19902,7 @@ var EventPropagators = {
 module.exports = EventPropagators;
 
 }).call(this,require('_process'))
-},{"./EventConstants":19,"./EventPluginHub":21,"./accumulateInto":110,"./forEachAccumulated":125,"_process":3}],25:[function(require,module,exports){
+},{"./EventConstants":47,"./EventPluginHub":49,"./accumulateInto":138,"./forEachAccumulated":153,"_process":3}],53:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -16355,7 +19946,7 @@ var ExecutionEnvironment = {
 
 module.exports = ExecutionEnvironment;
 
-},{}],26:[function(require,module,exports){
+},{}],54:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -16446,7 +20037,7 @@ PooledClass.addPoolingTo(FallbackCompositionState);
 
 module.exports = FallbackCompositionState;
 
-},{"./Object.assign":31,"./PooledClass":32,"./getTextContentAccessor":135}],27:[function(require,module,exports){
+},{"./Object.assign":59,"./PooledClass":60,"./getTextContentAccessor":163}],55:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -16657,7 +20248,7 @@ var HTMLDOMPropertyConfig = {
 
 module.exports = HTMLDOMPropertyConfig;
 
-},{"./DOMProperty":14,"./ExecutionEnvironment":25}],28:[function(require,module,exports){
+},{"./DOMProperty":42,"./ExecutionEnvironment":53}],56:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -16813,7 +20404,7 @@ var LinkedValueUtils = {
 module.exports = LinkedValueUtils;
 
 }).call(this,require('_process'))
-},{"./ReactPropTypes":83,"./invariant":140,"_process":3}],29:[function(require,module,exports){
+},{"./ReactPropTypes":111,"./invariant":168,"_process":3}],57:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -16870,7 +20461,7 @@ var LocalEventTrapMixin = {
 module.exports = LocalEventTrapMixin;
 
 }).call(this,require('_process'))
-},{"./ReactBrowserEventEmitter":35,"./accumulateInto":110,"./forEachAccumulated":125,"./invariant":140,"_process":3}],30:[function(require,module,exports){
+},{"./ReactBrowserEventEmitter":63,"./accumulateInto":138,"./forEachAccumulated":153,"./invariant":168,"_process":3}],58:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -16928,7 +20519,7 @@ var MobileSafariClickEventPlugin = {
 
 module.exports = MobileSafariClickEventPlugin;
 
-},{"./EventConstants":19,"./emptyFunction":119}],31:[function(require,module,exports){
+},{"./EventConstants":47,"./emptyFunction":147}],59:[function(require,module,exports){
 /**
  * Copyright 2014-2015, Facebook, Inc.
  * All rights reserved.
@@ -16977,7 +20568,7 @@ function assign(target, sources) {
 
 module.exports = assign;
 
-},{}],32:[function(require,module,exports){
+},{}],60:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -17093,7 +20684,7 @@ var PooledClass = {
 module.exports = PooledClass;
 
 }).call(this,require('_process'))
-},{"./invariant":140,"_process":3}],33:[function(require,module,exports){
+},{"./invariant":168,"_process":3}],61:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -17245,7 +20836,7 @@ React.version = '0.13.3';
 module.exports = React;
 
 }).call(this,require('_process'))
-},{"./EventPluginUtils":23,"./ExecutionEnvironment":25,"./Object.assign":31,"./ReactChildren":37,"./ReactClass":38,"./ReactComponent":39,"./ReactContext":43,"./ReactCurrentOwner":44,"./ReactDOM":45,"./ReactDOMTextComponent":56,"./ReactDefaultInjection":59,"./ReactElement":62,"./ReactElementValidator":63,"./ReactInstanceHandles":71,"./ReactMount":75,"./ReactPerf":80,"./ReactPropTypes":83,"./ReactReconciler":86,"./ReactServerRendering":89,"./findDOMNode":122,"./onlyChild":149,"_process":3}],34:[function(require,module,exports){
+},{"./EventPluginUtils":51,"./ExecutionEnvironment":53,"./Object.assign":59,"./ReactChildren":65,"./ReactClass":66,"./ReactComponent":67,"./ReactContext":71,"./ReactCurrentOwner":72,"./ReactDOM":73,"./ReactDOMTextComponent":84,"./ReactDefaultInjection":87,"./ReactElement":90,"./ReactElementValidator":91,"./ReactInstanceHandles":99,"./ReactMount":103,"./ReactPerf":108,"./ReactPropTypes":111,"./ReactReconciler":114,"./ReactServerRendering":117,"./findDOMNode":150,"./onlyChild":177,"_process":3}],62:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -17276,7 +20867,7 @@ var ReactBrowserComponentMixin = {
 
 module.exports = ReactBrowserComponentMixin;
 
-},{"./findDOMNode":122}],35:[function(require,module,exports){
+},{"./findDOMNode":150}],63:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -17629,7 +21220,7 @@ var ReactBrowserEventEmitter = assign({}, ReactEventEmitterMixin, {
 
 module.exports = ReactBrowserEventEmitter;
 
-},{"./EventConstants":19,"./EventPluginHub":21,"./EventPluginRegistry":22,"./Object.assign":31,"./ReactEventEmitterMixin":66,"./ViewportMetrics":109,"./isEventSupported":141}],36:[function(require,module,exports){
+},{"./EventConstants":47,"./EventPluginHub":49,"./EventPluginRegistry":50,"./Object.assign":59,"./ReactEventEmitterMixin":94,"./ViewportMetrics":137,"./isEventSupported":169}],64:[function(require,module,exports){
 /**
  * Copyright 2014-2015, Facebook, Inc.
  * All rights reserved.
@@ -17756,7 +21347,7 @@ var ReactChildReconciler = {
 
 module.exports = ReactChildReconciler;
 
-},{"./ReactReconciler":86,"./flattenChildren":123,"./instantiateReactComponent":139,"./shouldUpdateReactComponent":156}],37:[function(require,module,exports){
+},{"./ReactReconciler":114,"./flattenChildren":151,"./instantiateReactComponent":167,"./shouldUpdateReactComponent":184}],65:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -17909,7 +21500,7 @@ var ReactChildren = {
 module.exports = ReactChildren;
 
 }).call(this,require('_process'))
-},{"./PooledClass":32,"./ReactFragment":68,"./traverseAllChildren":158,"./warning":159,"_process":3}],38:[function(require,module,exports){
+},{"./PooledClass":60,"./ReactFragment":96,"./traverseAllChildren":186,"./warning":187,"_process":3}],66:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -18855,7 +22446,7 @@ var ReactClass = {
 module.exports = ReactClass;
 
 }).call(this,require('_process'))
-},{"./Object.assign":31,"./ReactComponent":39,"./ReactCurrentOwner":44,"./ReactElement":62,"./ReactErrorUtils":65,"./ReactInstanceMap":72,"./ReactLifeCycle":73,"./ReactPropTypeLocationNames":81,"./ReactPropTypeLocations":82,"./ReactUpdateQueue":91,"./invariant":140,"./keyMirror":145,"./keyOf":146,"./warning":159,"_process":3}],39:[function(require,module,exports){
+},{"./Object.assign":59,"./ReactComponent":67,"./ReactCurrentOwner":72,"./ReactElement":90,"./ReactErrorUtils":93,"./ReactInstanceMap":100,"./ReactLifeCycle":101,"./ReactPropTypeLocationNames":109,"./ReactPropTypeLocations":110,"./ReactUpdateQueue":119,"./invariant":168,"./keyMirror":173,"./keyOf":174,"./warning":187,"_process":3}],67:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -19009,7 +22600,7 @@ if ("production" !== process.env.NODE_ENV) {
 module.exports = ReactComponent;
 
 }).call(this,require('_process'))
-},{"./ReactUpdateQueue":91,"./invariant":140,"./warning":159,"_process":3}],40:[function(require,module,exports){
+},{"./ReactUpdateQueue":119,"./invariant":168,"./warning":187,"_process":3}],68:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -19056,7 +22647,7 @@ var ReactComponentBrowserEnvironment = {
 
 module.exports = ReactComponentBrowserEnvironment;
 
-},{"./ReactDOMIDOperations":49,"./ReactMount":75}],41:[function(require,module,exports){
+},{"./ReactDOMIDOperations":77,"./ReactMount":103}],69:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -19117,7 +22708,7 @@ var ReactComponentEnvironment = {
 module.exports = ReactComponentEnvironment;
 
 }).call(this,require('_process'))
-},{"./invariant":140,"_process":3}],42:[function(require,module,exports){
+},{"./invariant":168,"_process":3}],70:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -20030,7 +23621,7 @@ var ReactCompositeComponent = {
 module.exports = ReactCompositeComponent;
 
 }).call(this,require('_process'))
-},{"./Object.assign":31,"./ReactComponentEnvironment":41,"./ReactContext":43,"./ReactCurrentOwner":44,"./ReactElement":62,"./ReactElementValidator":63,"./ReactInstanceMap":72,"./ReactLifeCycle":73,"./ReactNativeComponent":78,"./ReactPerf":80,"./ReactPropTypeLocationNames":81,"./ReactPropTypeLocations":82,"./ReactReconciler":86,"./ReactUpdates":92,"./emptyObject":120,"./invariant":140,"./shouldUpdateReactComponent":156,"./warning":159,"_process":3}],43:[function(require,module,exports){
+},{"./Object.assign":59,"./ReactComponentEnvironment":69,"./ReactContext":71,"./ReactCurrentOwner":72,"./ReactElement":90,"./ReactElementValidator":91,"./ReactInstanceMap":100,"./ReactLifeCycle":101,"./ReactNativeComponent":106,"./ReactPerf":108,"./ReactPropTypeLocationNames":109,"./ReactPropTypeLocations":110,"./ReactReconciler":114,"./ReactUpdates":120,"./emptyObject":148,"./invariant":168,"./shouldUpdateReactComponent":184,"./warning":187,"_process":3}],71:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -20108,7 +23699,7 @@ var ReactContext = {
 module.exports = ReactContext;
 
 }).call(this,require('_process'))
-},{"./Object.assign":31,"./emptyObject":120,"./warning":159,"_process":3}],44:[function(require,module,exports){
+},{"./Object.assign":59,"./emptyObject":148,"./warning":187,"_process":3}],72:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20142,7 +23733,7 @@ var ReactCurrentOwner = {
 
 module.exports = ReactCurrentOwner;
 
-},{}],45:[function(require,module,exports){
+},{}],73:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -20321,7 +23912,7 @@ var ReactDOM = mapObject({
 module.exports = ReactDOM;
 
 }).call(this,require('_process'))
-},{"./ReactElement":62,"./ReactElementValidator":63,"./mapObject":147,"_process":3}],46:[function(require,module,exports){
+},{"./ReactElement":90,"./ReactElementValidator":91,"./mapObject":175,"_process":3}],74:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20385,7 +23976,7 @@ var ReactDOMButton = ReactClass.createClass({
 
 module.exports = ReactDOMButton;
 
-},{"./AutoFocusMixin":6,"./ReactBrowserComponentMixin":34,"./ReactClass":38,"./ReactElement":62,"./keyMirror":145}],47:[function(require,module,exports){
+},{"./AutoFocusMixin":34,"./ReactBrowserComponentMixin":62,"./ReactClass":66,"./ReactElement":90,"./keyMirror":173}],75:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -20895,7 +24486,7 @@ ReactDOMComponent.injection = {
 module.exports = ReactDOMComponent;
 
 }).call(this,require('_process'))
-},{"./CSSPropertyOperations":9,"./DOMProperty":14,"./DOMPropertyOperations":15,"./Object.assign":31,"./ReactBrowserEventEmitter":35,"./ReactComponentBrowserEnvironment":40,"./ReactMount":75,"./ReactMultiChild":76,"./ReactPerf":80,"./escapeTextContentForBrowser":121,"./invariant":140,"./isEventSupported":141,"./keyOf":146,"./warning":159,"_process":3}],48:[function(require,module,exports){
+},{"./CSSPropertyOperations":37,"./DOMProperty":42,"./DOMPropertyOperations":43,"./Object.assign":59,"./ReactBrowserEventEmitter":63,"./ReactComponentBrowserEnvironment":68,"./ReactMount":103,"./ReactMultiChild":104,"./ReactPerf":108,"./escapeTextContentForBrowser":149,"./invariant":168,"./isEventSupported":169,"./keyOf":174,"./warning":187,"_process":3}],76:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20944,7 +24535,7 @@ var ReactDOMForm = ReactClass.createClass({
 
 module.exports = ReactDOMForm;
 
-},{"./EventConstants":19,"./LocalEventTrapMixin":29,"./ReactBrowserComponentMixin":34,"./ReactClass":38,"./ReactElement":62}],49:[function(require,module,exports){
+},{"./EventConstants":47,"./LocalEventTrapMixin":57,"./ReactBrowserComponentMixin":62,"./ReactClass":66,"./ReactElement":90}],77:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -21112,7 +24703,7 @@ ReactPerf.measureMethods(ReactDOMIDOperations, 'ReactDOMIDOperations', {
 module.exports = ReactDOMIDOperations;
 
 }).call(this,require('_process'))
-},{"./CSSPropertyOperations":9,"./DOMChildrenOperations":13,"./DOMPropertyOperations":15,"./ReactMount":75,"./ReactPerf":80,"./invariant":140,"./setInnerHTML":153,"_process":3}],50:[function(require,module,exports){
+},{"./CSSPropertyOperations":37,"./DOMChildrenOperations":41,"./DOMPropertyOperations":43,"./ReactMount":103,"./ReactPerf":108,"./invariant":168,"./setInnerHTML":181,"_process":3}],78:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -21157,7 +24748,7 @@ var ReactDOMIframe = ReactClass.createClass({
 
 module.exports = ReactDOMIframe;
 
-},{"./EventConstants":19,"./LocalEventTrapMixin":29,"./ReactBrowserComponentMixin":34,"./ReactClass":38,"./ReactElement":62}],51:[function(require,module,exports){
+},{"./EventConstants":47,"./LocalEventTrapMixin":57,"./ReactBrowserComponentMixin":62,"./ReactClass":66,"./ReactElement":90}],79:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -21203,7 +24794,7 @@ var ReactDOMImg = ReactClass.createClass({
 
 module.exports = ReactDOMImg;
 
-},{"./EventConstants":19,"./LocalEventTrapMixin":29,"./ReactBrowserComponentMixin":34,"./ReactClass":38,"./ReactElement":62}],52:[function(require,module,exports){
+},{"./EventConstants":47,"./LocalEventTrapMixin":57,"./ReactBrowserComponentMixin":62,"./ReactClass":66,"./ReactElement":90}],80:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -21380,7 +24971,7 @@ var ReactDOMInput = ReactClass.createClass({
 module.exports = ReactDOMInput;
 
 }).call(this,require('_process'))
-},{"./AutoFocusMixin":6,"./DOMPropertyOperations":15,"./LinkedValueUtils":28,"./Object.assign":31,"./ReactBrowserComponentMixin":34,"./ReactClass":38,"./ReactElement":62,"./ReactMount":75,"./ReactUpdates":92,"./invariant":140,"_process":3}],53:[function(require,module,exports){
+},{"./AutoFocusMixin":34,"./DOMPropertyOperations":43,"./LinkedValueUtils":56,"./Object.assign":59,"./ReactBrowserComponentMixin":62,"./ReactClass":66,"./ReactElement":90,"./ReactMount":103,"./ReactUpdates":120,"./invariant":168,"_process":3}],81:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -21432,7 +25023,7 @@ var ReactDOMOption = ReactClass.createClass({
 module.exports = ReactDOMOption;
 
 }).call(this,require('_process'))
-},{"./ReactBrowserComponentMixin":34,"./ReactClass":38,"./ReactElement":62,"./warning":159,"_process":3}],54:[function(require,module,exports){
+},{"./ReactBrowserComponentMixin":62,"./ReactClass":66,"./ReactElement":90,"./warning":187,"_process":3}],82:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -21610,7 +25201,7 @@ var ReactDOMSelect = ReactClass.createClass({
 
 module.exports = ReactDOMSelect;
 
-},{"./AutoFocusMixin":6,"./LinkedValueUtils":28,"./Object.assign":31,"./ReactBrowserComponentMixin":34,"./ReactClass":38,"./ReactElement":62,"./ReactUpdates":92}],55:[function(require,module,exports){
+},{"./AutoFocusMixin":34,"./LinkedValueUtils":56,"./Object.assign":59,"./ReactBrowserComponentMixin":62,"./ReactClass":66,"./ReactElement":90,"./ReactUpdates":120}],83:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -21823,7 +25414,7 @@ var ReactDOMSelection = {
 
 module.exports = ReactDOMSelection;
 
-},{"./ExecutionEnvironment":25,"./getNodeForCharacterOffset":133,"./getTextContentAccessor":135}],56:[function(require,module,exports){
+},{"./ExecutionEnvironment":53,"./getNodeForCharacterOffset":161,"./getTextContentAccessor":163}],84:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -21940,7 +25531,7 @@ assign(ReactDOMTextComponent.prototype, {
 
 module.exports = ReactDOMTextComponent;
 
-},{"./DOMPropertyOperations":15,"./Object.assign":31,"./ReactComponentBrowserEnvironment":40,"./ReactDOMComponent":47,"./escapeTextContentForBrowser":121}],57:[function(require,module,exports){
+},{"./DOMPropertyOperations":43,"./Object.assign":59,"./ReactComponentBrowserEnvironment":68,"./ReactDOMComponent":75,"./escapeTextContentForBrowser":149}],85:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -22080,7 +25671,7 @@ var ReactDOMTextarea = ReactClass.createClass({
 module.exports = ReactDOMTextarea;
 
 }).call(this,require('_process'))
-},{"./AutoFocusMixin":6,"./DOMPropertyOperations":15,"./LinkedValueUtils":28,"./Object.assign":31,"./ReactBrowserComponentMixin":34,"./ReactClass":38,"./ReactElement":62,"./ReactUpdates":92,"./invariant":140,"./warning":159,"_process":3}],58:[function(require,module,exports){
+},{"./AutoFocusMixin":34,"./DOMPropertyOperations":43,"./LinkedValueUtils":56,"./Object.assign":59,"./ReactBrowserComponentMixin":62,"./ReactClass":66,"./ReactElement":90,"./ReactUpdates":120,"./invariant":168,"./warning":187,"_process":3}],86:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -22153,7 +25744,7 @@ var ReactDefaultBatchingStrategy = {
 
 module.exports = ReactDefaultBatchingStrategy;
 
-},{"./Object.assign":31,"./ReactUpdates":92,"./Transaction":108,"./emptyFunction":119}],59:[function(require,module,exports){
+},{"./Object.assign":59,"./ReactUpdates":120,"./Transaction":136,"./emptyFunction":147}],87:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -22312,7 +25903,7 @@ module.exports = {
 };
 
 }).call(this,require('_process'))
-},{"./BeforeInputEventPlugin":7,"./ChangeEventPlugin":11,"./ClientReactRootIndex":12,"./DefaultEventPluginOrder":17,"./EnterLeaveEventPlugin":18,"./ExecutionEnvironment":25,"./HTMLDOMPropertyConfig":27,"./MobileSafariClickEventPlugin":30,"./ReactBrowserComponentMixin":34,"./ReactClass":38,"./ReactComponentBrowserEnvironment":40,"./ReactDOMButton":46,"./ReactDOMComponent":47,"./ReactDOMForm":48,"./ReactDOMIDOperations":49,"./ReactDOMIframe":50,"./ReactDOMImg":51,"./ReactDOMInput":52,"./ReactDOMOption":53,"./ReactDOMSelect":54,"./ReactDOMTextComponent":56,"./ReactDOMTextarea":57,"./ReactDefaultBatchingStrategy":58,"./ReactDefaultPerf":60,"./ReactElement":62,"./ReactEventListener":67,"./ReactInjection":69,"./ReactInstanceHandles":71,"./ReactMount":75,"./ReactReconcileTransaction":85,"./SVGDOMPropertyConfig":93,"./SelectEventPlugin":94,"./ServerReactRootIndex":95,"./SimpleEventPlugin":96,"./createFullPageComponent":116,"_process":3}],60:[function(require,module,exports){
+},{"./BeforeInputEventPlugin":35,"./ChangeEventPlugin":39,"./ClientReactRootIndex":40,"./DefaultEventPluginOrder":45,"./EnterLeaveEventPlugin":46,"./ExecutionEnvironment":53,"./HTMLDOMPropertyConfig":55,"./MobileSafariClickEventPlugin":58,"./ReactBrowserComponentMixin":62,"./ReactClass":66,"./ReactComponentBrowserEnvironment":68,"./ReactDOMButton":74,"./ReactDOMComponent":75,"./ReactDOMForm":76,"./ReactDOMIDOperations":77,"./ReactDOMIframe":78,"./ReactDOMImg":79,"./ReactDOMInput":80,"./ReactDOMOption":81,"./ReactDOMSelect":82,"./ReactDOMTextComponent":84,"./ReactDOMTextarea":85,"./ReactDefaultBatchingStrategy":86,"./ReactDefaultPerf":88,"./ReactElement":90,"./ReactEventListener":95,"./ReactInjection":97,"./ReactInstanceHandles":99,"./ReactMount":103,"./ReactReconcileTransaction":113,"./SVGDOMPropertyConfig":121,"./SelectEventPlugin":122,"./ServerReactRootIndex":123,"./SimpleEventPlugin":124,"./createFullPageComponent":144,"_process":3}],88:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -22578,7 +26169,7 @@ var ReactDefaultPerf = {
 
 module.exports = ReactDefaultPerf;
 
-},{"./DOMProperty":14,"./ReactDefaultPerfAnalysis":61,"./ReactMount":75,"./ReactPerf":80,"./performanceNow":151}],61:[function(require,module,exports){
+},{"./DOMProperty":42,"./ReactDefaultPerfAnalysis":89,"./ReactMount":103,"./ReactPerf":108,"./performanceNow":179}],89:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -22784,7 +26375,7 @@ var ReactDefaultPerfAnalysis = {
 
 module.exports = ReactDefaultPerfAnalysis;
 
-},{"./Object.assign":31}],62:[function(require,module,exports){
+},{"./Object.assign":59}],90:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -23092,7 +26683,7 @@ ReactElement.isValidElement = function(object) {
 module.exports = ReactElement;
 
 }).call(this,require('_process'))
-},{"./Object.assign":31,"./ReactContext":43,"./ReactCurrentOwner":44,"./warning":159,"_process":3}],63:[function(require,module,exports){
+},{"./Object.assign":59,"./ReactContext":71,"./ReactCurrentOwner":72,"./warning":187,"_process":3}],91:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -23557,7 +27148,7 @@ var ReactElementValidator = {
 module.exports = ReactElementValidator;
 
 }).call(this,require('_process'))
-},{"./ReactCurrentOwner":44,"./ReactElement":62,"./ReactFragment":68,"./ReactNativeComponent":78,"./ReactPropTypeLocationNames":81,"./ReactPropTypeLocations":82,"./getIteratorFn":131,"./invariant":140,"./warning":159,"_process":3}],64:[function(require,module,exports){
+},{"./ReactCurrentOwner":72,"./ReactElement":90,"./ReactFragment":96,"./ReactNativeComponent":106,"./ReactPropTypeLocationNames":109,"./ReactPropTypeLocations":110,"./getIteratorFn":159,"./invariant":168,"./warning":187,"_process":3}],92:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -23652,7 +27243,7 @@ var ReactEmptyComponent = {
 module.exports = ReactEmptyComponent;
 
 }).call(this,require('_process'))
-},{"./ReactElement":62,"./ReactInstanceMap":72,"./invariant":140,"_process":3}],65:[function(require,module,exports){
+},{"./ReactElement":90,"./ReactInstanceMap":100,"./invariant":168,"_process":3}],93:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -23684,7 +27275,7 @@ var ReactErrorUtils = {
 
 module.exports = ReactErrorUtils;
 
-},{}],66:[function(require,module,exports){
+},{}],94:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -23734,7 +27325,7 @@ var ReactEventEmitterMixin = {
 
 module.exports = ReactEventEmitterMixin;
 
-},{"./EventPluginHub":21}],67:[function(require,module,exports){
+},{"./EventPluginHub":49}],95:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -23917,7 +27508,7 @@ var ReactEventListener = {
 
 module.exports = ReactEventListener;
 
-},{"./EventListener":20,"./ExecutionEnvironment":25,"./Object.assign":31,"./PooledClass":32,"./ReactInstanceHandles":71,"./ReactMount":75,"./ReactUpdates":92,"./getEventTarget":130,"./getUnboundedScrollPosition":136}],68:[function(require,module,exports){
+},{"./EventListener":48,"./ExecutionEnvironment":53,"./Object.assign":59,"./PooledClass":60,"./ReactInstanceHandles":99,"./ReactMount":103,"./ReactUpdates":120,"./getEventTarget":158,"./getUnboundedScrollPosition":164}],96:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2015, Facebook, Inc.
@@ -24102,7 +27693,7 @@ var ReactFragment = {
 module.exports = ReactFragment;
 
 }).call(this,require('_process'))
-},{"./ReactElement":62,"./warning":159,"_process":3}],69:[function(require,module,exports){
+},{"./ReactElement":90,"./warning":187,"_process":3}],97:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -24144,7 +27735,7 @@ var ReactInjection = {
 
 module.exports = ReactInjection;
 
-},{"./DOMProperty":14,"./EventPluginHub":21,"./ReactBrowserEventEmitter":35,"./ReactClass":38,"./ReactComponentEnvironment":41,"./ReactDOMComponent":47,"./ReactEmptyComponent":64,"./ReactNativeComponent":78,"./ReactPerf":80,"./ReactRootIndex":88,"./ReactUpdates":92}],70:[function(require,module,exports){
+},{"./DOMProperty":42,"./EventPluginHub":49,"./ReactBrowserEventEmitter":63,"./ReactClass":66,"./ReactComponentEnvironment":69,"./ReactDOMComponent":75,"./ReactEmptyComponent":92,"./ReactNativeComponent":106,"./ReactPerf":108,"./ReactRootIndex":116,"./ReactUpdates":120}],98:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -24279,7 +27870,7 @@ var ReactInputSelection = {
 
 module.exports = ReactInputSelection;
 
-},{"./ReactDOMSelection":55,"./containsNode":114,"./focusNode":124,"./getActiveElement":126}],71:[function(require,module,exports){
+},{"./ReactDOMSelection":83,"./containsNode":142,"./focusNode":152,"./getActiveElement":154}],99:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -24615,7 +28206,7 @@ var ReactInstanceHandles = {
 module.exports = ReactInstanceHandles;
 
 }).call(this,require('_process'))
-},{"./ReactRootIndex":88,"./invariant":140,"_process":3}],72:[function(require,module,exports){
+},{"./ReactRootIndex":116,"./invariant":168,"_process":3}],100:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -24664,7 +28255,7 @@ var ReactInstanceMap = {
 
 module.exports = ReactInstanceMap;
 
-},{}],73:[function(require,module,exports){
+},{}],101:[function(require,module,exports){
 /**
  * Copyright 2015, Facebook, Inc.
  * All rights reserved.
@@ -24701,7 +28292,7 @@ var ReactLifeCycle = {
 
 module.exports = ReactLifeCycle;
 
-},{}],74:[function(require,module,exports){
+},{}],102:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -24749,7 +28340,7 @@ var ReactMarkupChecksum = {
 
 module.exports = ReactMarkupChecksum;
 
-},{"./adler32":111}],75:[function(require,module,exports){
+},{"./adler32":139}],103:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -25640,7 +29231,7 @@ ReactPerf.measureMethods(ReactMount, 'ReactMount', {
 module.exports = ReactMount;
 
 }).call(this,require('_process'))
-},{"./DOMProperty":14,"./ReactBrowserEventEmitter":35,"./ReactCurrentOwner":44,"./ReactElement":62,"./ReactElementValidator":63,"./ReactEmptyComponent":64,"./ReactInstanceHandles":71,"./ReactInstanceMap":72,"./ReactMarkupChecksum":74,"./ReactPerf":80,"./ReactReconciler":86,"./ReactUpdateQueue":91,"./ReactUpdates":92,"./containsNode":114,"./emptyObject":120,"./getReactRootElementInContainer":134,"./instantiateReactComponent":139,"./invariant":140,"./setInnerHTML":153,"./shouldUpdateReactComponent":156,"./warning":159,"_process":3}],76:[function(require,module,exports){
+},{"./DOMProperty":42,"./ReactBrowserEventEmitter":63,"./ReactCurrentOwner":72,"./ReactElement":90,"./ReactElementValidator":91,"./ReactEmptyComponent":92,"./ReactInstanceHandles":99,"./ReactInstanceMap":100,"./ReactMarkupChecksum":102,"./ReactPerf":108,"./ReactReconciler":114,"./ReactUpdateQueue":119,"./ReactUpdates":120,"./containsNode":142,"./emptyObject":148,"./getReactRootElementInContainer":162,"./instantiateReactComponent":167,"./invariant":168,"./setInnerHTML":181,"./shouldUpdateReactComponent":184,"./warning":187,"_process":3}],104:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -26070,7 +29661,7 @@ var ReactMultiChild = {
 
 module.exports = ReactMultiChild;
 
-},{"./ReactChildReconciler":36,"./ReactComponentEnvironment":41,"./ReactMultiChildUpdateTypes":77,"./ReactReconciler":86}],77:[function(require,module,exports){
+},{"./ReactChildReconciler":64,"./ReactComponentEnvironment":69,"./ReactMultiChildUpdateTypes":105,"./ReactReconciler":114}],105:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -26103,7 +29694,7 @@ var ReactMultiChildUpdateTypes = keyMirror({
 
 module.exports = ReactMultiChildUpdateTypes;
 
-},{"./keyMirror":145}],78:[function(require,module,exports){
+},{"./keyMirror":173}],106:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -26210,7 +29801,7 @@ var ReactNativeComponent = {
 module.exports = ReactNativeComponent;
 
 }).call(this,require('_process'))
-},{"./Object.assign":31,"./invariant":140,"_process":3}],79:[function(require,module,exports){
+},{"./Object.assign":59,"./invariant":168,"_process":3}],107:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -26322,7 +29913,7 @@ var ReactOwner = {
 module.exports = ReactOwner;
 
 }).call(this,require('_process'))
-},{"./invariant":140,"_process":3}],80:[function(require,module,exports){
+},{"./invariant":168,"_process":3}],108:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -26426,7 +30017,7 @@ function _noMeasure(objName, fnName, func) {
 module.exports = ReactPerf;
 
 }).call(this,require('_process'))
-},{"_process":3}],81:[function(require,module,exports){
+},{"_process":3}],109:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -26454,7 +30045,7 @@ if ("production" !== process.env.NODE_ENV) {
 module.exports = ReactPropTypeLocationNames;
 
 }).call(this,require('_process'))
-},{"_process":3}],82:[function(require,module,exports){
+},{"_process":3}],110:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -26478,7 +30069,7 @@ var ReactPropTypeLocations = keyMirror({
 
 module.exports = ReactPropTypeLocations;
 
-},{"./keyMirror":145}],83:[function(require,module,exports){
+},{"./keyMirror":173}],111:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -26827,7 +30418,7 @@ function getPreciseType(propValue) {
 
 module.exports = ReactPropTypes;
 
-},{"./ReactElement":62,"./ReactFragment":68,"./ReactPropTypeLocationNames":81,"./emptyFunction":119}],84:[function(require,module,exports){
+},{"./ReactElement":90,"./ReactFragment":96,"./ReactPropTypeLocationNames":109,"./emptyFunction":147}],112:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -26883,7 +30474,7 @@ PooledClass.addPoolingTo(ReactPutListenerQueue);
 
 module.exports = ReactPutListenerQueue;
 
-},{"./Object.assign":31,"./PooledClass":32,"./ReactBrowserEventEmitter":35}],85:[function(require,module,exports){
+},{"./Object.assign":59,"./PooledClass":60,"./ReactBrowserEventEmitter":63}],113:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -27059,7 +30650,7 @@ PooledClass.addPoolingTo(ReactReconcileTransaction);
 
 module.exports = ReactReconcileTransaction;
 
-},{"./CallbackQueue":10,"./Object.assign":31,"./PooledClass":32,"./ReactBrowserEventEmitter":35,"./ReactInputSelection":70,"./ReactPutListenerQueue":84,"./Transaction":108}],86:[function(require,module,exports){
+},{"./CallbackQueue":38,"./Object.assign":59,"./PooledClass":60,"./ReactBrowserEventEmitter":63,"./ReactInputSelection":98,"./ReactPutListenerQueue":112,"./Transaction":136}],114:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -27183,7 +30774,7 @@ var ReactReconciler = {
 module.exports = ReactReconciler;
 
 }).call(this,require('_process'))
-},{"./ReactElementValidator":63,"./ReactRef":87,"_process":3}],87:[function(require,module,exports){
+},{"./ReactElementValidator":91,"./ReactRef":115,"_process":3}],115:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -27254,7 +30845,7 @@ ReactRef.detachRefs = function(instance, element) {
 
 module.exports = ReactRef;
 
-},{"./ReactOwner":79}],88:[function(require,module,exports){
+},{"./ReactOwner":107}],116:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -27285,7 +30876,7 @@ var ReactRootIndex = {
 
 module.exports = ReactRootIndex;
 
-},{}],89:[function(require,module,exports){
+},{}],117:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -27367,7 +30958,7 @@ module.exports = {
 };
 
 }).call(this,require('_process'))
-},{"./ReactElement":62,"./ReactInstanceHandles":71,"./ReactMarkupChecksum":74,"./ReactServerRenderingTransaction":90,"./emptyObject":120,"./instantiateReactComponent":139,"./invariant":140,"_process":3}],90:[function(require,module,exports){
+},{"./ReactElement":90,"./ReactInstanceHandles":99,"./ReactMarkupChecksum":102,"./ReactServerRenderingTransaction":118,"./emptyObject":148,"./instantiateReactComponent":167,"./invariant":168,"_process":3}],118:[function(require,module,exports){
 /**
  * Copyright 2014-2015, Facebook, Inc.
  * All rights reserved.
@@ -27480,7 +31071,7 @@ PooledClass.addPoolingTo(ReactServerRenderingTransaction);
 
 module.exports = ReactServerRenderingTransaction;
 
-},{"./CallbackQueue":10,"./Object.assign":31,"./PooledClass":32,"./ReactPutListenerQueue":84,"./Transaction":108,"./emptyFunction":119}],91:[function(require,module,exports){
+},{"./CallbackQueue":38,"./Object.assign":59,"./PooledClass":60,"./ReactPutListenerQueue":112,"./Transaction":136,"./emptyFunction":147}],119:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2015, Facebook, Inc.
@@ -27779,7 +31370,7 @@ var ReactUpdateQueue = {
 module.exports = ReactUpdateQueue;
 
 }).call(this,require('_process'))
-},{"./Object.assign":31,"./ReactCurrentOwner":44,"./ReactElement":62,"./ReactInstanceMap":72,"./ReactLifeCycle":73,"./ReactUpdates":92,"./invariant":140,"./warning":159,"_process":3}],92:[function(require,module,exports){
+},{"./Object.assign":59,"./ReactCurrentOwner":72,"./ReactElement":90,"./ReactInstanceMap":100,"./ReactLifeCycle":101,"./ReactUpdates":120,"./invariant":168,"./warning":187,"_process":3}],120:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -28061,7 +31652,7 @@ var ReactUpdates = {
 module.exports = ReactUpdates;
 
 }).call(this,require('_process'))
-},{"./CallbackQueue":10,"./Object.assign":31,"./PooledClass":32,"./ReactCurrentOwner":44,"./ReactPerf":80,"./ReactReconciler":86,"./Transaction":108,"./invariant":140,"./warning":159,"_process":3}],93:[function(require,module,exports){
+},{"./CallbackQueue":38,"./Object.assign":59,"./PooledClass":60,"./ReactCurrentOwner":72,"./ReactPerf":108,"./ReactReconciler":114,"./Transaction":136,"./invariant":168,"./warning":187,"_process":3}],121:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -28155,7 +31746,7 @@ var SVGDOMPropertyConfig = {
 
 module.exports = SVGDOMPropertyConfig;
 
-},{"./DOMProperty":14}],94:[function(require,module,exports){
+},{"./DOMProperty":42}],122:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -28350,7 +31941,7 @@ var SelectEventPlugin = {
 
 module.exports = SelectEventPlugin;
 
-},{"./EventConstants":19,"./EventPropagators":24,"./ReactInputSelection":70,"./SyntheticEvent":100,"./getActiveElement":126,"./isTextInputElement":143,"./keyOf":146,"./shallowEqual":155}],95:[function(require,module,exports){
+},{"./EventConstants":47,"./EventPropagators":52,"./ReactInputSelection":98,"./SyntheticEvent":128,"./getActiveElement":154,"./isTextInputElement":171,"./keyOf":174,"./shallowEqual":183}],123:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -28381,7 +31972,7 @@ var ServerReactRootIndex = {
 
 module.exports = ServerReactRootIndex;
 
-},{}],96:[function(require,module,exports){
+},{}],124:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -28809,7 +32400,7 @@ var SimpleEventPlugin = {
 module.exports = SimpleEventPlugin;
 
 }).call(this,require('_process'))
-},{"./EventConstants":19,"./EventPluginUtils":23,"./EventPropagators":24,"./SyntheticClipboardEvent":97,"./SyntheticDragEvent":99,"./SyntheticEvent":100,"./SyntheticFocusEvent":101,"./SyntheticKeyboardEvent":103,"./SyntheticMouseEvent":104,"./SyntheticTouchEvent":105,"./SyntheticUIEvent":106,"./SyntheticWheelEvent":107,"./getEventCharCode":127,"./invariant":140,"./keyOf":146,"./warning":159,"_process":3}],97:[function(require,module,exports){
+},{"./EventConstants":47,"./EventPluginUtils":51,"./EventPropagators":52,"./SyntheticClipboardEvent":125,"./SyntheticDragEvent":127,"./SyntheticEvent":128,"./SyntheticFocusEvent":129,"./SyntheticKeyboardEvent":131,"./SyntheticMouseEvent":132,"./SyntheticTouchEvent":133,"./SyntheticUIEvent":134,"./SyntheticWheelEvent":135,"./getEventCharCode":155,"./invariant":168,"./keyOf":174,"./warning":187,"_process":3}],125:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -28854,7 +32445,7 @@ SyntheticEvent.augmentClass(SyntheticClipboardEvent, ClipboardEventInterface);
 
 module.exports = SyntheticClipboardEvent;
 
-},{"./SyntheticEvent":100}],98:[function(require,module,exports){
+},{"./SyntheticEvent":128}],126:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -28899,7 +32490,7 @@ SyntheticEvent.augmentClass(
 
 module.exports = SyntheticCompositionEvent;
 
-},{"./SyntheticEvent":100}],99:[function(require,module,exports){
+},{"./SyntheticEvent":128}],127:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -28938,7 +32529,7 @@ SyntheticMouseEvent.augmentClass(SyntheticDragEvent, DragEventInterface);
 
 module.exports = SyntheticDragEvent;
 
-},{"./SyntheticMouseEvent":104}],100:[function(require,module,exports){
+},{"./SyntheticMouseEvent":132}],128:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -29104,7 +32695,7 @@ PooledClass.addPoolingTo(SyntheticEvent, PooledClass.threeArgumentPooler);
 
 module.exports = SyntheticEvent;
 
-},{"./Object.assign":31,"./PooledClass":32,"./emptyFunction":119,"./getEventTarget":130}],101:[function(require,module,exports){
+},{"./Object.assign":59,"./PooledClass":60,"./emptyFunction":147,"./getEventTarget":158}],129:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -29143,7 +32734,7 @@ SyntheticUIEvent.augmentClass(SyntheticFocusEvent, FocusEventInterface);
 
 module.exports = SyntheticFocusEvent;
 
-},{"./SyntheticUIEvent":106}],102:[function(require,module,exports){
+},{"./SyntheticUIEvent":134}],130:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -29189,7 +32780,7 @@ SyntheticEvent.augmentClass(
 
 module.exports = SyntheticInputEvent;
 
-},{"./SyntheticEvent":100}],103:[function(require,module,exports){
+},{"./SyntheticEvent":128}],131:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -29276,7 +32867,7 @@ SyntheticUIEvent.augmentClass(SyntheticKeyboardEvent, KeyboardEventInterface);
 
 module.exports = SyntheticKeyboardEvent;
 
-},{"./SyntheticUIEvent":106,"./getEventCharCode":127,"./getEventKey":128,"./getEventModifierState":129}],104:[function(require,module,exports){
+},{"./SyntheticUIEvent":134,"./getEventCharCode":155,"./getEventKey":156,"./getEventModifierState":157}],132:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -29357,7 +32948,7 @@ SyntheticUIEvent.augmentClass(SyntheticMouseEvent, MouseEventInterface);
 
 module.exports = SyntheticMouseEvent;
 
-},{"./SyntheticUIEvent":106,"./ViewportMetrics":109,"./getEventModifierState":129}],105:[function(require,module,exports){
+},{"./SyntheticUIEvent":134,"./ViewportMetrics":137,"./getEventModifierState":157}],133:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -29405,7 +32996,7 @@ SyntheticUIEvent.augmentClass(SyntheticTouchEvent, TouchEventInterface);
 
 module.exports = SyntheticTouchEvent;
 
-},{"./SyntheticUIEvent":106,"./getEventModifierState":129}],106:[function(require,module,exports){
+},{"./SyntheticUIEvent":134,"./getEventModifierState":157}],134:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -29467,7 +33058,7 @@ SyntheticEvent.augmentClass(SyntheticUIEvent, UIEventInterface);
 
 module.exports = SyntheticUIEvent;
 
-},{"./SyntheticEvent":100,"./getEventTarget":130}],107:[function(require,module,exports){
+},{"./SyntheticEvent":128,"./getEventTarget":158}],135:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -29528,7 +33119,7 @@ SyntheticMouseEvent.augmentClass(SyntheticWheelEvent, WheelEventInterface);
 
 module.exports = SyntheticWheelEvent;
 
-},{"./SyntheticMouseEvent":104}],108:[function(require,module,exports){
+},{"./SyntheticMouseEvent":132}],136:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -29769,7 +33360,7 @@ var Transaction = {
 module.exports = Transaction;
 
 }).call(this,require('_process'))
-},{"./invariant":140,"_process":3}],109:[function(require,module,exports){
+},{"./invariant":168,"_process":3}],137:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -29798,7 +33389,7 @@ var ViewportMetrics = {
 
 module.exports = ViewportMetrics;
 
-},{}],110:[function(require,module,exports){
+},{}],138:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -29864,7 +33455,7 @@ function accumulateInto(current, next) {
 module.exports = accumulateInto;
 
 }).call(this,require('_process'))
-},{"./invariant":140,"_process":3}],111:[function(require,module,exports){
+},{"./invariant":168,"_process":3}],139:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -29898,7 +33489,7 @@ function adler32(data) {
 
 module.exports = adler32;
 
-},{}],112:[function(require,module,exports){
+},{}],140:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -29930,7 +33521,7 @@ function camelize(string) {
 
 module.exports = camelize;
 
-},{}],113:[function(require,module,exports){
+},{}],141:[function(require,module,exports){
 /**
  * Copyright 2014-2015, Facebook, Inc.
  * All rights reserved.
@@ -29972,7 +33563,7 @@ function camelizeStyleName(string) {
 
 module.exports = camelizeStyleName;
 
-},{"./camelize":112}],114:[function(require,module,exports){
+},{"./camelize":140}],142:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -30016,7 +33607,7 @@ function containsNode(outerNode, innerNode) {
 
 module.exports = containsNode;
 
-},{"./isTextNode":144}],115:[function(require,module,exports){
+},{"./isTextNode":172}],143:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -30102,7 +33693,7 @@ function createArrayFromMixed(obj) {
 
 module.exports = createArrayFromMixed;
 
-},{"./toArray":157}],116:[function(require,module,exports){
+},{"./toArray":185}],144:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -30164,7 +33755,7 @@ function createFullPageComponent(tag) {
 module.exports = createFullPageComponent;
 
 }).call(this,require('_process'))
-},{"./ReactClass":38,"./ReactElement":62,"./invariant":140,"_process":3}],117:[function(require,module,exports){
+},{"./ReactClass":66,"./ReactElement":90,"./invariant":168,"_process":3}],145:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -30254,7 +33845,7 @@ function createNodesFromMarkup(markup, handleScript) {
 module.exports = createNodesFromMarkup;
 
 }).call(this,require('_process'))
-},{"./ExecutionEnvironment":25,"./createArrayFromMixed":115,"./getMarkupWrap":132,"./invariant":140,"_process":3}],118:[function(require,module,exports){
+},{"./ExecutionEnvironment":53,"./createArrayFromMixed":143,"./getMarkupWrap":160,"./invariant":168,"_process":3}],146:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -30312,7 +33903,7 @@ function dangerousStyleValue(name, value) {
 
 module.exports = dangerousStyleValue;
 
-},{"./CSSProperty":8}],119:[function(require,module,exports){
+},{"./CSSProperty":36}],147:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -30346,7 +33937,7 @@ emptyFunction.thatReturnsArgument = function(arg) { return arg; };
 
 module.exports = emptyFunction;
 
-},{}],120:[function(require,module,exports){
+},{}],148:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -30370,7 +33961,7 @@ if ("production" !== process.env.NODE_ENV) {
 module.exports = emptyObject;
 
 }).call(this,require('_process'))
-},{"_process":3}],121:[function(require,module,exports){
+},{"_process":3}],149:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -30410,7 +34001,7 @@ function escapeTextContentForBrowser(text) {
 
 module.exports = escapeTextContentForBrowser;
 
-},{}],122:[function(require,module,exports){
+},{}],150:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -30483,7 +34074,7 @@ function findDOMNode(componentOrElement) {
 module.exports = findDOMNode;
 
 }).call(this,require('_process'))
-},{"./ReactCurrentOwner":44,"./ReactInstanceMap":72,"./ReactMount":75,"./invariant":140,"./isNode":142,"./warning":159,"_process":3}],123:[function(require,module,exports){
+},{"./ReactCurrentOwner":72,"./ReactInstanceMap":100,"./ReactMount":103,"./invariant":168,"./isNode":170,"./warning":187,"_process":3}],151:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -30541,7 +34132,7 @@ function flattenChildren(children) {
 module.exports = flattenChildren;
 
 }).call(this,require('_process'))
-},{"./traverseAllChildren":158,"./warning":159,"_process":3}],124:[function(require,module,exports){
+},{"./traverseAllChildren":186,"./warning":187,"_process":3}],152:[function(require,module,exports){
 /**
  * Copyright 2014-2015, Facebook, Inc.
  * All rights reserved.
@@ -30570,7 +34161,7 @@ function focusNode(node) {
 
 module.exports = focusNode;
 
-},{}],125:[function(require,module,exports){
+},{}],153:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -30601,7 +34192,7 @@ var forEachAccumulated = function(arr, cb, scope) {
 
 module.exports = forEachAccumulated;
 
-},{}],126:[function(require,module,exports){
+},{}],154:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -30630,7 +34221,7 @@ function getActiveElement() /*?DOMElement*/ {
 
 module.exports = getActiveElement;
 
-},{}],127:[function(require,module,exports){
+},{}],155:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -30682,7 +34273,7 @@ function getEventCharCode(nativeEvent) {
 
 module.exports = getEventCharCode;
 
-},{}],128:[function(require,module,exports){
+},{}],156:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -30787,7 +34378,7 @@ function getEventKey(nativeEvent) {
 
 module.exports = getEventKey;
 
-},{"./getEventCharCode":127}],129:[function(require,module,exports){
+},{"./getEventCharCode":155}],157:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -30834,7 +34425,7 @@ function getEventModifierState(nativeEvent) {
 
 module.exports = getEventModifierState;
 
-},{}],130:[function(require,module,exports){
+},{}],158:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -30865,7 +34456,7 @@ function getEventTarget(nativeEvent) {
 
 module.exports = getEventTarget;
 
-},{}],131:[function(require,module,exports){
+},{}],159:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -30909,7 +34500,7 @@ function getIteratorFn(maybeIterable) {
 
 module.exports = getIteratorFn;
 
-},{}],132:[function(require,module,exports){
+},{}],160:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -31028,7 +34619,7 @@ function getMarkupWrap(nodeName) {
 module.exports = getMarkupWrap;
 
 }).call(this,require('_process'))
-},{"./ExecutionEnvironment":25,"./invariant":140,"_process":3}],133:[function(require,module,exports){
+},{"./ExecutionEnvironment":53,"./invariant":168,"_process":3}],161:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -31103,7 +34694,7 @@ function getNodeForCharacterOffset(root, offset) {
 
 module.exports = getNodeForCharacterOffset;
 
-},{}],134:[function(require,module,exports){
+},{}],162:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -31138,7 +34729,7 @@ function getReactRootElementInContainer(container) {
 
 module.exports = getReactRootElementInContainer;
 
-},{}],135:[function(require,module,exports){
+},{}],163:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -31175,7 +34766,7 @@ function getTextContentAccessor() {
 
 module.exports = getTextContentAccessor;
 
-},{"./ExecutionEnvironment":25}],136:[function(require,module,exports){
+},{"./ExecutionEnvironment":53}],164:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -31215,7 +34806,7 @@ function getUnboundedScrollPosition(scrollable) {
 
 module.exports = getUnboundedScrollPosition;
 
-},{}],137:[function(require,module,exports){
+},{}],165:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -31248,7 +34839,7 @@ function hyphenate(string) {
 
 module.exports = hyphenate;
 
-},{}],138:[function(require,module,exports){
+},{}],166:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -31289,7 +34880,7 @@ function hyphenateStyleName(string) {
 
 module.exports = hyphenateStyleName;
 
-},{"./hyphenate":137}],139:[function(require,module,exports){
+},{"./hyphenate":165}],167:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -31427,7 +35018,7 @@ function instantiateReactComponent(node, parentCompositeType) {
 module.exports = instantiateReactComponent;
 
 }).call(this,require('_process'))
-},{"./Object.assign":31,"./ReactCompositeComponent":42,"./ReactEmptyComponent":64,"./ReactNativeComponent":78,"./invariant":140,"./warning":159,"_process":3}],140:[function(require,module,exports){
+},{"./Object.assign":59,"./ReactCompositeComponent":70,"./ReactEmptyComponent":92,"./ReactNativeComponent":106,"./invariant":168,"./warning":187,"_process":3}],168:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -31484,7 +35075,7 @@ var invariant = function(condition, format, a, b, c, d, e, f) {
 module.exports = invariant;
 
 }).call(this,require('_process'))
-},{"_process":3}],141:[function(require,module,exports){
+},{"_process":3}],169:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -31549,7 +35140,7 @@ function isEventSupported(eventNameSuffix, capture) {
 
 module.exports = isEventSupported;
 
-},{"./ExecutionEnvironment":25}],142:[function(require,module,exports){
+},{"./ExecutionEnvironment":53}],170:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -31576,7 +35167,7 @@ function isNode(object) {
 
 module.exports = isNode;
 
-},{}],143:[function(require,module,exports){
+},{}],171:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -31619,7 +35210,7 @@ function isTextInputElement(elem) {
 
 module.exports = isTextInputElement;
 
-},{}],144:[function(require,module,exports){
+},{}],172:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -31644,7 +35235,7 @@ function isTextNode(object) {
 
 module.exports = isTextNode;
 
-},{"./isNode":142}],145:[function(require,module,exports){
+},{"./isNode":170}],173:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -31699,7 +35290,7 @@ var keyMirror = function(obj) {
 module.exports = keyMirror;
 
 }).call(this,require('_process'))
-},{"./invariant":140,"_process":3}],146:[function(require,module,exports){
+},{"./invariant":168,"_process":3}],174:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -31735,7 +35326,7 @@ var keyOf = function(oneKeyObj) {
 
 module.exports = keyOf;
 
-},{}],147:[function(require,module,exports){
+},{}],175:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -31788,7 +35379,7 @@ function mapObject(object, callback, context) {
 
 module.exports = mapObject;
 
-},{}],148:[function(require,module,exports){
+},{}],176:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -31821,7 +35412,7 @@ function memoizeStringOnly(callback) {
 
 module.exports = memoizeStringOnly;
 
-},{}],149:[function(require,module,exports){
+},{}],177:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -31861,7 +35452,7 @@ function onlyChild(children) {
 module.exports = onlyChild;
 
 }).call(this,require('_process'))
-},{"./ReactElement":62,"./invariant":140,"_process":3}],150:[function(require,module,exports){
+},{"./ReactElement":90,"./invariant":168,"_process":3}],178:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -31889,7 +35480,7 @@ if (ExecutionEnvironment.canUseDOM) {
 
 module.exports = performance || {};
 
-},{"./ExecutionEnvironment":25}],151:[function(require,module,exports){
+},{"./ExecutionEnvironment":53}],179:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -31917,7 +35508,7 @@ var performanceNow = performance.now.bind(performance);
 
 module.exports = performanceNow;
 
-},{"./performance":150}],152:[function(require,module,exports){
+},{"./performance":178}],180:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -31945,7 +35536,7 @@ function quoteAttributeValueForBrowser(value) {
 
 module.exports = quoteAttributeValueForBrowser;
 
-},{"./escapeTextContentForBrowser":121}],153:[function(require,module,exports){
+},{"./escapeTextContentForBrowser":149}],181:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -32034,7 +35625,7 @@ if (ExecutionEnvironment.canUseDOM) {
 
 module.exports = setInnerHTML;
 
-},{"./ExecutionEnvironment":25}],154:[function(require,module,exports){
+},{"./ExecutionEnvironment":53}],182:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -32076,7 +35667,7 @@ if (ExecutionEnvironment.canUseDOM) {
 
 module.exports = setTextContent;
 
-},{"./ExecutionEnvironment":25,"./escapeTextContentForBrowser":121,"./setInnerHTML":153}],155:[function(require,module,exports){
+},{"./ExecutionEnvironment":53,"./escapeTextContentForBrowser":149,"./setInnerHTML":181}],183:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -32120,7 +35711,7 @@ function shallowEqual(objA, objB) {
 
 module.exports = shallowEqual;
 
-},{}],156:[function(require,module,exports){
+},{}],184:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -32224,7 +35815,7 @@ function shouldUpdateReactComponent(prevElement, nextElement) {
 module.exports = shouldUpdateReactComponent;
 
 }).call(this,require('_process'))
-},{"./warning":159,"_process":3}],157:[function(require,module,exports){
+},{"./warning":187,"_process":3}],185:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -32296,7 +35887,7 @@ function toArray(obj) {
 module.exports = toArray;
 
 }).call(this,require('_process'))
-},{"./invariant":140,"_process":3}],158:[function(require,module,exports){
+},{"./invariant":168,"_process":3}],186:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -32549,7 +36140,7 @@ function traverseAllChildren(children, callback, traverseContext) {
 module.exports = traverseAllChildren;
 
 }).call(this,require('_process'))
-},{"./ReactElement":62,"./ReactFragment":68,"./ReactInstanceHandles":71,"./getIteratorFn":131,"./invariant":140,"./warning":159,"_process":3}],159:[function(require,module,exports){
+},{"./ReactElement":90,"./ReactFragment":96,"./ReactInstanceHandles":99,"./getIteratorFn":159,"./invariant":168,"./warning":187,"_process":3}],187:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -32612,12 +36203,1560 @@ if ("production" !== process.env.NODE_ENV) {
 module.exports = warning;
 
 }).call(this,require('_process'))
-},{"./emptyFunction":119,"_process":3}],160:[function(require,module,exports){
+},{"./emptyFunction":147,"_process":3}],188:[function(require,module,exports){
 module.exports = require('./lib/React');
 
-},{"./lib/React":33}],161:[function(require,module,exports){
-arguments[4][2][0].apply(exports,arguments)
-},{"dup":2}],162:[function(require,module,exports){
+},{"./lib/React":61}],189:[function(require,module,exports){
+//     Underscore.js 1.8.3
+//     http://underscorejs.org
+//     (c) 2009-2015 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
+//     Underscore may be freely distributed under the MIT license.
+
+(function() {
+
+  // Baseline setup
+  // --------------
+
+  // Establish the root object, `window` in the browser, or `exports` on the server.
+  var root = this;
+
+  // Save the previous value of the `_` variable.
+  var previousUnderscore = root._;
+
+  // Save bytes in the minified (but not gzipped) version:
+  var ArrayProto = Array.prototype, ObjProto = Object.prototype, FuncProto = Function.prototype;
+
+  // Create quick reference variables for speed access to core prototypes.
+  var
+    push             = ArrayProto.push,
+    slice            = ArrayProto.slice,
+    toString         = ObjProto.toString,
+    hasOwnProperty   = ObjProto.hasOwnProperty;
+
+  // All **ECMAScript 5** native function implementations that we hope to use
+  // are declared here.
+  var
+    nativeIsArray      = Array.isArray,
+    nativeKeys         = Object.keys,
+    nativeBind         = FuncProto.bind,
+    nativeCreate       = Object.create;
+
+  // Naked function reference for surrogate-prototype-swapping.
+  var Ctor = function(){};
+
+  // Create a safe reference to the Underscore object for use below.
+  var _ = function(obj) {
+    if (obj instanceof _) return obj;
+    if (!(this instanceof _)) return new _(obj);
+    this._wrapped = obj;
+  };
+
+  // Export the Underscore object for **Node.js**, with
+  // backwards-compatibility for the old `require()` API. If we're in
+  // the browser, add `_` as a global object.
+  if (typeof exports !== 'undefined') {
+    if (typeof module !== 'undefined' && module.exports) {
+      exports = module.exports = _;
+    }
+    exports._ = _;
+  } else {
+    root._ = _;
+  }
+
+  // Current version.
+  _.VERSION = '1.8.3';
+
+  // Internal function that returns an efficient (for current engines) version
+  // of the passed-in callback, to be repeatedly applied in other Underscore
+  // functions.
+  var optimizeCb = function(func, context, argCount) {
+    if (context === void 0) return func;
+    switch (argCount == null ? 3 : argCount) {
+      case 1: return function(value) {
+        return func.call(context, value);
+      };
+      case 2: return function(value, other) {
+        return func.call(context, value, other);
+      };
+      case 3: return function(value, index, collection) {
+        return func.call(context, value, index, collection);
+      };
+      case 4: return function(accumulator, value, index, collection) {
+        return func.call(context, accumulator, value, index, collection);
+      };
+    }
+    return function() {
+      return func.apply(context, arguments);
+    };
+  };
+
+  // A mostly-internal function to generate callbacks that can be applied
+  // to each element in a collection, returning the desired result — either
+  // identity, an arbitrary callback, a property matcher, or a property accessor.
+  var cb = function(value, context, argCount) {
+    if (value == null) return _.identity;
+    if (_.isFunction(value)) return optimizeCb(value, context, argCount);
+    if (_.isObject(value)) return _.matcher(value);
+    return _.property(value);
+  };
+  _.iteratee = function(value, context) {
+    return cb(value, context, Infinity);
+  };
+
+  // An internal function for creating assigner functions.
+  var createAssigner = function(keysFunc, undefinedOnly) {
+    return function(obj) {
+      var length = arguments.length;
+      if (length < 2 || obj == null) return obj;
+      for (var index = 1; index < length; index++) {
+        var source = arguments[index],
+            keys = keysFunc(source),
+            l = keys.length;
+        for (var i = 0; i < l; i++) {
+          var key = keys[i];
+          if (!undefinedOnly || obj[key] === void 0) obj[key] = source[key];
+        }
+      }
+      return obj;
+    };
+  };
+
+  // An internal function for creating a new object that inherits from another.
+  var baseCreate = function(prototype) {
+    if (!_.isObject(prototype)) return {};
+    if (nativeCreate) return nativeCreate(prototype);
+    Ctor.prototype = prototype;
+    var result = new Ctor;
+    Ctor.prototype = null;
+    return result;
+  };
+
+  var property = function(key) {
+    return function(obj) {
+      return obj == null ? void 0 : obj[key];
+    };
+  };
+
+  // Helper for collection methods to determine whether a collection
+  // should be iterated as an array or as an object
+  // Related: http://people.mozilla.org/~jorendorff/es6-draft.html#sec-tolength
+  // Avoids a very nasty iOS 8 JIT bug on ARM-64. #2094
+  var MAX_ARRAY_INDEX = Math.pow(2, 53) - 1;
+  var getLength = property('length');
+  var isArrayLike = function(collection) {
+    var length = getLength(collection);
+    return typeof length == 'number' && length >= 0 && length <= MAX_ARRAY_INDEX;
+  };
+
+  // Collection Functions
+  // --------------------
+
+  // The cornerstone, an `each` implementation, aka `forEach`.
+  // Handles raw objects in addition to array-likes. Treats all
+  // sparse array-likes as if they were dense.
+  _.each = _.forEach = function(obj, iteratee, context) {
+    iteratee = optimizeCb(iteratee, context);
+    var i, length;
+    if (isArrayLike(obj)) {
+      for (i = 0, length = obj.length; i < length; i++) {
+        iteratee(obj[i], i, obj);
+      }
+    } else {
+      var keys = _.keys(obj);
+      for (i = 0, length = keys.length; i < length; i++) {
+        iteratee(obj[keys[i]], keys[i], obj);
+      }
+    }
+    return obj;
+  };
+
+  // Return the results of applying the iteratee to each element.
+  _.map = _.collect = function(obj, iteratee, context) {
+    iteratee = cb(iteratee, context);
+    var keys = !isArrayLike(obj) && _.keys(obj),
+        length = (keys || obj).length,
+        results = Array(length);
+    for (var index = 0; index < length; index++) {
+      var currentKey = keys ? keys[index] : index;
+      results[index] = iteratee(obj[currentKey], currentKey, obj);
+    }
+    return results;
+  };
+
+  // Create a reducing function iterating left or right.
+  function createReduce(dir) {
+    // Optimized iterator function as using arguments.length
+    // in the main function will deoptimize the, see #1991.
+    function iterator(obj, iteratee, memo, keys, index, length) {
+      for (; index >= 0 && index < length; index += dir) {
+        var currentKey = keys ? keys[index] : index;
+        memo = iteratee(memo, obj[currentKey], currentKey, obj);
+      }
+      return memo;
+    }
+
+    return function(obj, iteratee, memo, context) {
+      iteratee = optimizeCb(iteratee, context, 4);
+      var keys = !isArrayLike(obj) && _.keys(obj),
+          length = (keys || obj).length,
+          index = dir > 0 ? 0 : length - 1;
+      // Determine the initial value if none is provided.
+      if (arguments.length < 3) {
+        memo = obj[keys ? keys[index] : index];
+        index += dir;
+      }
+      return iterator(obj, iteratee, memo, keys, index, length);
+    };
+  }
+
+  // **Reduce** builds up a single result from a list of values, aka `inject`,
+  // or `foldl`.
+  _.reduce = _.foldl = _.inject = createReduce(1);
+
+  // The right-associative version of reduce, also known as `foldr`.
+  _.reduceRight = _.foldr = createReduce(-1);
+
+  // Return the first value which passes a truth test. Aliased as `detect`.
+  _.find = _.detect = function(obj, predicate, context) {
+    var key;
+    if (isArrayLike(obj)) {
+      key = _.findIndex(obj, predicate, context);
+    } else {
+      key = _.findKey(obj, predicate, context);
+    }
+    if (key !== void 0 && key !== -1) return obj[key];
+  };
+
+  // Return all the elements that pass a truth test.
+  // Aliased as `select`.
+  _.filter = _.select = function(obj, predicate, context) {
+    var results = [];
+    predicate = cb(predicate, context);
+    _.each(obj, function(value, index, list) {
+      if (predicate(value, index, list)) results.push(value);
+    });
+    return results;
+  };
+
+  // Return all the elements for which a truth test fails.
+  _.reject = function(obj, predicate, context) {
+    return _.filter(obj, _.negate(cb(predicate)), context);
+  };
+
+  // Determine whether all of the elements match a truth test.
+  // Aliased as `all`.
+  _.every = _.all = function(obj, predicate, context) {
+    predicate = cb(predicate, context);
+    var keys = !isArrayLike(obj) && _.keys(obj),
+        length = (keys || obj).length;
+    for (var index = 0; index < length; index++) {
+      var currentKey = keys ? keys[index] : index;
+      if (!predicate(obj[currentKey], currentKey, obj)) return false;
+    }
+    return true;
+  };
+
+  // Determine if at least one element in the object matches a truth test.
+  // Aliased as `any`.
+  _.some = _.any = function(obj, predicate, context) {
+    predicate = cb(predicate, context);
+    var keys = !isArrayLike(obj) && _.keys(obj),
+        length = (keys || obj).length;
+    for (var index = 0; index < length; index++) {
+      var currentKey = keys ? keys[index] : index;
+      if (predicate(obj[currentKey], currentKey, obj)) return true;
+    }
+    return false;
+  };
+
+  // Determine if the array or object contains a given item (using `===`).
+  // Aliased as `includes` and `include`.
+  _.contains = _.includes = _.include = function(obj, item, fromIndex, guard) {
+    if (!isArrayLike(obj)) obj = _.values(obj);
+    if (typeof fromIndex != 'number' || guard) fromIndex = 0;
+    return _.indexOf(obj, item, fromIndex) >= 0;
+  };
+
+  // Invoke a method (with arguments) on every item in a collection.
+  _.invoke = function(obj, method) {
+    var args = slice.call(arguments, 2);
+    var isFunc = _.isFunction(method);
+    return _.map(obj, function(value) {
+      var func = isFunc ? method : value[method];
+      return func == null ? func : func.apply(value, args);
+    });
+  };
+
+  // Convenience version of a common use case of `map`: fetching a property.
+  _.pluck = function(obj, key) {
+    return _.map(obj, _.property(key));
+  };
+
+  // Convenience version of a common use case of `filter`: selecting only objects
+  // containing specific `key:value` pairs.
+  _.where = function(obj, attrs) {
+    return _.filter(obj, _.matcher(attrs));
+  };
+
+  // Convenience version of a common use case of `find`: getting the first object
+  // containing specific `key:value` pairs.
+  _.findWhere = function(obj, attrs) {
+    return _.find(obj, _.matcher(attrs));
+  };
+
+  // Return the maximum element (or element-based computation).
+  _.max = function(obj, iteratee, context) {
+    var result = -Infinity, lastComputed = -Infinity,
+        value, computed;
+    if (iteratee == null && obj != null) {
+      obj = isArrayLike(obj) ? obj : _.values(obj);
+      for (var i = 0, length = obj.length; i < length; i++) {
+        value = obj[i];
+        if (value > result) {
+          result = value;
+        }
+      }
+    } else {
+      iteratee = cb(iteratee, context);
+      _.each(obj, function(value, index, list) {
+        computed = iteratee(value, index, list);
+        if (computed > lastComputed || computed === -Infinity && result === -Infinity) {
+          result = value;
+          lastComputed = computed;
+        }
+      });
+    }
+    return result;
+  };
+
+  // Return the minimum element (or element-based computation).
+  _.min = function(obj, iteratee, context) {
+    var result = Infinity, lastComputed = Infinity,
+        value, computed;
+    if (iteratee == null && obj != null) {
+      obj = isArrayLike(obj) ? obj : _.values(obj);
+      for (var i = 0, length = obj.length; i < length; i++) {
+        value = obj[i];
+        if (value < result) {
+          result = value;
+        }
+      }
+    } else {
+      iteratee = cb(iteratee, context);
+      _.each(obj, function(value, index, list) {
+        computed = iteratee(value, index, list);
+        if (computed < lastComputed || computed === Infinity && result === Infinity) {
+          result = value;
+          lastComputed = computed;
+        }
+      });
+    }
+    return result;
+  };
+
+  // Shuffle a collection, using the modern version of the
+  // [Fisher-Yates shuffle](http://en.wikipedia.org/wiki/Fisher–Yates_shuffle).
+  _.shuffle = function(obj) {
+    var set = isArrayLike(obj) ? obj : _.values(obj);
+    var length = set.length;
+    var shuffled = Array(length);
+    for (var index = 0, rand; index < length; index++) {
+      rand = _.random(0, index);
+      if (rand !== index) shuffled[index] = shuffled[rand];
+      shuffled[rand] = set[index];
+    }
+    return shuffled;
+  };
+
+  // Sample **n** random values from a collection.
+  // If **n** is not specified, returns a single random element.
+  // The internal `guard` argument allows it to work with `map`.
+  _.sample = function(obj, n, guard) {
+    if (n == null || guard) {
+      if (!isArrayLike(obj)) obj = _.values(obj);
+      return obj[_.random(obj.length - 1)];
+    }
+    return _.shuffle(obj).slice(0, Math.max(0, n));
+  };
+
+  // Sort the object's values by a criterion produced by an iteratee.
+  _.sortBy = function(obj, iteratee, context) {
+    iteratee = cb(iteratee, context);
+    return _.pluck(_.map(obj, function(value, index, list) {
+      return {
+        value: value,
+        index: index,
+        criteria: iteratee(value, index, list)
+      };
+    }).sort(function(left, right) {
+      var a = left.criteria;
+      var b = right.criteria;
+      if (a !== b) {
+        if (a > b || a === void 0) return 1;
+        if (a < b || b === void 0) return -1;
+      }
+      return left.index - right.index;
+    }), 'value');
+  };
+
+  // An internal function used for aggregate "group by" operations.
+  var group = function(behavior) {
+    return function(obj, iteratee, context) {
+      var result = {};
+      iteratee = cb(iteratee, context);
+      _.each(obj, function(value, index) {
+        var key = iteratee(value, index, obj);
+        behavior(result, value, key);
+      });
+      return result;
+    };
+  };
+
+  // Groups the object's values by a criterion. Pass either a string attribute
+  // to group by, or a function that returns the criterion.
+  _.groupBy = group(function(result, value, key) {
+    if (_.has(result, key)) result[key].push(value); else result[key] = [value];
+  });
+
+  // Indexes the object's values by a criterion, similar to `groupBy`, but for
+  // when you know that your index values will be unique.
+  _.indexBy = group(function(result, value, key) {
+    result[key] = value;
+  });
+
+  // Counts instances of an object that group by a certain criterion. Pass
+  // either a string attribute to count by, or a function that returns the
+  // criterion.
+  _.countBy = group(function(result, value, key) {
+    if (_.has(result, key)) result[key]++; else result[key] = 1;
+  });
+
+  // Safely create a real, live array from anything iterable.
+  _.toArray = function(obj) {
+    if (!obj) return [];
+    if (_.isArray(obj)) return slice.call(obj);
+    if (isArrayLike(obj)) return _.map(obj, _.identity);
+    return _.values(obj);
+  };
+
+  // Return the number of elements in an object.
+  _.size = function(obj) {
+    if (obj == null) return 0;
+    return isArrayLike(obj) ? obj.length : _.keys(obj).length;
+  };
+
+  // Split a collection into two arrays: one whose elements all satisfy the given
+  // predicate, and one whose elements all do not satisfy the predicate.
+  _.partition = function(obj, predicate, context) {
+    predicate = cb(predicate, context);
+    var pass = [], fail = [];
+    _.each(obj, function(value, key, obj) {
+      (predicate(value, key, obj) ? pass : fail).push(value);
+    });
+    return [pass, fail];
+  };
+
+  // Array Functions
+  // ---------------
+
+  // Get the first element of an array. Passing **n** will return the first N
+  // values in the array. Aliased as `head` and `take`. The **guard** check
+  // allows it to work with `_.map`.
+  _.first = _.head = _.take = function(array, n, guard) {
+    if (array == null) return void 0;
+    if (n == null || guard) return array[0];
+    return _.initial(array, array.length - n);
+  };
+
+  // Returns everything but the last entry of the array. Especially useful on
+  // the arguments object. Passing **n** will return all the values in
+  // the array, excluding the last N.
+  _.initial = function(array, n, guard) {
+    return slice.call(array, 0, Math.max(0, array.length - (n == null || guard ? 1 : n)));
+  };
+
+  // Get the last element of an array. Passing **n** will return the last N
+  // values in the array.
+  _.last = function(array, n, guard) {
+    if (array == null) return void 0;
+    if (n == null || guard) return array[array.length - 1];
+    return _.rest(array, Math.max(0, array.length - n));
+  };
+
+  // Returns everything but the first entry of the array. Aliased as `tail` and `drop`.
+  // Especially useful on the arguments object. Passing an **n** will return
+  // the rest N values in the array.
+  _.rest = _.tail = _.drop = function(array, n, guard) {
+    return slice.call(array, n == null || guard ? 1 : n);
+  };
+
+  // Trim out all falsy values from an array.
+  _.compact = function(array) {
+    return _.filter(array, _.identity);
+  };
+
+  // Internal implementation of a recursive `flatten` function.
+  var flatten = function(input, shallow, strict, startIndex) {
+    var output = [], idx = 0;
+    for (var i = startIndex || 0, length = getLength(input); i < length; i++) {
+      var value = input[i];
+      if (isArrayLike(value) && (_.isArray(value) || _.isArguments(value))) {
+        //flatten current level of array or arguments object
+        if (!shallow) value = flatten(value, shallow, strict);
+        var j = 0, len = value.length;
+        output.length += len;
+        while (j < len) {
+          output[idx++] = value[j++];
+        }
+      } else if (!strict) {
+        output[idx++] = value;
+      }
+    }
+    return output;
+  };
+
+  // Flatten out an array, either recursively (by default), or just one level.
+  _.flatten = function(array, shallow) {
+    return flatten(array, shallow, false);
+  };
+
+  // Return a version of the array that does not contain the specified value(s).
+  _.without = function(array) {
+    return _.difference(array, slice.call(arguments, 1));
+  };
+
+  // Produce a duplicate-free version of the array. If the array has already
+  // been sorted, you have the option of using a faster algorithm.
+  // Aliased as `unique`.
+  _.uniq = _.unique = function(array, isSorted, iteratee, context) {
+    if (!_.isBoolean(isSorted)) {
+      context = iteratee;
+      iteratee = isSorted;
+      isSorted = false;
+    }
+    if (iteratee != null) iteratee = cb(iteratee, context);
+    var result = [];
+    var seen = [];
+    for (var i = 0, length = getLength(array); i < length; i++) {
+      var value = array[i],
+          computed = iteratee ? iteratee(value, i, array) : value;
+      if (isSorted) {
+        if (!i || seen !== computed) result.push(value);
+        seen = computed;
+      } else if (iteratee) {
+        if (!_.contains(seen, computed)) {
+          seen.push(computed);
+          result.push(value);
+        }
+      } else if (!_.contains(result, value)) {
+        result.push(value);
+      }
+    }
+    return result;
+  };
+
+  // Produce an array that contains the union: each distinct element from all of
+  // the passed-in arrays.
+  _.union = function() {
+    return _.uniq(flatten(arguments, true, true));
+  };
+
+  // Produce an array that contains every item shared between all the
+  // passed-in arrays.
+  _.intersection = function(array) {
+    var result = [];
+    var argsLength = arguments.length;
+    for (var i = 0, length = getLength(array); i < length; i++) {
+      var item = array[i];
+      if (_.contains(result, item)) continue;
+      for (var j = 1; j < argsLength; j++) {
+        if (!_.contains(arguments[j], item)) break;
+      }
+      if (j === argsLength) result.push(item);
+    }
+    return result;
+  };
+
+  // Take the difference between one array and a number of other arrays.
+  // Only the elements present in just the first array will remain.
+  _.difference = function(array) {
+    var rest = flatten(arguments, true, true, 1);
+    return _.filter(array, function(value){
+      return !_.contains(rest, value);
+    });
+  };
+
+  // Zip together multiple lists into a single array -- elements that share
+  // an index go together.
+  _.zip = function() {
+    return _.unzip(arguments);
+  };
+
+  // Complement of _.zip. Unzip accepts an array of arrays and groups
+  // each array's elements on shared indices
+  _.unzip = function(array) {
+    var length = array && _.max(array, getLength).length || 0;
+    var result = Array(length);
+
+    for (var index = 0; index < length; index++) {
+      result[index] = _.pluck(array, index);
+    }
+    return result;
+  };
+
+  // Converts lists into objects. Pass either a single array of `[key, value]`
+  // pairs, or two parallel arrays of the same length -- one of keys, and one of
+  // the corresponding values.
+  _.object = function(list, values) {
+    var result = {};
+    for (var i = 0, length = getLength(list); i < length; i++) {
+      if (values) {
+        result[list[i]] = values[i];
+      } else {
+        result[list[i][0]] = list[i][1];
+      }
+    }
+    return result;
+  };
+
+  // Generator function to create the findIndex and findLastIndex functions
+  function createPredicateIndexFinder(dir) {
+    return function(array, predicate, context) {
+      predicate = cb(predicate, context);
+      var length = getLength(array);
+      var index = dir > 0 ? 0 : length - 1;
+      for (; index >= 0 && index < length; index += dir) {
+        if (predicate(array[index], index, array)) return index;
+      }
+      return -1;
+    };
+  }
+
+  // Returns the first index on an array-like that passes a predicate test
+  _.findIndex = createPredicateIndexFinder(1);
+  _.findLastIndex = createPredicateIndexFinder(-1);
+
+  // Use a comparator function to figure out the smallest index at which
+  // an object should be inserted so as to maintain order. Uses binary search.
+  _.sortedIndex = function(array, obj, iteratee, context) {
+    iteratee = cb(iteratee, context, 1);
+    var value = iteratee(obj);
+    var low = 0, high = getLength(array);
+    while (low < high) {
+      var mid = Math.floor((low + high) / 2);
+      if (iteratee(array[mid]) < value) low = mid + 1; else high = mid;
+    }
+    return low;
+  };
+
+  // Generator function to create the indexOf and lastIndexOf functions
+  function createIndexFinder(dir, predicateFind, sortedIndex) {
+    return function(array, item, idx) {
+      var i = 0, length = getLength(array);
+      if (typeof idx == 'number') {
+        if (dir > 0) {
+            i = idx >= 0 ? idx : Math.max(idx + length, i);
+        } else {
+            length = idx >= 0 ? Math.min(idx + 1, length) : idx + length + 1;
+        }
+      } else if (sortedIndex && idx && length) {
+        idx = sortedIndex(array, item);
+        return array[idx] === item ? idx : -1;
+      }
+      if (item !== item) {
+        idx = predicateFind(slice.call(array, i, length), _.isNaN);
+        return idx >= 0 ? idx + i : -1;
+      }
+      for (idx = dir > 0 ? i : length - 1; idx >= 0 && idx < length; idx += dir) {
+        if (array[idx] === item) return idx;
+      }
+      return -1;
+    };
+  }
+
+  // Return the position of the first occurrence of an item in an array,
+  // or -1 if the item is not included in the array.
+  // If the array is large and already in sort order, pass `true`
+  // for **isSorted** to use binary search.
+  _.indexOf = createIndexFinder(1, _.findIndex, _.sortedIndex);
+  _.lastIndexOf = createIndexFinder(-1, _.findLastIndex);
+
+  // Generate an integer Array containing an arithmetic progression. A port of
+  // the native Python `range()` function. See
+  // [the Python documentation](http://docs.python.org/library/functions.html#range).
+  _.range = function(start, stop, step) {
+    if (stop == null) {
+      stop = start || 0;
+      start = 0;
+    }
+    step = step || 1;
+
+    var length = Math.max(Math.ceil((stop - start) / step), 0);
+    var range = Array(length);
+
+    for (var idx = 0; idx < length; idx++, start += step) {
+      range[idx] = start;
+    }
+
+    return range;
+  };
+
+  // Function (ahem) Functions
+  // ------------------
+
+  // Determines whether to execute a function as a constructor
+  // or a normal function with the provided arguments
+  var executeBound = function(sourceFunc, boundFunc, context, callingContext, args) {
+    if (!(callingContext instanceof boundFunc)) return sourceFunc.apply(context, args);
+    var self = baseCreate(sourceFunc.prototype);
+    var result = sourceFunc.apply(self, args);
+    if (_.isObject(result)) return result;
+    return self;
+  };
+
+  // Create a function bound to a given object (assigning `this`, and arguments,
+  // optionally). Delegates to **ECMAScript 5**'s native `Function.bind` if
+  // available.
+  _.bind = function(func, context) {
+    if (nativeBind && func.bind === nativeBind) return nativeBind.apply(func, slice.call(arguments, 1));
+    if (!_.isFunction(func)) throw new TypeError('Bind must be called on a function');
+    var args = slice.call(arguments, 2);
+    var bound = function() {
+      return executeBound(func, bound, context, this, args.concat(slice.call(arguments)));
+    };
+    return bound;
+  };
+
+  // Partially apply a function by creating a version that has had some of its
+  // arguments pre-filled, without changing its dynamic `this` context. _ acts
+  // as a placeholder, allowing any combination of arguments to be pre-filled.
+  _.partial = function(func) {
+    var boundArgs = slice.call(arguments, 1);
+    var bound = function() {
+      var position = 0, length = boundArgs.length;
+      var args = Array(length);
+      for (var i = 0; i < length; i++) {
+        args[i] = boundArgs[i] === _ ? arguments[position++] : boundArgs[i];
+      }
+      while (position < arguments.length) args.push(arguments[position++]);
+      return executeBound(func, bound, this, this, args);
+    };
+    return bound;
+  };
+
+  // Bind a number of an object's methods to that object. Remaining arguments
+  // are the method names to be bound. Useful for ensuring that all callbacks
+  // defined on an object belong to it.
+  _.bindAll = function(obj) {
+    var i, length = arguments.length, key;
+    if (length <= 1) throw new Error('bindAll must be passed function names');
+    for (i = 1; i < length; i++) {
+      key = arguments[i];
+      obj[key] = _.bind(obj[key], obj);
+    }
+    return obj;
+  };
+
+  // Memoize an expensive function by storing its results.
+  _.memoize = function(func, hasher) {
+    var memoize = function(key) {
+      var cache = memoize.cache;
+      var address = '' + (hasher ? hasher.apply(this, arguments) : key);
+      if (!_.has(cache, address)) cache[address] = func.apply(this, arguments);
+      return cache[address];
+    };
+    memoize.cache = {};
+    return memoize;
+  };
+
+  // Delays a function for the given number of milliseconds, and then calls
+  // it with the arguments supplied.
+  _.delay = function(func, wait) {
+    var args = slice.call(arguments, 2);
+    return setTimeout(function(){
+      return func.apply(null, args);
+    }, wait);
+  };
+
+  // Defers a function, scheduling it to run after the current call stack has
+  // cleared.
+  _.defer = _.partial(_.delay, _, 1);
+
+  // Returns a function, that, when invoked, will only be triggered at most once
+  // during a given window of time. Normally, the throttled function will run
+  // as much as it can, without ever going more than once per `wait` duration;
+  // but if you'd like to disable the execution on the leading edge, pass
+  // `{leading: false}`. To disable execution on the trailing edge, ditto.
+  _.throttle = function(func, wait, options) {
+    var context, args, result;
+    var timeout = null;
+    var previous = 0;
+    if (!options) options = {};
+    var later = function() {
+      previous = options.leading === false ? 0 : _.now();
+      timeout = null;
+      result = func.apply(context, args);
+      if (!timeout) context = args = null;
+    };
+    return function() {
+      var now = _.now();
+      if (!previous && options.leading === false) previous = now;
+      var remaining = wait - (now - previous);
+      context = this;
+      args = arguments;
+      if (remaining <= 0 || remaining > wait) {
+        if (timeout) {
+          clearTimeout(timeout);
+          timeout = null;
+        }
+        previous = now;
+        result = func.apply(context, args);
+        if (!timeout) context = args = null;
+      } else if (!timeout && options.trailing !== false) {
+        timeout = setTimeout(later, remaining);
+      }
+      return result;
+    };
+  };
+
+  // Returns a function, that, as long as it continues to be invoked, will not
+  // be triggered. The function will be called after it stops being called for
+  // N milliseconds. If `immediate` is passed, trigger the function on the
+  // leading edge, instead of the trailing.
+  _.debounce = function(func, wait, immediate) {
+    var timeout, args, context, timestamp, result;
+
+    var later = function() {
+      var last = _.now() - timestamp;
+
+      if (last < wait && last >= 0) {
+        timeout = setTimeout(later, wait - last);
+      } else {
+        timeout = null;
+        if (!immediate) {
+          result = func.apply(context, args);
+          if (!timeout) context = args = null;
+        }
+      }
+    };
+
+    return function() {
+      context = this;
+      args = arguments;
+      timestamp = _.now();
+      var callNow = immediate && !timeout;
+      if (!timeout) timeout = setTimeout(later, wait);
+      if (callNow) {
+        result = func.apply(context, args);
+        context = args = null;
+      }
+
+      return result;
+    };
+  };
+
+  // Returns the first function passed as an argument to the second,
+  // allowing you to adjust arguments, run code before and after, and
+  // conditionally execute the original function.
+  _.wrap = function(func, wrapper) {
+    return _.partial(wrapper, func);
+  };
+
+  // Returns a negated version of the passed-in predicate.
+  _.negate = function(predicate) {
+    return function() {
+      return !predicate.apply(this, arguments);
+    };
+  };
+
+  // Returns a function that is the composition of a list of functions, each
+  // consuming the return value of the function that follows.
+  _.compose = function() {
+    var args = arguments;
+    var start = args.length - 1;
+    return function() {
+      var i = start;
+      var result = args[start].apply(this, arguments);
+      while (i--) result = args[i].call(this, result);
+      return result;
+    };
+  };
+
+  // Returns a function that will only be executed on and after the Nth call.
+  _.after = function(times, func) {
+    return function() {
+      if (--times < 1) {
+        return func.apply(this, arguments);
+      }
+    };
+  };
+
+  // Returns a function that will only be executed up to (but not including) the Nth call.
+  _.before = function(times, func) {
+    var memo;
+    return function() {
+      if (--times > 0) {
+        memo = func.apply(this, arguments);
+      }
+      if (times <= 1) func = null;
+      return memo;
+    };
+  };
+
+  // Returns a function that will be executed at most one time, no matter how
+  // often you call it. Useful for lazy initialization.
+  _.once = _.partial(_.before, 2);
+
+  // Object Functions
+  // ----------------
+
+  // Keys in IE < 9 that won't be iterated by `for key in ...` and thus missed.
+  var hasEnumBug = !{toString: null}.propertyIsEnumerable('toString');
+  var nonEnumerableProps = ['valueOf', 'isPrototypeOf', 'toString',
+                      'propertyIsEnumerable', 'hasOwnProperty', 'toLocaleString'];
+
+  function collectNonEnumProps(obj, keys) {
+    var nonEnumIdx = nonEnumerableProps.length;
+    var constructor = obj.constructor;
+    var proto = (_.isFunction(constructor) && constructor.prototype) || ObjProto;
+
+    // Constructor is a special case.
+    var prop = 'constructor';
+    if (_.has(obj, prop) && !_.contains(keys, prop)) keys.push(prop);
+
+    while (nonEnumIdx--) {
+      prop = nonEnumerableProps[nonEnumIdx];
+      if (prop in obj && obj[prop] !== proto[prop] && !_.contains(keys, prop)) {
+        keys.push(prop);
+      }
+    }
+  }
+
+  // Retrieve the names of an object's own properties.
+  // Delegates to **ECMAScript 5**'s native `Object.keys`
+  _.keys = function(obj) {
+    if (!_.isObject(obj)) return [];
+    if (nativeKeys) return nativeKeys(obj);
+    var keys = [];
+    for (var key in obj) if (_.has(obj, key)) keys.push(key);
+    // Ahem, IE < 9.
+    if (hasEnumBug) collectNonEnumProps(obj, keys);
+    return keys;
+  };
+
+  // Retrieve all the property names of an object.
+  _.allKeys = function(obj) {
+    if (!_.isObject(obj)) return [];
+    var keys = [];
+    for (var key in obj) keys.push(key);
+    // Ahem, IE < 9.
+    if (hasEnumBug) collectNonEnumProps(obj, keys);
+    return keys;
+  };
+
+  // Retrieve the values of an object's properties.
+  _.values = function(obj) {
+    var keys = _.keys(obj);
+    var length = keys.length;
+    var values = Array(length);
+    for (var i = 0; i < length; i++) {
+      values[i] = obj[keys[i]];
+    }
+    return values;
+  };
+
+  // Returns the results of applying the iteratee to each element of the object
+  // In contrast to _.map it returns an object
+  _.mapObject = function(obj, iteratee, context) {
+    iteratee = cb(iteratee, context);
+    var keys =  _.keys(obj),
+          length = keys.length,
+          results = {},
+          currentKey;
+      for (var index = 0; index < length; index++) {
+        currentKey = keys[index];
+        results[currentKey] = iteratee(obj[currentKey], currentKey, obj);
+      }
+      return results;
+  };
+
+  // Convert an object into a list of `[key, value]` pairs.
+  _.pairs = function(obj) {
+    var keys = _.keys(obj);
+    var length = keys.length;
+    var pairs = Array(length);
+    for (var i = 0; i < length; i++) {
+      pairs[i] = [keys[i], obj[keys[i]]];
+    }
+    return pairs;
+  };
+
+  // Invert the keys and values of an object. The values must be serializable.
+  _.invert = function(obj) {
+    var result = {};
+    var keys = _.keys(obj);
+    for (var i = 0, length = keys.length; i < length; i++) {
+      result[obj[keys[i]]] = keys[i];
+    }
+    return result;
+  };
+
+  // Return a sorted list of the function names available on the object.
+  // Aliased as `methods`
+  _.functions = _.methods = function(obj) {
+    var names = [];
+    for (var key in obj) {
+      if (_.isFunction(obj[key])) names.push(key);
+    }
+    return names.sort();
+  };
+
+  // Extend a given object with all the properties in passed-in object(s).
+  _.extend = createAssigner(_.allKeys);
+
+  // Assigns a given object with all the own properties in the passed-in object(s)
+  // (https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object/assign)
+  _.extendOwn = _.assign = createAssigner(_.keys);
+
+  // Returns the first key on an object that passes a predicate test
+  _.findKey = function(obj, predicate, context) {
+    predicate = cb(predicate, context);
+    var keys = _.keys(obj), key;
+    for (var i = 0, length = keys.length; i < length; i++) {
+      key = keys[i];
+      if (predicate(obj[key], key, obj)) return key;
+    }
+  };
+
+  // Return a copy of the object only containing the whitelisted properties.
+  _.pick = function(object, oiteratee, context) {
+    var result = {}, obj = object, iteratee, keys;
+    if (obj == null) return result;
+    if (_.isFunction(oiteratee)) {
+      keys = _.allKeys(obj);
+      iteratee = optimizeCb(oiteratee, context);
+    } else {
+      keys = flatten(arguments, false, false, 1);
+      iteratee = function(value, key, obj) { return key in obj; };
+      obj = Object(obj);
+    }
+    for (var i = 0, length = keys.length; i < length; i++) {
+      var key = keys[i];
+      var value = obj[key];
+      if (iteratee(value, key, obj)) result[key] = value;
+    }
+    return result;
+  };
+
+   // Return a copy of the object without the blacklisted properties.
+  _.omit = function(obj, iteratee, context) {
+    if (_.isFunction(iteratee)) {
+      iteratee = _.negate(iteratee);
+    } else {
+      var keys = _.map(flatten(arguments, false, false, 1), String);
+      iteratee = function(value, key) {
+        return !_.contains(keys, key);
+      };
+    }
+    return _.pick(obj, iteratee, context);
+  };
+
+  // Fill in a given object with default properties.
+  _.defaults = createAssigner(_.allKeys, true);
+
+  // Creates an object that inherits from the given prototype object.
+  // If additional properties are provided then they will be added to the
+  // created object.
+  _.create = function(prototype, props) {
+    var result = baseCreate(prototype);
+    if (props) _.extendOwn(result, props);
+    return result;
+  };
+
+  // Create a (shallow-cloned) duplicate of an object.
+  _.clone = function(obj) {
+    if (!_.isObject(obj)) return obj;
+    return _.isArray(obj) ? obj.slice() : _.extend({}, obj);
+  };
+
+  // Invokes interceptor with the obj, and then returns obj.
+  // The primary purpose of this method is to "tap into" a method chain, in
+  // order to perform operations on intermediate results within the chain.
+  _.tap = function(obj, interceptor) {
+    interceptor(obj);
+    return obj;
+  };
+
+  // Returns whether an object has a given set of `key:value` pairs.
+  _.isMatch = function(object, attrs) {
+    var keys = _.keys(attrs), length = keys.length;
+    if (object == null) return !length;
+    var obj = Object(object);
+    for (var i = 0; i < length; i++) {
+      var key = keys[i];
+      if (attrs[key] !== obj[key] || !(key in obj)) return false;
+    }
+    return true;
+  };
+
+
+  // Internal recursive comparison function for `isEqual`.
+  var eq = function(a, b, aStack, bStack) {
+    // Identical objects are equal. `0 === -0`, but they aren't identical.
+    // See the [Harmony `egal` proposal](http://wiki.ecmascript.org/doku.php?id=harmony:egal).
+    if (a === b) return a !== 0 || 1 / a === 1 / b;
+    // A strict comparison is necessary because `null == undefined`.
+    if (a == null || b == null) return a === b;
+    // Unwrap any wrapped objects.
+    if (a instanceof _) a = a._wrapped;
+    if (b instanceof _) b = b._wrapped;
+    // Compare `[[Class]]` names.
+    var className = toString.call(a);
+    if (className !== toString.call(b)) return false;
+    switch (className) {
+      // Strings, numbers, regular expressions, dates, and booleans are compared by value.
+      case '[object RegExp]':
+      // RegExps are coerced to strings for comparison (Note: '' + /a/i === '/a/i')
+      case '[object String]':
+        // Primitives and their corresponding object wrappers are equivalent; thus, `"5"` is
+        // equivalent to `new String("5")`.
+        return '' + a === '' + b;
+      case '[object Number]':
+        // `NaN`s are equivalent, but non-reflexive.
+        // Object(NaN) is equivalent to NaN
+        if (+a !== +a) return +b !== +b;
+        // An `egal` comparison is performed for other numeric values.
+        return +a === 0 ? 1 / +a === 1 / b : +a === +b;
+      case '[object Date]':
+      case '[object Boolean]':
+        // Coerce dates and booleans to numeric primitive values. Dates are compared by their
+        // millisecond representations. Note that invalid dates with millisecond representations
+        // of `NaN` are not equivalent.
+        return +a === +b;
+    }
+
+    var areArrays = className === '[object Array]';
+    if (!areArrays) {
+      if (typeof a != 'object' || typeof b != 'object') return false;
+
+      // Objects with different constructors are not equivalent, but `Object`s or `Array`s
+      // from different frames are.
+      var aCtor = a.constructor, bCtor = b.constructor;
+      if (aCtor !== bCtor && !(_.isFunction(aCtor) && aCtor instanceof aCtor &&
+                               _.isFunction(bCtor) && bCtor instanceof bCtor)
+                          && ('constructor' in a && 'constructor' in b)) {
+        return false;
+      }
+    }
+    // Assume equality for cyclic structures. The algorithm for detecting cyclic
+    // structures is adapted from ES 5.1 section 15.12.3, abstract operation `JO`.
+
+    // Initializing stack of traversed objects.
+    // It's done here since we only need them for objects and arrays comparison.
+    aStack = aStack || [];
+    bStack = bStack || [];
+    var length = aStack.length;
+    while (length--) {
+      // Linear search. Performance is inversely proportional to the number of
+      // unique nested structures.
+      if (aStack[length] === a) return bStack[length] === b;
+    }
+
+    // Add the first object to the stack of traversed objects.
+    aStack.push(a);
+    bStack.push(b);
+
+    // Recursively compare objects and arrays.
+    if (areArrays) {
+      // Compare array lengths to determine if a deep comparison is necessary.
+      length = a.length;
+      if (length !== b.length) return false;
+      // Deep compare the contents, ignoring non-numeric properties.
+      while (length--) {
+        if (!eq(a[length], b[length], aStack, bStack)) return false;
+      }
+    } else {
+      // Deep compare objects.
+      var keys = _.keys(a), key;
+      length = keys.length;
+      // Ensure that both objects contain the same number of properties before comparing deep equality.
+      if (_.keys(b).length !== length) return false;
+      while (length--) {
+        // Deep compare each member
+        key = keys[length];
+        if (!(_.has(b, key) && eq(a[key], b[key], aStack, bStack))) return false;
+      }
+    }
+    // Remove the first object from the stack of traversed objects.
+    aStack.pop();
+    bStack.pop();
+    return true;
+  };
+
+  // Perform a deep comparison to check if two objects are equal.
+  _.isEqual = function(a, b) {
+    return eq(a, b);
+  };
+
+  // Is a given array, string, or object empty?
+  // An "empty" object has no enumerable own-properties.
+  _.isEmpty = function(obj) {
+    if (obj == null) return true;
+    if (isArrayLike(obj) && (_.isArray(obj) || _.isString(obj) || _.isArguments(obj))) return obj.length === 0;
+    return _.keys(obj).length === 0;
+  };
+
+  // Is a given value a DOM element?
+  _.isElement = function(obj) {
+    return !!(obj && obj.nodeType === 1);
+  };
+
+  // Is a given value an array?
+  // Delegates to ECMA5's native Array.isArray
+  _.isArray = nativeIsArray || function(obj) {
+    return toString.call(obj) === '[object Array]';
+  };
+
+  // Is a given variable an object?
+  _.isObject = function(obj) {
+    var type = typeof obj;
+    return type === 'function' || type === 'object' && !!obj;
+  };
+
+  // Add some isType methods: isArguments, isFunction, isString, isNumber, isDate, isRegExp, isError.
+  _.each(['Arguments', 'Function', 'String', 'Number', 'Date', 'RegExp', 'Error'], function(name) {
+    _['is' + name] = function(obj) {
+      return toString.call(obj) === '[object ' + name + ']';
+    };
+  });
+
+  // Define a fallback version of the method in browsers (ahem, IE < 9), where
+  // there isn't any inspectable "Arguments" type.
+  if (!_.isArguments(arguments)) {
+    _.isArguments = function(obj) {
+      return _.has(obj, 'callee');
+    };
+  }
+
+  // Optimize `isFunction` if appropriate. Work around some typeof bugs in old v8,
+  // IE 11 (#1621), and in Safari 8 (#1929).
+  if (typeof /./ != 'function' && typeof Int8Array != 'object') {
+    _.isFunction = function(obj) {
+      return typeof obj == 'function' || false;
+    };
+  }
+
+  // Is a given object a finite number?
+  _.isFinite = function(obj) {
+    return isFinite(obj) && !isNaN(parseFloat(obj));
+  };
+
+  // Is the given value `NaN`? (NaN is the only number which does not equal itself).
+  _.isNaN = function(obj) {
+    return _.isNumber(obj) && obj !== +obj;
+  };
+
+  // Is a given value a boolean?
+  _.isBoolean = function(obj) {
+    return obj === true || obj === false || toString.call(obj) === '[object Boolean]';
+  };
+
+  // Is a given value equal to null?
+  _.isNull = function(obj) {
+    return obj === null;
+  };
+
+  // Is a given variable undefined?
+  _.isUndefined = function(obj) {
+    return obj === void 0;
+  };
+
+  // Shortcut function for checking if an object has a given property directly
+  // on itself (in other words, not on a prototype).
+  _.has = function(obj, key) {
+    return obj != null && hasOwnProperty.call(obj, key);
+  };
+
+  // Utility Functions
+  // -----------------
+
+  // Run Underscore.js in *noConflict* mode, returning the `_` variable to its
+  // previous owner. Returns a reference to the Underscore object.
+  _.noConflict = function() {
+    root._ = previousUnderscore;
+    return this;
+  };
+
+  // Keep the identity function around for default iteratees.
+  _.identity = function(value) {
+    return value;
+  };
+
+  // Predicate-generating functions. Often useful outside of Underscore.
+  _.constant = function(value) {
+    return function() {
+      return value;
+    };
+  };
+
+  _.noop = function(){};
+
+  _.property = property;
+
+  // Generates a function for a given object that returns a given property.
+  _.propertyOf = function(obj) {
+    return obj == null ? function(){} : function(key) {
+      return obj[key];
+    };
+  };
+
+  // Returns a predicate for checking whether an object has a given set of
+  // `key:value` pairs.
+  _.matcher = _.matches = function(attrs) {
+    attrs = _.extendOwn({}, attrs);
+    return function(obj) {
+      return _.isMatch(obj, attrs);
+    };
+  };
+
+  // Run a function **n** times.
+  _.times = function(n, iteratee, context) {
+    var accum = Array(Math.max(0, n));
+    iteratee = optimizeCb(iteratee, context, 1);
+    for (var i = 0; i < n; i++) accum[i] = iteratee(i);
+    return accum;
+  };
+
+  // Return a random integer between min and max (inclusive).
+  _.random = function(min, max) {
+    if (max == null) {
+      max = min;
+      min = 0;
+    }
+    return min + Math.floor(Math.random() * (max - min + 1));
+  };
+
+  // A (possibly faster) way to get the current timestamp as an integer.
+  _.now = Date.now || function() {
+    return new Date().getTime();
+  };
+
+   // List of HTML entities for escaping.
+  var escapeMap = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#x27;',
+    '`': '&#x60;'
+  };
+  var unescapeMap = _.invert(escapeMap);
+
+  // Functions for escaping and unescaping strings to/from HTML interpolation.
+  var createEscaper = function(map) {
+    var escaper = function(match) {
+      return map[match];
+    };
+    // Regexes for identifying a key that needs to be escaped
+    var source = '(?:' + _.keys(map).join('|') + ')';
+    var testRegexp = RegExp(source);
+    var replaceRegexp = RegExp(source, 'g');
+    return function(string) {
+      string = string == null ? '' : '' + string;
+      return testRegexp.test(string) ? string.replace(replaceRegexp, escaper) : string;
+    };
+  };
+  _.escape = createEscaper(escapeMap);
+  _.unescape = createEscaper(unescapeMap);
+
+  // If the value of the named `property` is a function then invoke it with the
+  // `object` as context; otherwise, return it.
+  _.result = function(object, property, fallback) {
+    var value = object == null ? void 0 : object[property];
+    if (value === void 0) {
+      value = fallback;
+    }
+    return _.isFunction(value) ? value.call(object) : value;
+  };
+
+  // Generate a unique integer id (unique within the entire client session).
+  // Useful for temporary DOM ids.
+  var idCounter = 0;
+  _.uniqueId = function(prefix) {
+    var id = ++idCounter + '';
+    return prefix ? prefix + id : id;
+  };
+
+  // By default, Underscore uses ERB-style template delimiters, change the
+  // following template settings to use alternative delimiters.
+  _.templateSettings = {
+    evaluate    : /<%([\s\S]+?)%>/g,
+    interpolate : /<%=([\s\S]+?)%>/g,
+    escape      : /<%-([\s\S]+?)%>/g
+  };
+
+  // When customizing `templateSettings`, if you don't want to define an
+  // interpolation, evaluation or escaping regex, we need one that is
+  // guaranteed not to match.
+  var noMatch = /(.)^/;
+
+  // Certain characters need to be escaped so that they can be put into a
+  // string literal.
+  var escapes = {
+    "'":      "'",
+    '\\':     '\\',
+    '\r':     'r',
+    '\n':     'n',
+    '\u2028': 'u2028',
+    '\u2029': 'u2029'
+  };
+
+  var escaper = /\\|'|\r|\n|\u2028|\u2029/g;
+
+  var escapeChar = function(match) {
+    return '\\' + escapes[match];
+  };
+
+  // JavaScript micro-templating, similar to John Resig's implementation.
+  // Underscore templating handles arbitrary delimiters, preserves whitespace,
+  // and correctly escapes quotes within interpolated code.
+  // NB: `oldSettings` only exists for backwards compatibility.
+  _.template = function(text, settings, oldSettings) {
+    if (!settings && oldSettings) settings = oldSettings;
+    settings = _.defaults({}, settings, _.templateSettings);
+
+    // Combine delimiters into one regular expression via alternation.
+    var matcher = RegExp([
+      (settings.escape || noMatch).source,
+      (settings.interpolate || noMatch).source,
+      (settings.evaluate || noMatch).source
+    ].join('|') + '|$', 'g');
+
+    // Compile the template source, escaping string literals appropriately.
+    var index = 0;
+    var source = "__p+='";
+    text.replace(matcher, function(match, escape, interpolate, evaluate, offset) {
+      source += text.slice(index, offset).replace(escaper, escapeChar);
+      index = offset + match.length;
+
+      if (escape) {
+        source += "'+\n((__t=(" + escape + "))==null?'':_.escape(__t))+\n'";
+      } else if (interpolate) {
+        source += "'+\n((__t=(" + interpolate + "))==null?'':__t)+\n'";
+      } else if (evaluate) {
+        source += "';\n" + evaluate + "\n__p+='";
+      }
+
+      // Adobe VMs need the match returned to produce the correct offest.
+      return match;
+    });
+    source += "';\n";
+
+    // If a variable is not specified, place data values in local scope.
+    if (!settings.variable) source = 'with(obj||{}){\n' + source + '}\n';
+
+    source = "var __t,__p='',__j=Array.prototype.join," +
+      "print=function(){__p+=__j.call(arguments,'');};\n" +
+      source + 'return __p;\n';
+
+    try {
+      var render = new Function(settings.variable || 'obj', '_', source);
+    } catch (e) {
+      e.source = source;
+      throw e;
+    }
+
+    var template = function(data) {
+      return render.call(this, data, _);
+    };
+
+    // Provide the compiled source as a convenience for precompilation.
+    var argument = settings.variable || 'obj';
+    template.source = 'function(' + argument + '){\n' + source + '}';
+
+    return template;
+  };
+
+  // Add a "chain" function. Start chaining a wrapped Underscore object.
+  _.chain = function(obj) {
+    var instance = _(obj);
+    instance._chain = true;
+    return instance;
+  };
+
+  // OOP
+  // ---------------
+  // If Underscore is called as a function, it returns a wrapped object that
+  // can be used OO-style. This wrapper holds altered versions of all the
+  // underscore functions. Wrapped objects may be chained.
+
+  // Helper function to continue chaining intermediate results.
+  var result = function(instance, obj) {
+    return instance._chain ? _(obj).chain() : obj;
+  };
+
+  // Add your own custom functions to the Underscore object.
+  _.mixin = function(obj) {
+    _.each(_.functions(obj), function(name) {
+      var func = _[name] = obj[name];
+      _.prototype[name] = function() {
+        var args = [this._wrapped];
+        push.apply(args, arguments);
+        return result(this, func.apply(_, args));
+      };
+    });
+  };
+
+  // Add all of the Underscore functions to the wrapper object.
+  _.mixin(_);
+
+  // Add all mutator Array functions to the wrapper.
+  _.each(['pop', 'push', 'reverse', 'shift', 'sort', 'splice', 'unshift'], function(name) {
+    var method = ArrayProto[name];
+    _.prototype[name] = function() {
+      var obj = this._wrapped;
+      method.apply(obj, arguments);
+      if ((name === 'shift' || name === 'splice') && obj.length === 0) delete obj[0];
+      return result(this, obj);
+    };
+  });
+
+  // Add all accessor Array functions to the wrapper.
+  _.each(['concat', 'join', 'slice'], function(name) {
+    var method = ArrayProto[name];
+    _.prototype[name] = function() {
+      return result(this, method.apply(this._wrapped, arguments));
+    };
+  });
+
+  // Extracts the result from a wrapped and chained object.
+  _.prototype.value = function() {
+    return this._wrapped;
+  };
+
+  // Provide unwrapping proxy for some methods used in engine operations
+  // such as arithmetic and JSON stringification.
+  _.prototype.valueOf = _.prototype.toJSON = _.prototype.value;
+
+  _.prototype.toString = function() {
+    return '' + this._wrapped;
+  };
+
+  // AMD registration happens at the end for compatibility with AMD loaders
+  // that may not enforce next-turn semantics on modules. Even though general
+  // practice for AMD registration is to be anonymous, underscore registers
+  // as a named module because, like jQuery, it is a base library that is
+  // popular enough to be bundled in a third party lib, but not be part of
+  // an AMD load request. Those cases could generate an error when an
+  // anonymous define() is called outside of a loader request.
+  if (typeof define === 'function' && define.amd) {
+    define('underscore', [], function() {
+      return _;
+    });
+  }
+}.call(this));
+
+},{}],190:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require('react');
 var Backbone = require('backbone');
@@ -32638,14 +37777,14 @@ var BaseView = Backbone.View.extend({
 });
 
 module.exports = BaseView;
-},{"backbone":1,"react":160}],163:[function(require,module,exports){
+},{"backbone":1,"react":188}],191:[function(require,module,exports){
 var React = require('react');
 var Backbone = require('backbone');
 var ReactBackbone = require('react.backbone');
 var ProfileList = Backbone.Collection.extend({
   model: Profile
 });
-},{"backbone":1,"react":160,"react.backbone":5}],164:[function(require,module,exports){
+},{"backbone":1,"react":188,"react.backbone":33}],192:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require('react');
 var Backbone = require('backbone');
@@ -32661,7 +37800,7 @@ module.exports =  React.createClass({
         );
     }
 });
-},{"backbone":1,"react":160,"react.backbone":5}],165:[function(require,module,exports){
+},{"backbone":1,"react":188,"react.backbone":33}],193:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require('react');
 var Backbone = require('backbone');
@@ -32677,7 +37816,312 @@ module.exports =  React.createClass({displayName: "exports",
     }
 })
 
-},{"./Element":164,"backbone":1,"react":160,"react.backbone":5}],166:[function(require,module,exports){
+},{"./Element":192,"backbone":1,"react":188,"react.backbone":33}],194:[function(require,module,exports){
+/** @jsx React.DOM */
+var React = require('react');
+var Backbone = require('backbone');
+var ReactBackbone = require('react.backbone');
+var ReactCanvas = require('react-canvas');
+
+var Surface = ReactCanvas.Surface;
+var drawKaleidoscope = require('./modules/kaleidoscope');
+
+var Kscope = React.createBackboneClass({
+
+    getInitialState: function () {
+        return {}
+    },
+    componentDidMount: function () {
+        //console.log(React.render(<this.canvasString id="canvasCheck" />, document.getElementById('container'), this.prepPage()));
+        //React.render(<this.canvasString />, document.getElementById('sckscope'));
+        this.prepPage();
+    },
+
+    kScope: [], canvasActive: 8,
+    preVideo: React.createClass({displayName: "preVideo",
+        render: function () {
+            return (
+                React.createElement("video", {width: "0", height: "0", autoplay: true})
+            );
+        }
+    }),
+    preImage: React.createClass({displayName: "preImage",
+        render: function () {
+            return (
+                React.createElement("img", {class: "vid-img", src: "/image/kaleidoscope.jpg", height: "500", width: "500"})
+            )
+        }
+    }),
+    preCanvas: React.createClass({displayName: "preCanvas",
+        render: function () {
+            return (
+                React.createElement("canvas", {class: "vid-canvas", height: "500", width: "500"})
+            );
+        }
+    }),
+    canvasString: React.createClass({displayName: "canvasString",
+        render: function () {
+            var specs = this.props;
+            var size = specs.scopeSize;
+            var src = specs.src;
+            return (
+                React.createElement("canvas", {id: "canvasCheck", 
+                        class: "kaleidoscope", 
+                        height: size, 
+                        width: size})
+            );
+        }
+    }),
+    imageString: React.createClass({displayName: "imageString",
+        render: function () {
+            //style="position: absolute; left: -9999px; margin: 0px; padding: 0px"
+            var specs = this.props;
+            var size = specs.scopeSize;
+            var src = specs.src;
+            return (
+                React.createElement("img", {class: "body-kscope img", 
+                     height: size, 
+                     width: size, 
+                     src: src, 
+                     alt: "kaleidoscope"})
+            )
+        }
+    }),
+    prepPage: function (src) {
+        src = src || '';
+        var canvas,
+            canvasString, image;
+        //canvasAll = React.createElement("image", {}, canvasAll); //canvasAll.add(image);
+        //canvasAll = <canvas>{{canvasString}}</canvas>;
+        for (i = 0; i < this.canvasActive; i++) {
+             //console.log('test');
+             canvasString = document.getElementById('canvasCheck');
+             //canvasAll.add(canvasString);
+             //console.log(canvasString);
+             this.kScope[i] = {
+                 img: image,
+                 height: 500,
+                 width: 500,
+                 canvas: canvasString,
+                 ctx: canvasString.getContext('2d'),
+                 imgLoaded: true
+             }
+        }
+
+        React.render(React.createElement(this.imageString, {scopeSize: "500", src: "https://scontent.cdninstagram.com/hphotos-xaf1/t51.2885-15/s640x640/sh0.08/e35/11363716_134653433554276_1743669472_n.jpg"}), document.getElementById('image-container'))
+
+       /* if (container.children().length) {
+        container.children().replaceWith(canvasAll);
+        } else {
+        container.html(canvasAll);
+        }*/
+
+        /*if (audioActive) {
+         addNewImages(src, scopeSize, canvasActive);
+         }
+         if (staticImg) {
+         images.attr('src', src);
+         setTimeout(function () {
+         move(189, 189);
+         }, 3000);
+
+         }
+         canvases = $('#sckscope canvas');
+         images = $('#sckscope img');*/
+    },
+    render: function () {
+
+        return (
+            React.createElement("div", {id: "sckscope"}, 
+                React.createElement("div", {id: "image-container"}), 
+                React.createElement(this.canvasString, {scopeSize: "500", src: "https://scontent.cdninstagram.com/hphotos-xaf1/t51.2885-15/s640x640/sh0.08/e35/11363716_134653433554276_1743669472_n.jpg"})
+            )
+        );
+    }
+});
+
+module.exports = Kscope;
+
+/*prepVideo: function () {
+ window.URL = window.URL || window.webkitURL;
+ navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia ||
+ navigator.mozGetUserMedia || navigator.msGetUserMedia;
+ limit = 420;
+ var preImage = this.preImage(),
+ preCanvas = this.preCanvas();
+ ctx = preCanvas[0].getContext('2d')
+ if (navigator.getUserMedia) {
+ navigator.getUserMedia({
+ video: true,
+ audio: true
+ }, function (mediaStream) {
+ var video = preVideo(); //document.querySelector('video');
+
+ video.src = window.URL.createObjectURL(mediaStream);
+ audioActive = video.src;
+ audioCache[audioActive] = {
+ image: preImage.attr('src')
+ }
+ //container.show();
+ if (isFirefox) {
+ snapshotFf(video, preCanvas[0], ctx, mediaStream);
+ } else {
+ snapshot(video, preCanvas[0], ctx, mediaStream);
+ //$('input[name=fullscreen]').show();
+ }
+
+ vac[audioActive] = new VisualAudioContext(context, audioActive, mediaStream);
+ visualizeAudio(audioActive);
+ // Note: onloadedmetadata doesn't fire in Chrome when using it with getUserMedia.
+ // See crbug.com/110938.
+ video.onloadedmetadata = function (e) {
+ console.log('videLoaded');
+ };
+ }, function (error) {
+ console.log('Failed' + error);
+ });
+ } else {
+ console.log('failed getUserMedia(). :( ');
+ //video.src = 'somevideo.webm'; // fallback.
+ }
+
+ },
+ snapshot: function (video, preCanvas, ctx, stream) {
+ var img = preCanvas.toDataURL('image/webp');
+ ctx.drawImage(video, 0, 0, scopeSize, scopeSize);
+ addNewImages(img, scopeSize, canvasActive);
+ setTimeout(function () {
+ snapshot(video, preCanvas, ctx, stream);
+ }, 10);
+
+ },
+ move: function (x, y) {
+ $.each(kScope, function (i) {
+ drawKaleidoscope(this.ctx, images[0], x, y, scopeSize);
+ });
+ },*/
+},{"./modules/kaleidoscope":196,"backbone":1,"react":188,"react-canvas":21,"react.backbone":33}],195:[function(require,module,exports){
+var React = require('react');
+var Backbone = require('backbone');
+var ReactBackbone = require('react.backbone');
+
+var BaseView = require('../base-view');
+var Kscope = require('./component');
+
+var Scope = {
+  init: function () {
+    React.render(React.createElement(Kscope, null), document.getElementById('container'));
+  }
+};
+
+module.exports = Scope;
+},{"../base-view":190,"./component":194,"backbone":1,"react":188,"react.backbone":33}],196:[function(require,module,exports){
+var drawKaleidoscope = function (ctx, img, imgX, imgY, mask) {
+    try {
+        var maskSide = !mask ? 300 : mask;
+        var sqSide = maskSide / 2;
+        var sqDiag = Math.sqrt(2 * sqSide * sqSide);
+        var c = maskSide / 2;
+        var centerSide = 0;
+
+        var bufferCanvas = document.createElement('canvas');
+        var bufferContext = bufferCanvas.getContext('2d');
+
+        bufferCanvas.height = mask;
+        bufferCanvas.width = mask;
+
+        if (img.height < img.width) {
+            maskSide = Math.abs(img.height - sqDiag);
+        } else {
+            maskSide = Math.abs(img.width - sqDiag);
+        }
+
+        //bufferContext.clearRect(0, 0, maskSide, maskSide);
+        //7 (1) 1
+        bufferContext.save();
+        bufferContext.translate(c, c);
+        bufferContext.rotate(-90 * (Math.PI / 180));
+        bufferContext.scale(-1, -1);
+        bufferContext.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
+        bufferContext.restore();
+        //2 (4) 2
+        bufferContext.save();
+        bufferContext.translate(c, c);
+        bufferContext.rotate(-90 * (Math.PI / 180));
+        bufferContext.scale(1, -1);
+        bufferContext.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
+        bufferContext.restore();
+        //3 (5) 3
+        bufferContext.save();
+        bufferContext.translate(c, c);
+        bufferContext.rotate(-90 * (Math.PI / 180));
+        bufferContext.scale(1, 1);
+        bufferContext.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
+        bufferContext.restore();
+        //8 4
+        bufferContext.save();
+        bufferContext.translate(c, c);
+        bufferContext.rotate(-90 * (Math.PI / 180));
+        bufferContext.scale(-1, 1);
+        bufferContext.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
+        bufferContext.restore();
+        //1 5
+        bufferContext.save();
+        bufferContext.moveTo(c, c);
+        bufferContext.lineTo(c - sqSide, c);
+        bufferContext.lineTo(c - sqSide, c - sqSide);
+        bufferContext.lineTo(c, c);
+        bufferContext.clip();
+        bufferContext.translate(c, c);
+        bufferContext.scale(-1, -1);
+        bufferContext.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
+        ctx.drawImage(bufferCanvas, 0, 0);
+        bufferContext.restore();
+        //4 6
+        bufferContext.save();
+        bufferContext.moveTo(c, c);
+        bufferContext.lineTo(c + sqSide, c - sqSide);
+        bufferContext.lineTo(c + sqSide, c);
+        bufferContext.lineTo(c, c);
+        bufferContext.clip();
+        bufferContext.translate(c, c);
+        bufferContext.scale(1, -1);
+        bufferContext.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
+        bufferContext.restore();
+        //5 7
+        bufferContext.save();
+        bufferContext.moveTo(c, c);
+        bufferContext.lineTo(c + sqSide, c);
+        bufferContext.lineTo(c + sqSide, c + sqSide);
+        bufferContext.lineTo(c, c);
+        bufferContext.clip();
+        bufferContext.translate(c, c);
+        bufferContext.scale(1, 1);
+        bufferContext.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
+        bufferContext.restore();
+        //8 8
+        bufferContext.save();
+        bufferContext.moveTo(c, c);
+        bufferContext.lineTo(c - sqSide, c + sqSide);
+        bufferContext.lineTo(c - sqSide, c);
+        bufferContext.lineTo(c, c);
+        bufferContext.clip();
+        bufferContext.translate(c, c);
+        bufferContext.scale(-1, 1);
+        bufferContext.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
+        bufferContext.restore();
+        ctx.drawImage(bufferCanvas, 0, 0);
+    } catch (err) {
+        $('#currentImage').remove();
+        img = '';
+        $('#loadingContainer').show();
+        bufferContext.clearRect(0, 0, 300, 300);
+    }
+}
+
+module.exports = drawKaleidoscope;
+
+},{}],197:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require('react');
 var Backbone = require('backbone');
@@ -32689,18 +38133,23 @@ var UsersIndexScreen = require('./users/component');
         routes: {
             "": "index",
             "users": "users",
-            "users/:id": "user"
+            "users/:id": "user",
+            "kscope": "kscope"
         },
-        users: function () {
+        kscope: function() {
+            var Kscope = require('./kaleidoscope');
+            Kscope.init();
+        },
+        users: function() {
             var UsersIndexView = require('./users');
             UsersIndexView.list();
         },
-        user: function (id) {
+        user: function(id) {
             var UsersIndexView = require('./users');
             UsersIndexView.show(id);
             
         },
-        index: function () {
+        index: function() {
             var movies = require('./collections/movies');
             var List = require('./component/List');
             React.render(React.createElement(List, {movies: movies}), document.getElementById('container'));
@@ -32709,7 +38158,7 @@ var UsersIndexScreen = require('./users/component');
     new app;
     Backbone.history.start();
 })()
-},{"./collections/movies":163,"./component/List":165,"./users":169,"./users/component":168,"backbone":1,"react":160,"react.backbone":5}],167:[function(require,module,exports){
+},{"./collections/movies":191,"./component/List":193,"./kaleidoscope":195,"./users":200,"./users/component":199,"backbone":1,"react":188,"react.backbone":33}],198:[function(require,module,exports){
 var React = require('react');
 var Backbone = require('backbone');
 var ReactBackbone = require('react.backbone');
@@ -32725,7 +38174,7 @@ module.exports = Users;
 
 
 
-},{"./model":170,"backbone":1,"react":160,"react.backbone":5}],168:[function(require,module,exports){
+},{"./model":201,"backbone":1,"react":188,"react.backbone":33}],199:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require('react');
 var Backbone = require('backbone');
@@ -32780,7 +38229,7 @@ var UsersIndexScreen = React.createBackboneClass({
 });
 
 module.exports = UsersIndexScreen;
-},{"./user-block":172,"backbone":1,"react":160,"react.backbone":5}],169:[function(require,module,exports){
+},{"./user-block":203,"backbone":1,"react":188,"react.backbone":33}],200:[function(require,module,exports){
 //var BaseView = require('../base-view');
 var React = require('react');
 var Backbone = require('backbone');
@@ -32823,7 +38272,7 @@ var UsersIndexView = {
 };
 
 module.exports = UsersIndexView;
-},{"./collection":167,"./component":168,"./show/component":171,"backbone":1,"react":160,"react.backbone":5}],170:[function(require,module,exports){
+},{"./collection":198,"./component":199,"./show/component":202,"backbone":1,"react":188,"react.backbone":33}],201:[function(require,module,exports){
 var React = require('react');
 var Backbone = require('backbone');
 var ReactBackbone = require('react.backbone');
@@ -32847,7 +38296,7 @@ var User = Backbone.Model.extend({
   },*/
 
 module.exports = User;
-},{"backbone":1,"react":160,"react.backbone":5}],171:[function(require,module,exports){
+},{"backbone":1,"react":188,"react.backbone":33}],202:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require('react');
 var Backbone = require('backbone');
@@ -32916,7 +38365,7 @@ var UserShowScreen = React.createBackboneClass({
 });
 
 module.exports = UserShowScreen;
-},{"../collection":167,"backbone":1,"react":160,"react.backbone":5}],172:[function(require,module,exports){
+},{"../collection":198,"backbone":1,"react":188,"react.backbone":33}],203:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require('react');
 var Backbone = require('backbone');
@@ -32942,4 +38391,4 @@ var UserBlock = React.createBackboneClass({
 });
 
 module.exports = UserBlock;
-},{"backbone":1,"react":160,"react.backbone":5}]},{},[162,166]);
+},{"backbone":1,"react":188,"react.backbone":33}]},{},[190,197]);
