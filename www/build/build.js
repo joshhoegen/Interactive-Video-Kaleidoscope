@@ -37826,60 +37826,118 @@ var ReactCanvas = require('react-canvas');
 var Surface = ReactCanvas.Surface;
 var drawKaleidoscope = require('./modules/kaleidoscope');
 
-var Kscope = React.createBackboneClass({
+var kScope = [], canvasActive = 8,
+    app = {
+        listener: null,
+        newImage: function(src) {
+            return src;
+        },
+        prepPage: function (src) {
+            src = src || '';
+            var canvas,
+                CanvasKscope, image;
+            this.setState({
+                imgUrl: src
+            });
+            console.log(this);
+            //canvasAll = React.createElement("image", {}, canvasAll); //canvasAll.add(image);
+            //canvasAll = <canvas>{{CanvasKscope}}</canvas>;
+            for (i = 0; i < canvasActive; i++) {
+                //console.log('test');
+                CanvasKscope = document.getElementById('canvasCheck');
+                //canvasAll.add(CanvasKscope);
+                //console.log(CanvasKscope);
+                kScope[i] = {
+                    img: image,
+                    height: 500,
+                    width: 500,
+                    canvas: CanvasKscope,
+                    // ctx: CanvasKscope.getContext('2d'),
+                    imgLoaded: true
+                }
+            }
 
-    getInitialState: function () {
-        return {}
-    },
-    componentDidMount: function () {
-        //console.log(React.render(<this.canvasString id="canvasCheck" />, document.getElementById('container'), this.prepPage()));
-        //React.render(<this.canvasString />, document.getElementById('sckscope'));
-        this.prepPage();
-    },
+            //React.render(<ImageString scopeSize="500" src={src} />, document.getElementById('image-container'))
 
-    kScope: [], canvasActive: 8,
-    preVideo: React.createClass({displayName: "preVideo",
+            /* if (container.children().length) {
+             container.children().replaceWith(canvasAll);
+             } else {
+             container.html(canvasAll);
+             }*/
+
+            /*if (audioActive) {
+             addNewImages(src, scopeSize, canvasActive);
+             }
+             if (staticImg) {
+             images.attr('src', src);
+             setTimeout(function () {
+             move(189, 189);
+             }, 3000);
+
+             }
+             canvases = $('#sckscope canvas');
+             images = $('#sckscope img');*/
+        },
+    }
+    preVideo = React.createClass({displayName: "preVideo",
         render: function () {
             return (
                 React.createElement("video", {width: "0", height: "0", autoplay: true})
             );
         }
     }),
-    preImage: React.createClass({displayName: "preImage",
+    preImage = React.createClass({displayName: "preImage",
         render: function () {
             return (
-                React.createElement("img", {class: "vid-img", src: "/image/kaleidoscope.jpg", height: "500", width: "500"})
+                React.createElement("img", {className: "vid-img", src: "/image/kaleidoscope.jpg", height: "500", width: "500"})
             )
         }
     }),
-    preCanvas: React.createClass({displayName: "preCanvas",
+    preCanvas = React.createClass({displayName: "preCanvas",
         render: function () {
             return (
-                React.createElement("canvas", {class: "vid-canvas", height: "500", width: "500"})
+                React.createElement("canvas", {className: "vid-canvas", height: "500", width: "500"})
             );
         }
     }),
-    canvasString: React.createClass({displayName: "canvasString",
+    CanvasKscope = React.createClass({displayName: "CanvasKscope",
         render: function () {
             var specs = this.props;
             var size = specs.scopeSize;
             var src = specs.src;
             return (
                 React.createElement("canvas", {id: "canvasCheck", 
-                        class: "kaleidoscope", 
+                        className: "kaleidoscope", 
                         height: size, 
                         width: size})
             );
         }
     }),
-    imageString: React.createClass({displayName: "imageString",
+    InputString = React.createClass({displayName: "InputString",
+        newImage: function(e){
+            newImage(e.target.value);
+        },
+        componentWillMount: function() {
+            this.state.app.listener = this;
+        },
         render: function () {
+            return (
+                React.createElement("input", {onChange: this.newImage, 
+                       name: "fieldImg", 
+                       defaultValue: "https://scontent.cdninstagram.com/hphotos-xaf1/t51.2885-15/s640x640/sh0.08/e35/11363716_134653433554276_1743669472_n.jpg"}
+                    )
+            );
+        }
+    }),
+    ImageString = React.createClass({displayName: "ImageString",
+        render: function () {
+            console.log(this.props);
             //style="position: absolute; left: -9999px; margin: 0px; padding: 0px"
             var specs = this.props;
             var size = specs.scopeSize;
             var src = specs.src;
             return (
-                React.createElement("img", {class: "body-kscope img", 
+                React.createElement("img", {className: "body-kscope img", 
                      height: size, 
                      width: size, 
                      src: src, 
@@ -37887,58 +37945,35 @@ var Kscope = React.createBackboneClass({
             )
         }
     }),
-    prepPage: function (src) {
-        src = src || '';
-        var canvas,
-            canvasString, image;
-        //canvasAll = React.createElement("image", {}, canvasAll); //canvasAll.add(image);
-        //canvasAll = <canvas>{{canvasString}}</canvas>;
-        for (i = 0; i < this.canvasActive; i++) {
-             //console.log('test');
-             canvasString = document.getElementById('canvasCheck');
-             //canvasAll.add(canvasString);
-             //console.log(canvasString);
-             this.kScope[i] = {
-                 img: image,
-                 height: 500,
-                 width: 500,
-                 canvas: canvasString,
-                 ctx: canvasString.getContext('2d'),
-                 imgLoaded: true
-             }
+    Kscope = React.createBackboneClass({
+
+        getInitialState: function () {
+            return {
+                app: app
+            }
+        },
+        componentDidMount: function () {
+            //console.log(React.render(<this.CanvasKscope id="canvasCheck" />, document.getElementById('container'), this.prepPage()));
+            //React.render(<this.CanvasKscope />, document.getElementById('sckscope'));
+            this.prepPage();
+            console.log(this.state);
+        },
+        render: function () {
+            console.log(this.state.app);
+            var imgSrc = "https://scontent.cdninstagram.com/hphotos-xaf1/t51.2885-15/s640x640/sh0.08/e35/11363716_134653433554276_1743669472_n.jpg";
+            return (
+                React.createElement("div", {imgUrl: "test", 
+                     id: "sckscope"}, 
+                    "HEY", 
+                    React.createElement(InputString, {src: imgSrc}), 
+                    React.createElement("div", {id: "image-container"}, 
+                        React.createElement(ImageString, {scopeSize: "500", src: imgSrc})
+                    ), 
+                    React.createElement(CanvasKscope, {scopeSize: "500", src: imgSrc})
+                )
+            );
         }
-
-        React.render(React.createElement(this.imageString, {scopeSize: "500", src: "https://scontent.cdninstagram.com/hphotos-xaf1/t51.2885-15/s640x640/sh0.08/e35/11363716_134653433554276_1743669472_n.jpg"}), document.getElementById('image-container'))
-
-       /* if (container.children().length) {
-        container.children().replaceWith(canvasAll);
-        } else {
-        container.html(canvasAll);
-        }*/
-
-        /*if (audioActive) {
-         addNewImages(src, scopeSize, canvasActive);
-         }
-         if (staticImg) {
-         images.attr('src', src);
-         setTimeout(function () {
-         move(189, 189);
-         }, 3000);
-
-         }
-         canvases = $('#sckscope canvas');
-         images = $('#sckscope img');*/
-    },
-    render: function () {
-
-        return (
-            React.createElement("div", {id: "sckscope"}, 
-                React.createElement("div", {id: "image-container"}), 
-                React.createElement(this.canvasString, {scopeSize: "500", src: "https://scontent.cdninstagram.com/hphotos-xaf1/t51.2885-15/s640x640/sh0.08/e35/11363716_134653433554276_1743669472_n.jpg"})
-            )
-        );
-    }
-});
+    });
 
 module.exports = Kscope;
 
