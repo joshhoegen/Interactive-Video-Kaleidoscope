@@ -7,7 +7,7 @@ var Kscope = require('./component');
 
 var Scope = {
   init: function () {
-    React.render(<Kscope />, document.getElementById('container'));
+    React.render(<Kscope src="" />, document.getElementById('container'));
   }
 };
 

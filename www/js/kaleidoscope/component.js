@@ -3,40 +3,53 @@ var React = require('react');
 var Backbone = require('backbone');
 var ReactBackbone = require('react.backbone');
 var ReactCanvas = require('react-canvas');
+var $ = require('jquery');
 
 var Surface = ReactCanvas.Surface;
 var drawKaleidoscope = require('./modules/kaleidoscope');
 
-var kScope = [], canvasActive = 8,
-    app = {
+var app = {
+        kScope: [],
+        canvasActive: 1,
         listener: null,
-        newImage: function(src) {
-            return src;
+        scopeSize: 500,
+        img: '',
+        move: function (x, y) {
+            $.each(this.kScope, function (i) {
+                drawKaleidoscope(this.ctx, document.getElementById('canvasCheck'), x, y, this.scopeSize);
+                console.log(i + 'kScope[]');
+            });
         },
         prepPage: function (src) {
             src = src || '';
             var canvas,
-                CanvasKscope, image;
-            this.setState({
-                imgUrl: src
-            });
+                CanvasKscope = document.getElementById('canvasCheck');;
             console.log(this);
             //canvasAll = React.createElement("image", {}, canvasAll); //canvasAll.add(image);
             //canvasAll = <canvas>{{CanvasKscope}}</canvas>;
-            for (i = 0; i < canvasActive; i++) {
+            for (i = 0; i < this.canvasActive; i++) {
                 //console.log('test');
-                CanvasKscope = document.getElementById('canvasCheck');
                 //canvasAll.add(CanvasKscope);
                 //console.log(CanvasKscope);
-                kScope[i] = {
-                    img: image,
+                this.kScope[i] = {
+                    img: document.getElementById('preImg'),
                     height: 500,
                     width: 500,
                     canvas: CanvasKscope,
-                    // ctx: CanvasKscope.getContext('2d'),
+                    ctx: CanvasKscope.getContext('2d'),
                     imgLoaded: true
                 }
             }
+
+            this.move(50, 50);
+
+            console.log(ImageString);
+            //React.render(<listener.ImageString src={src} />, document.getElementById('image-container'), this.move(50, 50));
+
+
+
+            //this.listener.forceUpdate();
+            //console.log(this.listener);
 
             //React.render(<ImageString scopeSize="500" src={src} />, document.getElementById('image-container'))
 
@@ -94,22 +107,6 @@ var kScope = [], canvasActive = 8,
             );
         }
     }),
-    InputString = React.createClass({
-        newImage: function(e){
-            newImage(e.target.value);
-        },
-        componentWillMount: function() {
-            this.state.app.listener = this;
-        },
-        render: function () {
-            return (
-                <input onChange={this.newImage}
-                       name="fieldImg"
-                       defaultValue="https://scontent.cdninstagram.com/hphotos-xaf1/t51.2885-15/s640x640/sh0.08/e35/11363716_134653433554276_1743669472_n.jpg"
-                    />
-            );
-        }
-    }),
     ImageString = React.createClass({
         render: function () {
             console.log(this.props);
@@ -118,7 +115,8 @@ var kScope = [], canvasActive = 8,
             var size = specs.scopeSize;
             var src = specs.src;
             return (
-                <img className="body-kscope img"
+                <img id="preImg"
+                     className="body-kscope img"
                      height={size}
                      width={size}
                      src={src}
@@ -127,7 +125,14 @@ var kScope = [], canvasActive = 8,
         }
     }),
     Kscope = React.createBackboneClass({
-
+        newImage: function(e){
+            this.props.src = e.target.value;
+            this.state.app.prepPage(this.props.src);
+            console.log(this.props.canvas);
+        },
+        componentWillMount: function() {
+            this.state.app.listener = this;
+        },
         getInitialState: function () {
             return {
                 app: app
@@ -136,17 +141,19 @@ var kScope = [], canvasActive = 8,
         componentDidMount: function () {
             //console.log(React.render(<this.CanvasKscope id="canvasCheck" />, document.getElementById('container'), this.prepPage()));
             //React.render(<this.CanvasKscope />, document.getElementById('sckscope'));
-            this.prepPage();
             console.log(this.state);
         },
         render: function () {
             console.log(this.state.app);
-            var imgSrc = "https://scontent.cdninstagram.com/hphotos-xaf1/t51.2885-15/s640x640/sh0.08/e35/11363716_134653433554276_1743669472_n.jpg";
+            var imgSrc = this.props.src || "https://scontent.cdninstagram.com/hphotos-xaf1/t51.2885-15/s640x640/sh0.08/e35/11363716_134653433554276_1743669472_n.jpg";
             return (
                 <div imgUrl="test"
                      id="sckscope">
                     HEY
-                    <InputString src={imgSrc} />
+                    <input onChange={this.newImage}
+                           name="fieldImg"
+                           defaultValue="https://scontent.cdninstagram.com/hphotos-xaf1/t51.2885-15/s640x640/sh0.08/e35/11363716_134653433554276_1743669472_n.jpg"
+                        />
                     <div id="image-container">
                         <ImageString scopeSize="500" src={imgSrc} />
                     </div>

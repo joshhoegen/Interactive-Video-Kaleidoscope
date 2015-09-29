@@ -93,10 +93,16 @@ var drawKaleidoscope = function (ctx, img, imgX, imgY, mask) {
         bufferContext.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
         bufferContext.restore();
         ctx.drawImage(bufferCanvas, 0, 0);
+        console.log(ctx);
     } catch (err) {
-        $('#currentImage').remove();
+       /* $('#currentImage').remove();
         img = '';
-        $('#loadingContainer').show();
+        $('#loadingContainer').show();*/
+        console.log(ctx);
+        console.log(img);
+        console.log(imgX);
+        console.log(imgY);
+        console.log(mask);
         bufferContext.clearRect(0, 0, 300, 300);
     }
 }

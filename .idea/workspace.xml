@@ -4,6 +4,8 @@
     <list default="true" id="35e92ec0-dfbd-4c26-8891-8f4d853783eb" name="Default" comment="">
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/www/build/build.js" afterPath="$PROJECT_DIR$/www/build/build.js" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/www/js/kaleidoscope/component.js" afterPath="$PROJECT_DIR$/www/js/kaleidoscope/component.js" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/www/js/kaleidoscope/index.js" afterPath="$PROJECT_DIR$/www/js/kaleidoscope/index.js" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/www/js/kaleidoscope/modules/kaleidoscope.js" afterPath="$PROJECT_DIR$/www/js/kaleidoscope/modules/kaleidoscope.js" />
     </list>
     <ignored path="uscope_backbone-react.iws" />
     <ignored path=".idea/workspace.xml" />
@@ -27,8 +29,8 @@
       <file leaf-file-name="component.js" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/www/js/kaleidoscope/component.js">
           <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="0.7475456">
-              <caret line="148" column="44" selection-start-line="148" selection-start-column="44" selection-end-line="148" selection-end-column="44" />
+            <state vertical-scroll-proportion="0.69970846">
+              <caret line="38" column="37" selection-start-line="38" selection-start-column="25" selection-end-line="38" selection-end-column="37" />
               <folding />
             </state>
           </provider>
@@ -38,7 +40,17 @@
         <entry file="file://$PROJECT_DIR$/www/js/kaleidoscope/index.js">
           <provider selected="true" editor-type-id="text-editor">
             <state vertical-scroll-proportion="-5.0">
-              <caret line="9" column="24" selection-start-line="9" selection-start-column="24" selection-end-line="9" selection-end-column="24" />
+              <caret line="9" column="30" selection-start-line="9" selection-start-column="30" selection-end-line="9" selection-end-column="30" />
+              <folding />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="kaleidoscope.js" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/www/js/kaleidoscope/modules/kaleidoscope.js">
+          <provider selected="true" editor-type-id="text-editor">
+            <state vertical-scroll-proportion="0.0">
+              <caret line="95" column="23" selection-start-line="95" selection-start-column="23" selection-end-line="95" selection-end-column="23" />
               <folding />
             </state>
           </provider>
@@ -69,17 +81,10 @@
           <provider selected="true" editor-type-id="text-editor">
             <state vertical-scroll-proportion="0.0">
               <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-              <folding />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="main.js" pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/www/js/main.js">
-          <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="0.0">
-              <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-              <folding />
+              <folding>
+                <marker date="1442937637000" expanded="true" signature="442:635" placeholder="&lt;xml/&gt;" />
+                <marker date="1442937637000" expanded="true" signature="493:622" placeholder="&lt;xml/&gt;" />
+              </folding>
             </state>
           </provider>
         </entry>
@@ -87,8 +92,18 @@
       <file leaf-file-name="main.js" pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/../../sc-kscope/sc-kscope/js/main.js">
           <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="-9.611111">
-              <caret line="117" column="10" selection-start-line="100" selection-start-column="8" selection-end-line="117" selection-end-column="10" />
+            <state vertical-scroll-proportion="-5.1666665">
+              <caret line="335" column="17" selection-start-line="335" selection-start-column="17" selection-end-line="335" selection-end-column="17" />
+              <folding />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="kaleidoscope.js" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/../../sc-kscope/sc-kscope/js/kaleidoscope.js">
+          <provider selected="true" editor-type-id="text-editor">
+            <state vertical-scroll-proportion="-17.074074">
+              <caret line="93" column="43" selection-start-line="93" selection-start-column="43" selection-end-line="93" selection-end-column="43" />
               <folding />
             </state>
           </provider>
@@ -102,10 +117,11 @@
   <component name="IdeDocumentHistory">
     <option name="CHANGED_PATHS">
       <list>
-        <option value="$PROJECT_DIR$/www/js/kaleidoscope/modules/kaleidoscope.js" />
-        <option value="$PROJECT_DIR$/www/js/kaleidoscope/index.js" />
         <option value="$PROJECT_DIR$/package.json" />
+        <option value="$PROJECT_DIR$/www/js/kaleidoscope/index.js" />
         <option value="$PROJECT_DIR$/www/js/kaleidoscope/component.js" />
+        <option value="$PROJECT_DIR$/www/js/kaleidoscope/modules/kaleidoscope.js" />
+        <option value="$PROJECT_DIR$/../../sc-kscope/sc-kscope/js/kaleidoscope.js" />
       </list>
     </option>
   </component>
@@ -365,42 +381,10 @@
     <watches-manager />
   </component>
   <component name="editorHistoryManager">
-    <entry file="file://$PROJECT_DIR$/www/js/kaleidoscope/modules/kaleidoscope.js">
-      <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.12622721">
-          <caret line="6" column="27" selection-start-line="6" selection-start-column="27" selection-end-line="6" selection-end-column="27" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/package.json">
       <provider selected="true" editor-type-id="text-editor">
         <state vertical-scroll-proportion="-15.625">
           <caret line="25" column="23" selection-start-line="25" selection-start-column="23" selection-end-line="25" selection-end-column="23" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/www/js/users/user-block.js">
-      <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0">
-          <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/../../sc-kscope/sc-kscope/js/main.js">
-      <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="-9.611111">
-          <caret line="117" column="10" selection-start-line="100" selection-start-column="8" selection-end-line="117" selection-end-column="10" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/www/js/users/component.js">
-      <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.0">
-          <caret line="35" column="35" selection-start-line="35" selection-start-column="30" selection-end-line="35" selection-end-column="35" />
           <folding />
         </state>
       </provider>
@@ -413,6 +397,14 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/www/js/users/component.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state vertical-scroll-proportion="0.0">
+          <caret line="35" column="35" selection-start-line="35" selection-start-column="30" selection-end-line="35" selection-end-column="35" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/www/js/users/index.js">
       <provider selected="true" editor-type-id="text-editor">
         <state vertical-scroll-proportion="0.0">
@@ -421,18 +413,53 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/www/js/users/user-block.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state vertical-scroll-proportion="0.0">
+          <caret line="0" column="0" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
+          <folding>
+            <marker date="1442937637000" expanded="true" signature="442:635" placeholder="&lt;xml/&gt;" />
+            <marker date="1442937637000" expanded="true" signature="493:622" placeholder="&lt;xml/&gt;" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/www/js/kaleidoscope/index.js">
       <provider selected="true" editor-type-id="text-editor">
         <state vertical-scroll-proportion="-5.0">
-          <caret line="9" column="24" selection-start-line="9" selection-start-column="24" selection-end-line="9" selection-end-column="24" />
+          <caret line="9" column="30" selection-start-line="9" selection-start-column="30" selection-end-line="9" selection-end-column="30" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/www/js/kaleidoscope/modules/kaleidoscope.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state vertical-scroll-proportion="0.0">
+          <caret line="95" column="23" selection-start-line="95" selection-start-column="23" selection-end-line="95" selection-end-column="23" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/../../sc-kscope/sc-kscope/js/main.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state vertical-scroll-proportion="-5.1666665">
+          <caret line="335" column="17" selection-start-line="335" selection-start-column="17" selection-end-line="335" selection-end-column="17" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/../../sc-kscope/sc-kscope/js/kaleidoscope.js">
+      <provider selected="true" editor-type-id="text-editor">
+        <state vertical-scroll-proportion="-17.074074">
+          <caret line="93" column="43" selection-start-line="93" selection-start-column="43" selection-end-line="93" selection-end-column="43" />
           <folding />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/www/js/kaleidoscope/component.js">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="0.7475456">
-          <caret line="148" column="44" selection-start-line="148" selection-start-column="44" selection-end-line="148" selection-end-column="44" />
+        <state vertical-scroll-proportion="0.69970846">
+          <caret line="38" column="37" selection-start-line="38" selection-start-column="25" selection-end-line="38" selection-end-column="37" />
           <folding />
         </state>
       </provider>
