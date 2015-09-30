@@ -57,7 +57,7 @@ var drawKaleidoscope = function (ctx, img, imgX, imgY, mask) {
         bufferContext.translate(c, c);
         bufferContext.scale(-1, -1);
         bufferContext.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
-        ctx.drawImage(bufferCanvas, 0, 0);
+        //ctx.drawImage(bufferCanvas, 0, 0);
         bufferContext.restore();
         //4 6
         bufferContext.save();
@@ -92,8 +92,15 @@ var drawKaleidoscope = function (ctx, img, imgX, imgY, mask) {
         bufferContext.scale(-1, 1);
         bufferContext.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
         bufferContext.restore();
-        ctx.drawImage(bufferCanvas, 0, 0);
-        console.log(ctx);
+
+        //ctx.drawImage(bufferCanvas, 0, 0);
+
+        console.log('dk');
+
+        //document.getElementById('static-canvas').getContext('2d').drawImage(bufferCanvas, 0, 0);
+
+        return bufferCanvas;
+
     } catch (err) {
        /* $('#currentImage').remove();
         img = '';
