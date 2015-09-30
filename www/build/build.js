@@ -37831,12 +37831,12 @@ var app = {
         kScope: [],
         canvasActive: 1,
         listener: null,
-        scopeSize: 500,
+        scopeSize: 1000,
         img: '',
         move: function (x, y) {
             $.each(this.kScope, function (i) {
                 console.log('app.move');
-                var img = drawKaleidoscope(document.getElementById('canvasCheck').getContext('2d'), document.getElementById('preImg'), x, y, 500);
+                var img = drawKaleidoscope(document.getElementById('canvasCheck').getContext('2d'), document.getElementById('preImg'), x, y, 1000);
                 document.getElementById('canvasCheck').getContext('2d').drawImage(img, 0, 0);
             });
         },
@@ -37848,8 +37848,8 @@ var app = {
             for (i = 0; i < this.canvasActive; i++) {
                 this.kScope[i] = {
                     img: document.getElementById('preImg'),
-                    height: 500,
-                    width: 500,
+                    height: 1000,
+                    width: 1000,
                     canvas: CanvasKscope,
                     ctx: CanvasKscope.getContext('2d'),
                     imgLoaded: true
@@ -37885,12 +37885,11 @@ var app = {
             return (
                 React.createElement("div", {imgUrl: "test", 
                      id: "sckscope"}, 
-                    "HEY", 
                     React.createElement(Widget, {scopeSize: this.state.app.scopeSize, 
                             src: this.state.src, 
                             update: this.update, 
                             move: this.move}), 
-                    React.createElement(CanvasKscope, {scopeSize: "500", src: this.state.src})
+                    React.createElement(CanvasKscope, {scopeSize: "1000", src: this.state.src})
                 )
             );
         }
@@ -37933,7 +37932,7 @@ var app = {
                            name: "fieldImg", 
                            defaultValue: ""}
                         ), 
-                    "Move: ", React.createElement("input", {type: "range", min: "0", max: "500", name: "y-range", onChange: this.props.move, 
+                    "Move: ", React.createElement("input", {type: "range", min: "0", max: "1000", name: "y-range", onChange: this.props.move, 
                                  className: "static-range"}), 
 
                     React.createElement("div", {id: "image-container"}, 
