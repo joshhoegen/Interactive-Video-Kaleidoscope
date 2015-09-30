@@ -37817,6 +37817,102 @@ module.exports =  React.createClass({displayName: "exports",
 })
 
 },{"./Element":192,"backbone":1,"react":188,"react.backbone":33}],194:[function(require,module,exports){
+var $ = require('jquery');
+var drawKaleidoscope = require('./modules/kaleidoscope');
+
+var app = {
+    kScope: [],
+    canvasActive: 1,
+    listener: null,
+    scopeSize: 1000,
+    img: '',
+    move: function (x, y) {
+        $.each(this.kScope, function (i) {
+            console.log('app.move');
+            var img = drawKaleidoscope(document.getElementById('canvasCheck').getContext('2d'), document.getElementById('preImg'), x, y, 1000);
+            document.getElementById('canvasCheck').getContext('2d').drawImage(img, 0, 0);
+        });
+    },
+    prepPage: function (src) {
+        src = src || '';
+        var canvas,
+            CanvasKscope = document.getElementById('canvasCheck');
+        console.log('app.prepPage');
+        for (i = 0; i < this.canvasActive; i++) {
+            this.kScope[i] = {
+                img: document.getElementById('preImg'),
+                height: 1000,
+                width: 1000,
+                canvas: CanvasKscope,
+                ctx: CanvasKscope.getContext('2d'),
+                imgLoaded: true
+            }
+        }
+
+        this.move(50, 50);
+    },
+    prepVideo: function () {
+        window.URL = window.URL || window.webkitURL;
+        navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia ||
+            navigator.mozGetUserMedia || navigator.msGetUserMedia;
+        limit = 420;
+        var preImage = document.createElement('img'); //$('<img class="vid-img" src="/image/kaleidoscope.jpg" height="500" width="500" />'),
+            preCanvas = document.getElementById('preCanvas')//document.getElementById('canvasCheck'); //$('<canvas class="vid-canvas" height="500" width="500"></canvas>');
+        var ctx = preCanvas.getContext('2d');
+        if (navigator.getUserMedia) {
+            navigator.getUserMedia({
+                video: true,
+                audio: true
+            }, function (mediaStream) {
+                //console.log(mediaStream);
+                var video = document.getElementById('video');
+
+                console.log('app.prepVideo');
+                console.log(video);
+
+                video.src = window.URL.createObjectURL(mediaStream);
+                //audioActive = video.src;
+
+                /*audioCache[audioActive] = {
+                 image: preImage.attr('src')
+                 }*/
+                //container.show();
+                app.snapshot(video, document.getElementById('preCanvas'), ctx, mediaStream);
+
+                //vac[audioActive] = new VisualAudioContext(context, audioActive, mediaStream);
+                //visualizeAudio(audioActive);
+                // Note: onloadedmetadata doesn't fire in Chrome when using it with getUserMedia.
+                // See crbug.com/110938.
+                video.onloadedmetadata = function (e) {
+                    console.log('videLoaded');
+                };
+            }, function (error) {
+                console.log('Failed' + error);
+            });
+        } else {
+            console.log('failed getUserMedia(). :( ');
+            //video.src = 'somevideo.webm'; // fallback.
+        }
+
+    },
+    snapshot: function (video, preCanvas, ctx, stream) {
+        var img = preCanvas.toDataURL('image/webp');
+        document.getElementById('preImg');
+        document.getElementById('preImg').setAttribute('src', img);
+        console.log('app.snapshot');
+        console.log(img);
+        ctx.drawImage(video, 0, 0, 1000, 1000);
+        //addNewImages(img, scopeSize, canvasActive);
+        this.prepPage(img);
+        setTimeout(function () {
+            app.snapshot(video, preCanvas, ctx, stream);
+        }, 10);
+    }
+};
+
+module.exports = app;
+
+},{"./modules/kaleidoscope":197,"jquery":4}],195:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require('react');
 var Backbone = require('backbone');
@@ -37825,41 +37921,11 @@ var ReactCanvas = require('react-canvas');
 var $ = require('jquery');
 
 var Surface = ReactCanvas.Surface;
-var drawKaleidoscope = require('./modules/kaleidoscope');
 
-var app = {
-        kScope: [],
-        canvasActive: 1,
-        listener: null,
-        scopeSize: 1000,
-        img: '',
-        move: function (x, y) {
-            $.each(this.kScope, function (i) {
-                console.log('app.move');
-                var img = drawKaleidoscope(document.getElementById('canvasCheck').getContext('2d'), document.getElementById('preImg'), x, y, 1000);
-                document.getElementById('canvasCheck').getContext('2d').drawImage(img, 0, 0);
-            });
-        },
-        prepPage: function (src) {
-            src = src || '';
-            var canvas,
-                CanvasKscope = document.getElementById('canvasCheck');
-            console.log('app.prepPage');
-            for (i = 0; i < this.canvasActive; i++) {
-                this.kScope[i] = {
-                    img: document.getElementById('preImg'),
-                    height: 1000,
-                    width: 1000,
-                    canvas: CanvasKscope,
-                    ctx: CanvasKscope.getContext('2d'),
-                    imgLoaded: true
-                }
-            }
+var app = require('./app');
 
-            this.move(50, 50);
-        },
-    },
-    Kscope = React.createBackboneClass({
+
+var Kscope = React.createBackboneClass({
         update: function (e) {
             var src = e.target.value;
             this.setState({
@@ -37922,7 +37988,14 @@ var app = {
     Widget = React.createClass({displayName: "Widget",
         render: function () {
             console.log('widget');
-            //style="position: absolute; left: -9999px; margin: 0px; padding: 0px"
+            /*position: 'absolute',
+             left: '-9999px',
+             margin: '0px',
+             padding: '0px'*/
+            var style = {
+                    float: 'left',
+                    marginRight: '10px'
+                };
             var specs = this.props;
             var size = specs.scopeSize;
             var src = specs.src;
@@ -37941,6 +38014,7 @@ var app = {
                              height: 250, 
                              width: 250, 
                              src: src, 
+                             style: style, 
                              alt: "kaleidoscope"})
                     )
                 )
@@ -37950,7 +38024,7 @@ var app = {
 
 module.exports = Kscope;
 
-},{"./modules/kaleidoscope":196,"backbone":1,"jquery":4,"react":188,"react-canvas":21,"react.backbone":33}],195:[function(require,module,exports){
+},{"./app":194,"backbone":1,"jquery":4,"react":188,"react-canvas":21,"react.backbone":33}],196:[function(require,module,exports){
 var React = require('react');
 var Backbone = require('backbone');
 var ReactBackbone = require('react.backbone');
@@ -37965,9 +38039,14 @@ var Scope = {
 };
 
 module.exports = Scope;
-},{"../base-view":190,"./component":194,"backbone":1,"react":188,"react.backbone":33}],196:[function(require,module,exports){
+},{"../base-view":190,"./component":195,"backbone":1,"react":188,"react.backbone":33}],197:[function(require,module,exports){
 var drawKaleidoscope = function (ctx, img, imgX, imgY, mask) {
     try {
+        console.log(ctx);
+        console.log(img);
+        console.log(imgX);
+        console.log(imgY);
+        console.log(mask);
         var maskSide = !mask ? 300 : mask;
         var sqSide = maskSide / 2;
         var sqDiag = Math.sqrt(2 * sqSide * sqSide);
@@ -38025,7 +38104,7 @@ var drawKaleidoscope = function (ctx, img, imgX, imgY, mask) {
         bufferContext.translate(c, c);
         bufferContext.scale(-1, -1);
         bufferContext.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
-        //ctx.drawImage(bufferCanvas, 0, 0);
+        ctx.drawImage(bufferCanvas, 0, 0);
         bufferContext.restore();
         //4 6
         bufferContext.save();
@@ -38084,7 +38163,79 @@ var drawKaleidoscope = function (ctx, img, imgX, imgY, mask) {
 
 module.exports = drawKaleidoscope;
 
-},{}],197:[function(require,module,exports){
+},{}],198:[function(require,module,exports){
+/** @jsx React.DOM */
+var React = require('react');
+var Backbone = require('backbone');
+var ReactBackbone = require('react.backbone');
+var ReactCanvas = require('react-canvas');
+
+var app = require('../app');
+
+var Surface = ReactCanvas.Surface;
+//var drawKaleidoscope = require('./modules/kaleidoscope');
+var Kscope = require('../component');
+
+var KscopeVideo = React.createBackboneClass({
+    update: function (e) {
+        var src = e.target.value;
+        this.setState({
+            src: src
+        });
+        //this.state.app.prepPage(src);
+    },
+    move: function (e) {
+        this.state.app.move(e.target.value, e.target.value);
+    },
+    componentWillMount: function () {
+        this.state.app.listener = this;
+    },
+    componentDidMount: function () {
+        console.log('Video Did Mount');
+        this.state.app.prepVideo();
+    },
+    componentDidUpdate: function () {
+        //this.state.app.prepVideo();
+        console.log('Video Did Update');
+        //console.log(this.props.src);
+    },
+    getInitialState: function () {
+        return {
+            app: app,
+            src: ""
+        }
+    },
+    render: function () {
+        console.log('kscope');
+        var imgSrc = this.props.src;
+        return (
+            React.createElement("div", {imgUrl: "test", 
+                 id: "sckscopeVideo"}, 
+                React.createElement(Kscope, {src: ""}), 
+                React.createElement("canvas", {id: "preCanvas", width: "500", height: "500", scopeSize: "1000", src: this.state.src}), 
+                React.createElement("video", {id: "video", autoplay: "true"})
+            )
+        );
+    }
+});
+
+module.exports = KscopeVideo;
+},{"../app":194,"../component":195,"backbone":1,"react":188,"react-canvas":21,"react.backbone":33}],199:[function(require,module,exports){
+var React = require('react');
+var Backbone = require('backbone');
+var ReactBackbone = require('react.backbone');
+
+//var BaseView = require('../../base-view');
+var KscopeVideo = require('./component');
+
+var Scope = {
+    init: function () {
+        React.render(React.createElement(KscopeVideo, {src: ""}), document.getElementById('container'));
+    }
+};
+
+module.exports = Scope;
+},{"./component":198,"backbone":1,"react":188,"react.backbone":33}],200:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require('react');
 var Backbone = require('backbone');
@@ -38097,10 +38248,15 @@ var UsersIndexScreen = require('./users/component');
             "": "index",
             "users": "users",
             "users/:id": "user",
-            "kscope": "kscope"
+            "kscope": "kscope",
+            "kscope/video": "kscopeVideo"
         },
         kscope: function() {
             var Kscope = require('./kaleidoscope');
+            Kscope.init();
+        },
+        kscopeVideo: function() {
+            var Kscope = require('./kaleidoscope/video');
             Kscope.init();
         },
         users: function() {
@@ -38121,7 +38277,7 @@ var UsersIndexScreen = require('./users/component');
     new app;
     Backbone.history.start();
 })()
-},{"./collections/movies":191,"./component/List":193,"./kaleidoscope":195,"./users":200,"./users/component":199,"backbone":1,"react":188,"react.backbone":33}],198:[function(require,module,exports){
+},{"./collections/movies":191,"./component/List":193,"./kaleidoscope":196,"./kaleidoscope/video":199,"./users":203,"./users/component":202,"backbone":1,"react":188,"react.backbone":33}],201:[function(require,module,exports){
 var React = require('react');
 var Backbone = require('backbone');
 var ReactBackbone = require('react.backbone');
@@ -38137,7 +38293,7 @@ module.exports = Users;
 
 
 
-},{"./model":201,"backbone":1,"react":188,"react.backbone":33}],199:[function(require,module,exports){
+},{"./model":204,"backbone":1,"react":188,"react.backbone":33}],202:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require('react');
 var Backbone = require('backbone');
@@ -38192,7 +38348,7 @@ var UsersIndexScreen = React.createBackboneClass({
 });
 
 module.exports = UsersIndexScreen;
-},{"./user-block":203,"backbone":1,"react":188,"react.backbone":33}],200:[function(require,module,exports){
+},{"./user-block":206,"backbone":1,"react":188,"react.backbone":33}],203:[function(require,module,exports){
 //var BaseView = require('../base-view');
 var React = require('react');
 var Backbone = require('backbone');
@@ -38235,7 +38391,7 @@ var UsersIndexView = {
 };
 
 module.exports = UsersIndexView;
-},{"./collection":198,"./component":199,"./show/component":202,"backbone":1,"react":188,"react.backbone":33}],201:[function(require,module,exports){
+},{"./collection":201,"./component":202,"./show/component":205,"backbone":1,"react":188,"react.backbone":33}],204:[function(require,module,exports){
 var React = require('react');
 var Backbone = require('backbone');
 var ReactBackbone = require('react.backbone');
@@ -38259,7 +38415,7 @@ var User = Backbone.Model.extend({
   },*/
 
 module.exports = User;
-},{"backbone":1,"react":188,"react.backbone":33}],202:[function(require,module,exports){
+},{"backbone":1,"react":188,"react.backbone":33}],205:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require('react');
 var Backbone = require('backbone');
@@ -38328,7 +38484,7 @@ var UserShowScreen = React.createBackboneClass({
 });
 
 module.exports = UserShowScreen;
-},{"../collection":198,"backbone":1,"react":188,"react.backbone":33}],203:[function(require,module,exports){
+},{"../collection":201,"backbone":1,"react":188,"react.backbone":33}],206:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require('react');
 var Backbone = require('backbone');
@@ -38354,4 +38510,4 @@ var UserBlock = React.createBackboneClass({
 });
 
 module.exports = UserBlock;
-},{"backbone":1,"react":188,"react.backbone":33}]},{},[190,197]);
+},{"backbone":1,"react":188,"react.backbone":33}]},{},[190,200]);

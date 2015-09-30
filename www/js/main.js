@@ -10,10 +10,15 @@ var UsersIndexScreen = require('./users/component');
             "": "index",
             "users": "users",
             "users/:id": "user",
-            "kscope": "kscope"
+            "kscope": "kscope",
+            "kscope/video": "kscopeVideo"
         },
         kscope: function() {
             var Kscope = require('./kaleidoscope');
+            Kscope.init();
+        },
+        kscopeVideo: function() {
+            var Kscope = require('./kaleidoscope/video');
             Kscope.init();
         },
         users: function() {

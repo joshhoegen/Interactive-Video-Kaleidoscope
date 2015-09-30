@@ -1,5 +1,10 @@
 var drawKaleidoscope = function (ctx, img, imgX, imgY, mask) {
     try {
+        console.log(ctx);
+        console.log(img);
+        console.log(imgX);
+        console.log(imgY);
+        console.log(mask);
         var maskSide = !mask ? 300 : mask;
         var sqSide = maskSide / 2;
         var sqDiag = Math.sqrt(2 * sqSide * sqSide);
@@ -57,7 +62,7 @@ var drawKaleidoscope = function (ctx, img, imgX, imgY, mask) {
         bufferContext.translate(c, c);
         bufferContext.scale(-1, -1);
         bufferContext.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
-        //ctx.drawImage(bufferCanvas, 0, 0);
+        ctx.drawImage(bufferCanvas, 0, 0);
         bufferContext.restore();
         //4 6
         bufferContext.save();

@@ -6,41 +6,11 @@ var ReactCanvas = require('react-canvas');
 var $ = require('jquery');
 
 var Surface = ReactCanvas.Surface;
-var drawKaleidoscope = require('./modules/kaleidoscope');
 
-var app = {
-        kScope: [],
-        canvasActive: 1,
-        listener: null,
-        scopeSize: 1000,
-        img: '',
-        move: function (x, y) {
-            $.each(this.kScope, function (i) {
-                console.log('app.move');
-                var img = drawKaleidoscope(document.getElementById('canvasCheck').getContext('2d'), document.getElementById('preImg'), x, y, 1000);
-                document.getElementById('canvasCheck').getContext('2d').drawImage(img, 0, 0);
-            });
-        },
-        prepPage: function (src) {
-            src = src || '';
-            var canvas,
-                CanvasKscope = document.getElementById('canvasCheck');
-            console.log('app.prepPage');
-            for (i = 0; i < this.canvasActive; i++) {
-                this.kScope[i] = {
-                    img: document.getElementById('preImg'),
-                    height: 1000,
-                    width: 1000,
-                    canvas: CanvasKscope,
-                    ctx: CanvasKscope.getContext('2d'),
-                    imgLoaded: true
-                }
-            }
+var app = require('./app');
 
-            this.move(50, 50);
-        },
-    },
-    Kscope = React.createBackboneClass({
+
+var Kscope = React.createBackboneClass({
         update: function (e) {
             var src = e.target.value;
             this.setState({
@@ -103,7 +73,14 @@ var app = {
     Widget = React.createClass({
         render: function () {
             console.log('widget');
-            //style="position: absolute; left: -9999px; margin: 0px; padding: 0px"
+            /*position: 'absolute',
+             left: '-9999px',
+             margin: '0px',
+             padding: '0px'*/
+            var style = {
+                    float: 'left',
+                    marginRight: '10px'
+                };
             var specs = this.props;
             var size = specs.scopeSize;
             var src = specs.src;
@@ -122,6 +99,7 @@ var app = {
                              height={250}
                              width={250}
                              src={src}
+                             style={style}
                              alt="kaleidoscope"/>
                     </div>
                 </div>
