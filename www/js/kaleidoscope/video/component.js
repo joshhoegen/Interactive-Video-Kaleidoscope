@@ -46,7 +46,7 @@ var KscopeVideo = React.createBackboneClass({
             <div imgUrl="test"
                  id="sckscopeVideo">
                 <Kscope src=""/>
-                <canvas id="preCanvas" width="500" height="500" scopeSize="1000" src={this.state.src}/>
+                <canvas id="preCanvas" width="500" height="500" scopeSize="500" src={this.state.src}/>
                 <video id="video" autoplay="true" />
             </div>
         );

@@ -24,6 +24,10 @@ var Kscope = React.createBackboneClass({
         componentWillMount: function () {
             this.state.app.listener = this;
         },
+        componentDidMount: function () {
+            this.state.app.move(0, 0);
+            //console.log(this.state.app);
+        },
         getInitialState: function () {
             return {
                 app: app,
@@ -32,7 +36,7 @@ var Kscope = React.createBackboneClass({
         },
         render: function () {
             console.log('kscope');
-            var imgSrc = this.props.src || "https://scontent.cdninstagram.com/hphotos-xaf1/t51.2885-15/s640x640/sh0.08/e35/11363716_134653433554276_1743669472_n.jpg";
+            var imgSrc = this.state.src;
             return (
                 <div imgUrl="test"
                      id="sckscope">
@@ -40,7 +44,7 @@ var Kscope = React.createBackboneClass({
                             src={this.state.src}
                             update={this.update}
                             move={this.move}/>
-                    <CanvasKscope scopeSize="1000" src={this.state.src}/>
+                    <CanvasKscope scopeSize="500" src={this.state.src}/>
                 </div>
             );
         }
@@ -52,8 +56,12 @@ var Kscope = React.createBackboneClass({
                 src: this.props.src
             }
         },
+        componentDidMount: function () {
+            this.state.app.prepPage(this.props.src);
+        },
         componentDidUpdate: function () {
             this.state.app.prepPage(this.props.src);
+
             console.log('Canvas Did Update');
             console.log(this.props.src);
         },
@@ -90,8 +98,8 @@ var Kscope = React.createBackboneClass({
                            name="fieldImg"
                            defaultValue=""
                         />
-                    Move: <input type="range" min="0" max="1000" name="y-range" onChange={this.props.move}
-                                 className="static-range"/>
+                    Move: <input type="range" min="0" max="500" name="y-range" onChange={this.props.move}
+                                 className="static-range" defaultValue={this.props.src} />
 
                     <div id="image-container">
                         <img id="preImg"

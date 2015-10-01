@@ -5,32 +5,33 @@ var app = {
     kScope: [],
     canvasActive: 1,
     listener: null,
-    scopeSize: 1000,
+    scopeSize: 500,
     img: '',
+    coords: [0, 0],
     move: function (x, y) {
         $.each(this.kScope, function (i) {
-            console.log('app.move');
-            var img = drawKaleidoscope(document.getElementById('canvasCheck').getContext('2d'), document.getElementById('preImg'), x, y, 1000);
+            var img = drawKaleidoscope(document.getElementById('canvasCheck').getContext('2d'), document.getElementById('preImg'), x, y, 500);
             document.getElementById('canvasCheck').getContext('2d').drawImage(img, 0, 0);
         });
+        this.coords = [x, y];
+        console.log(this.kScope);
     },
     prepPage: function (src) {
         src = src || '';
         var canvas,
             CanvasKscope = document.getElementById('canvasCheck');
-        console.log('app.prepPage');
         for (i = 0; i < this.canvasActive; i++) {
             this.kScope[i] = {
                 img: document.getElementById('preImg'),
-                height: 1000,
-                width: 1000,
+                height: 500,
+                width: 500,
                 canvas: CanvasKscope,
                 ctx: CanvasKscope.getContext('2d'),
                 imgLoaded: true
             }
         }
 
-        this.move(50, 50);
+        this.move(this.coords[0], this.coords[1]);
     },
     prepVideo: function () {
         window.URL = window.URL || window.webkitURL;
@@ -52,6 +53,7 @@ var app = {
                 console.log(video);
 
                 video.src = window.URL.createObjectURL(mediaStream);
+                video.autoplay = true;
                 //audioActive = video.src;
 
                 /*audioCache[audioActive] = {
@@ -77,13 +79,11 @@ var app = {
 
     },
     snapshot: function (video, preCanvas, ctx, stream) {
-        var img = preCanvas.toDataURL('image/webp');
-        document.getElementById('preImg');
-        document.getElementById('preImg').setAttribute('src', img);
-        console.log('app.snapshot');
-        console.log(img);
-        ctx.drawImage(video, 0, 0, 1000, 1000);
-        //addNewImages(img, scopeSize, canvasActive);
+        var img = preCanvas.toDataURL('image/webp'),
+            preImg = document.getElementById('preImg');
+
+        preImg.setAttribute('src', img);
+        ctx.drawImage(video, 0, 0, 500, 500);
         this.prepPage(img);
         setTimeout(function () {
             app.snapshot(video, preCanvas, ctx, stream);

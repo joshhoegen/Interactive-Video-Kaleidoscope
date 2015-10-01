@@ -37824,32 +37824,33 @@ var app = {
     kScope: [],
     canvasActive: 1,
     listener: null,
-    scopeSize: 1000,
+    scopeSize: 500,
     img: '',
+    coords: [0, 0],
     move: function (x, y) {
         $.each(this.kScope, function (i) {
-            console.log('app.move');
-            var img = drawKaleidoscope(document.getElementById('canvasCheck').getContext('2d'), document.getElementById('preImg'), x, y, 1000);
+            var img = drawKaleidoscope(document.getElementById('canvasCheck').getContext('2d'), document.getElementById('preImg'), x, y, 500);
             document.getElementById('canvasCheck').getContext('2d').drawImage(img, 0, 0);
         });
+        this.coords = [x, y];
+        console.log(this.kScope);
     },
     prepPage: function (src) {
         src = src || '';
         var canvas,
             CanvasKscope = document.getElementById('canvasCheck');
-        console.log('app.prepPage');
         for (i = 0; i < this.canvasActive; i++) {
             this.kScope[i] = {
                 img: document.getElementById('preImg'),
-                height: 1000,
-                width: 1000,
+                height: 500,
+                width: 500,
                 canvas: CanvasKscope,
                 ctx: CanvasKscope.getContext('2d'),
                 imgLoaded: true
             }
         }
 
-        this.move(50, 50);
+        this.move(this.coords[0], this.coords[1]);
     },
     prepVideo: function () {
         window.URL = window.URL || window.webkitURL;
@@ -37871,6 +37872,7 @@ var app = {
                 console.log(video);
 
                 video.src = window.URL.createObjectURL(mediaStream);
+                video.autoplay = true;
                 //audioActive = video.src;
 
                 /*audioCache[audioActive] = {
@@ -37896,13 +37898,11 @@ var app = {
 
     },
     snapshot: function (video, preCanvas, ctx, stream) {
-        var img = preCanvas.toDataURL('image/webp');
-        document.getElementById('preImg');
-        document.getElementById('preImg').setAttribute('src', img);
-        console.log('app.snapshot');
-        console.log(img);
-        ctx.drawImage(video, 0, 0, 1000, 1000);
-        //addNewImages(img, scopeSize, canvasActive);
+        var img = preCanvas.toDataURL('image/webp'),
+            preImg = document.getElementById('preImg');
+
+        preImg.setAttribute('src', img);
+        ctx.drawImage(video, 0, 0, 500, 500);
         this.prepPage(img);
         setTimeout(function () {
             app.snapshot(video, preCanvas, ctx, stream);
@@ -37939,6 +37939,10 @@ var Kscope = React.createBackboneClass({
         componentWillMount: function () {
             this.state.app.listener = this;
         },
+        componentDidMount: function () {
+            this.state.app.move(0, 0);
+            //console.log(this.state.app);
+        },
         getInitialState: function () {
             return {
                 app: app,
@@ -37947,7 +37951,7 @@ var Kscope = React.createBackboneClass({
         },
         render: function () {
             console.log('kscope');
-            var imgSrc = this.props.src || "https://scontent.cdninstagram.com/hphotos-xaf1/t51.2885-15/s640x640/sh0.08/e35/11363716_134653433554276_1743669472_n.jpg";
+            var imgSrc = this.state.src;
             return (
                 React.createElement("div", {imgUrl: "test", 
                      id: "sckscope"}, 
@@ -37955,7 +37959,7 @@ var Kscope = React.createBackboneClass({
                             src: this.state.src, 
                             update: this.update, 
                             move: this.move}), 
-                    React.createElement(CanvasKscope, {scopeSize: "1000", src: this.state.src})
+                    React.createElement(CanvasKscope, {scopeSize: "500", src: this.state.src})
                 )
             );
         }
@@ -37967,8 +37971,12 @@ var Kscope = React.createBackboneClass({
                 src: this.props.src
             }
         },
+        componentDidMount: function () {
+            this.state.app.prepPage(this.props.src);
+        },
         componentDidUpdate: function () {
             this.state.app.prepPage(this.props.src);
+
             console.log('Canvas Did Update');
             console.log(this.props.src);
         },
@@ -38005,8 +38013,8 @@ var Kscope = React.createBackboneClass({
                            name: "fieldImg", 
                            defaultValue: ""}
                         ), 
-                    "Move: ", React.createElement("input", {type: "range", min: "0", max: "1000", name: "y-range", onChange: this.props.move, 
-                                 className: "static-range"}), 
+                    "Move: ", React.createElement("input", {type: "range", min: "0", max: "500", name: "y-range", onChange: this.props.move, 
+                                 className: "static-range", defaultValue: this.props.src}), 
 
                     React.createElement("div", {id: "image-container"}, 
                         React.createElement("img", {id: "preImg", 
@@ -38212,7 +38220,7 @@ var KscopeVideo = React.createBackboneClass({
             React.createElement("div", {imgUrl: "test", 
                  id: "sckscopeVideo"}, 
                 React.createElement(Kscope, {src: ""}), 
-                React.createElement("canvas", {id: "preCanvas", width: "500", height: "500", scopeSize: "1000", src: this.state.src}), 
+                React.createElement("canvas", {id: "preCanvas", width: "500", height: "500", scopeSize: "500", src: this.state.src}), 
                 React.createElement("video", {id: "video", autoplay: "true"})
             )
         );
