@@ -1,4 +1,4128 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+// MarionetteJS (Backbone.Marionette)
+// ----------------------------------
+// v2.4.3
+//
+// Copyright (c)2015 Derick Bailey, Muted Solutions, LLC.
+// Distributed under MIT license
+//
+// http://marionettejs.com
+
+(function(root, factory) {
+
+  if (typeof define === 'function' && define.amd) {
+    define(['backbone', 'underscore', 'backbone.wreqr', 'backbone.babysitter'], function(Backbone, _) {
+      return (root.Marionette = root.Mn = factory(root, Backbone, _));
+    });
+  } else if (typeof exports !== 'undefined') {
+    var Backbone = require('backbone');
+    var _ = require('underscore');
+    var Wreqr = require('backbone.wreqr');
+    var BabySitter = require('backbone.babysitter');
+    module.exports = factory(root, Backbone, _);
+  } else {
+    root.Marionette = root.Mn = factory(root, root.Backbone, root._);
+  }
+
+}(this, function(root, Backbone, _) {
+  'use strict';
+
+  var previousMarionette = root.Marionette;
+  var previousMn = root.Mn;
+
+  var Marionette = Backbone.Marionette = {};
+
+  Marionette.VERSION = '2.4.3';
+
+  Marionette.noConflict = function() {
+    root.Marionette = previousMarionette;
+    root.Mn = previousMn;
+    return this;
+  };
+
+  // Get the Deferred creator for later use
+  Marionette.Deferred = Backbone.$.Deferred;
+
+  Marionette.FEATURES = {
+  };
+  
+  Marionette.isEnabled = function(name) {
+    return !!Marionette.FEATURES[name];
+  };
+  
+  /* jshint unused: false *//* global console */
+  
+  // Helpers
+  // -------
+  
+  // Marionette.extend
+  // -----------------
+  
+  // Borrow the Backbone `extend` method so we can use it as needed
+  Marionette.extend = Backbone.Model.extend;
+  
+  // Marionette.isNodeAttached
+  // -------------------------
+  
+  // Determine if `el` is a child of the document
+  Marionette.isNodeAttached = function(el) {
+    return Backbone.$.contains(document.documentElement, el);
+  };
+  
+  // Merge `keys` from `options` onto `this`
+  Marionette.mergeOptions = function(options, keys) {
+    if (!options) { return; }
+    _.extend(this, _.pick(options, keys));
+  };
+  
+  // Marionette.getOption
+  // --------------------
+  
+  // Retrieve an object, function or other value from a target
+  // object or its `options`, with `options` taking precedence.
+  Marionette.getOption = function(target, optionName) {
+    if (!target || !optionName) { return; }
+    if (target.options && (target.options[optionName] !== undefined)) {
+      return target.options[optionName];
+    } else {
+      return target[optionName];
+    }
+  };
+  
+  // Proxy `Marionette.getOption`
+  Marionette.proxyGetOption = function(optionName) {
+    return Marionette.getOption(this, optionName);
+  };
+  
+  // Similar to `_.result`, this is a simple helper
+  // If a function is provided we call it with context
+  // otherwise just return the value. If the value is
+  // undefined return a default value
+  Marionette._getValue = function(value, context, params) {
+    if (_.isFunction(value)) {
+      value = params ? value.apply(context, params) : value.call(context);
+    }
+    return value;
+  };
+  
+  // Marionette.normalizeMethods
+  // ----------------------
+  
+  // Pass in a mapping of events => functions or function names
+  // and return a mapping of events => functions
+  Marionette.normalizeMethods = function(hash) {
+    return _.reduce(hash, function(normalizedHash, method, name) {
+      if (!_.isFunction(method)) {
+        method = this[method];
+      }
+      if (method) {
+        normalizedHash[name] = method;
+      }
+      return normalizedHash;
+    }, {}, this);
+  };
+  
+  // utility method for parsing @ui. syntax strings
+  // into associated selector
+  Marionette.normalizeUIString = function(uiString, ui) {
+    return uiString.replace(/@ui\.[a-zA-Z_$0-9]*/g, function(r) {
+      return ui[r.slice(4)];
+    });
+  };
+  
+  // allows for the use of the @ui. syntax within
+  // a given key for triggers and events
+  // swaps the @ui with the associated selector.
+  // Returns a new, non-mutated, parsed events hash.
+  Marionette.normalizeUIKeys = function(hash, ui) {
+    return _.reduce(hash, function(memo, val, key) {
+      var normalizedKey = Marionette.normalizeUIString(key, ui);
+      memo[normalizedKey] = val;
+      return memo;
+    }, {});
+  };
+  
+  // allows for the use of the @ui. syntax within
+  // a given value for regions
+  // swaps the @ui with the associated selector
+  Marionette.normalizeUIValues = function(hash, ui, properties) {
+    _.each(hash, function(val, key) {
+      if (_.isString(val)) {
+        hash[key] = Marionette.normalizeUIString(val, ui);
+      } else if (_.isObject(val) && _.isArray(properties)) {
+        _.extend(val, Marionette.normalizeUIValues(_.pick(val, properties), ui));
+        /* Value is an object, and we got an array of embedded property names to normalize. */
+        _.each(properties, function(property) {
+          var propertyVal = val[property];
+          if (_.isString(propertyVal)) {
+            val[property] = Marionette.normalizeUIString(propertyVal, ui);
+          }
+        });
+      }
+    });
+    return hash;
+  };
+  
+  // Mix in methods from Underscore, for iteration, and other
+  // collection related features.
+  // Borrowing this code from Backbone.Collection:
+  // http://backbonejs.org/docs/backbone.html#section-121
+  Marionette.actAsCollection = function(object, listProperty) {
+    var methods = ['forEach', 'each', 'map', 'find', 'detect', 'filter',
+      'select', 'reject', 'every', 'all', 'some', 'any', 'include',
+      'contains', 'invoke', 'toArray', 'first', 'initial', 'rest',
+      'last', 'without', 'isEmpty', 'pluck'];
+  
+    _.each(methods, function(method) {
+      object[method] = function() {
+        var list = _.values(_.result(this, listProperty));
+        var args = [list].concat(_.toArray(arguments));
+        return _[method].apply(_, args);
+      };
+    });
+  };
+  
+  var deprecate = Marionette.deprecate = function(message, test) {
+    if (_.isObject(message)) {
+      message = (
+        message.prev + ' is going to be removed in the future. ' +
+        'Please use ' + message.next + ' instead.' +
+        (message.url ? ' See: ' + message.url : '')
+      );
+    }
+  
+    if ((test === undefined || !test) && !deprecate._cache[message]) {
+      deprecate._warn('Deprecation warning: ' + message);
+      deprecate._cache[message] = true;
+    }
+  };
+  
+  deprecate._warn = typeof console !== 'undefined' && (console.warn || console.log) || function() {};
+  deprecate._cache = {};
+  
+  /* jshint maxstatements: 14, maxcomplexity: 7 */
+  
+  // Trigger Method
+  // --------------
+  
+  Marionette._triggerMethod = (function() {
+    // split the event name on the ":"
+    var splitter = /(^|:)(\w)/gi;
+  
+    // take the event section ("section1:section2:section3")
+    // and turn it in to uppercase name
+    function getEventName(match, prefix, eventName) {
+      return eventName.toUpperCase();
+    }
+  
+    return function(context, event, args) {
+      var noEventArg = arguments.length < 3;
+      if (noEventArg) {
+        args = event;
+        event = args[0];
+      }
+  
+      // get the method name from the event name
+      var methodName = 'on' + event.replace(splitter, getEventName);
+      var method = context[methodName];
+      var result;
+  
+      // call the onMethodName if it exists
+      if (_.isFunction(method)) {
+        // pass all args, except the event name
+        result = method.apply(context, noEventArg ? _.rest(args) : args);
+      }
+  
+      // trigger the event, if a trigger method exists
+      if (_.isFunction(context.trigger)) {
+        if (noEventArg + args.length > 1) {
+          context.trigger.apply(context, noEventArg ? args : [event].concat(_.drop(args, 0)));
+        } else {
+          context.trigger(event);
+        }
+      }
+  
+      return result;
+    };
+  })();
+  
+  // Trigger an event and/or a corresponding method name. Examples:
+  //
+  // `this.triggerMethod("foo")` will trigger the "foo" event and
+  // call the "onFoo" method.
+  //
+  // `this.triggerMethod("foo:bar")` will trigger the "foo:bar" event and
+  // call the "onFooBar" method.
+  Marionette.triggerMethod = function(event) {
+    return Marionette._triggerMethod(this, arguments);
+  };
+  
+  // triggerMethodOn invokes triggerMethod on a specific context
+  //
+  // e.g. `Marionette.triggerMethodOn(view, 'show')`
+  // will trigger a "show" event or invoke onShow the view.
+  Marionette.triggerMethodOn = function(context) {
+    var fnc = _.isFunction(context.triggerMethod) ?
+                  context.triggerMethod :
+                  Marionette.triggerMethod;
+  
+    return fnc.apply(context, _.rest(arguments));
+  };
+  
+  // DOM Refresh
+  // -----------
+  
+  // Monitor a view's state, and after it has been rendered and shown
+  // in the DOM, trigger a "dom:refresh" event every time it is
+  // re-rendered.
+  
+  Marionette.MonitorDOMRefresh = function(view) {
+    if (view._isDomRefreshMonitored) { return; }
+    view._isDomRefreshMonitored = true;
+  
+    // track when the view has been shown in the DOM,
+    // using a Marionette.Region (or by other means of triggering "show")
+    function handleShow() {
+      view._isShown = true;
+      triggerDOMRefresh();
+    }
+  
+    // track when the view has been rendered
+    function handleRender() {
+      view._isRendered = true;
+      triggerDOMRefresh();
+    }
+  
+    // Trigger the "dom:refresh" event and corresponding "onDomRefresh" method
+    function triggerDOMRefresh() {
+      if (view._isShown && view._isRendered && Marionette.isNodeAttached(view.el)) {
+        Marionette.triggerMethodOn(view, 'dom:refresh', view);
+      }
+    }
+  
+    view.on({
+      show: handleShow,
+      render: handleRender
+    });
+  };
+  
+  /* jshint maxparams: 5 */
+  
+  // Bind Entity Events & Unbind Entity Events
+  // -----------------------------------------
+  //
+  // These methods are used to bind/unbind a backbone "entity" (e.g. collection/model)
+  // to methods on a target object.
+  //
+  // The first parameter, `target`, must have the Backbone.Events module mixed in.
+  //
+  // The second parameter is the `entity` (Backbone.Model, Backbone.Collection or
+  // any object that has Backbone.Events mixed in) to bind the events from.
+  //
+  // The third parameter is a hash of { "event:name": "eventHandler" }
+  // configuration. Multiple handlers can be separated by a space. A
+  // function can be supplied instead of a string handler name.
+  
+  (function(Marionette) {
+    'use strict';
+  
+    // Bind the event to handlers specified as a string of
+    // handler names on the target object
+    function bindFromStrings(target, entity, evt, methods) {
+      var methodNames = methods.split(/\s+/);
+  
+      _.each(methodNames, function(methodName) {
+  
+        var method = target[methodName];
+        if (!method) {
+          throw new Marionette.Error('Method "' + methodName +
+            '" was configured as an event handler, but does not exist.');
+        }
+  
+        target.listenTo(entity, evt, method);
+      });
+    }
+  
+    // Bind the event to a supplied callback function
+    function bindToFunction(target, entity, evt, method) {
+      target.listenTo(entity, evt, method);
+    }
+  
+    // Bind the event to handlers specified as a string of
+    // handler names on the target object
+    function unbindFromStrings(target, entity, evt, methods) {
+      var methodNames = methods.split(/\s+/);
+  
+      _.each(methodNames, function(methodName) {
+        var method = target[methodName];
+        target.stopListening(entity, evt, method);
+      });
+    }
+  
+    // Bind the event to a supplied callback function
+    function unbindToFunction(target, entity, evt, method) {
+      target.stopListening(entity, evt, method);
+    }
+  
+    // generic looping function
+    function iterateEvents(target, entity, bindings, functionCallback, stringCallback) {
+      if (!entity || !bindings) { return; }
+  
+      // type-check bindings
+      if (!_.isObject(bindings)) {
+        throw new Marionette.Error({
+          message: 'Bindings must be an object or function.',
+          url: 'marionette.functions.html#marionettebindentityevents'
+        });
+      }
+  
+      // allow the bindings to be a function
+      bindings = Marionette._getValue(bindings, target);
+  
+      // iterate the bindings and bind them
+      _.each(bindings, function(methods, evt) {
+  
+        // allow for a function as the handler,
+        // or a list of event names as a string
+        if (_.isFunction(methods)) {
+          functionCallback(target, entity, evt, methods);
+        } else {
+          stringCallback(target, entity, evt, methods);
+        }
+  
+      });
+    }
+  
+    // Export Public API
+    Marionette.bindEntityEvents = function(target, entity, bindings) {
+      iterateEvents(target, entity, bindings, bindToFunction, bindFromStrings);
+    };
+  
+    Marionette.unbindEntityEvents = function(target, entity, bindings) {
+      iterateEvents(target, entity, bindings, unbindToFunction, unbindFromStrings);
+    };
+  
+    // Proxy `bindEntityEvents`
+    Marionette.proxyBindEntityEvents = function(entity, bindings) {
+      return Marionette.bindEntityEvents(this, entity, bindings);
+    };
+  
+    // Proxy `unbindEntityEvents`
+    Marionette.proxyUnbindEntityEvents = function(entity, bindings) {
+      return Marionette.unbindEntityEvents(this, entity, bindings);
+    };
+  })(Marionette);
+  
+
+  // Error
+  // -----
+  
+  var errorProps = ['description', 'fileName', 'lineNumber', 'name', 'message', 'number'];
+  
+  Marionette.Error = Marionette.extend.call(Error, {
+    urlRoot: 'http://marionettejs.com/docs/v' + Marionette.VERSION + '/',
+  
+    constructor: function(message, options) {
+      if (_.isObject(message)) {
+        options = message;
+        message = options.message;
+      } else if (!options) {
+        options = {};
+      }
+  
+      var error = Error.call(this, message);
+      _.extend(this, _.pick(error, errorProps), _.pick(options, errorProps));
+  
+      this.captureStackTrace();
+  
+      if (options.url) {
+        this.url = this.urlRoot + options.url;
+      }
+    },
+  
+    captureStackTrace: function() {
+      if (Error.captureStackTrace) {
+        Error.captureStackTrace(this, Marionette.Error);
+      }
+    },
+  
+    toString: function() {
+      return this.name + ': ' + this.message + (this.url ? ' See: ' + this.url : '');
+    }
+  });
+  
+  Marionette.Error.extend = Marionette.extend;
+  
+  // Callbacks
+  // ---------
+  
+  // A simple way of managing a collection of callbacks
+  // and executing them at a later point in time, using jQuery's
+  // `Deferred` object.
+  Marionette.Callbacks = function() {
+    this._deferred = Marionette.Deferred();
+    this._callbacks = [];
+  };
+  
+  _.extend(Marionette.Callbacks.prototype, {
+  
+    // Add a callback to be executed. Callbacks added here are
+    // guaranteed to execute, even if they are added after the
+    // `run` method is called.
+    add: function(callback, contextOverride) {
+      var promise = _.result(this._deferred, 'promise');
+  
+      this._callbacks.push({cb: callback, ctx: contextOverride});
+  
+      promise.then(function(args) {
+        if (contextOverride) { args.context = contextOverride; }
+        callback.call(args.context, args.options);
+      });
+    },
+  
+    // Run all registered callbacks with the context specified.
+    // Additional callbacks can be added after this has been run
+    // and they will still be executed.
+    run: function(options, context) {
+      this._deferred.resolve({
+        options: options,
+        context: context
+      });
+    },
+  
+    // Resets the list of callbacks to be run, allowing the same list
+    // to be run multiple times - whenever the `run` method is called.
+    reset: function() {
+      var callbacks = this._callbacks;
+      this._deferred = Marionette.Deferred();
+      this._callbacks = [];
+  
+      _.each(callbacks, function(cb) {
+        this.add(cb.cb, cb.ctx);
+      }, this);
+    }
+  });
+  
+  // Controller
+  // ----------
+  
+  // A multi-purpose object to use as a controller for
+  // modules and routers, and as a mediator for workflow
+  // and coordination of other objects, views, and more.
+  Marionette.Controller = function(options) {
+    this.options = options || {};
+  
+    if (_.isFunction(this.initialize)) {
+      this.initialize(this.options);
+    }
+  };
+  
+  Marionette.Controller.extend = Marionette.extend;
+  
+  // Controller Methods
+  // --------------
+  
+  // Ensure it can trigger events with Backbone.Events
+  _.extend(Marionette.Controller.prototype, Backbone.Events, {
+    destroy: function() {
+      Marionette._triggerMethod(this, 'before:destroy', arguments);
+      Marionette._triggerMethod(this, 'destroy', arguments);
+  
+      this.stopListening();
+      this.off();
+      return this;
+    },
+  
+    // import the `triggerMethod` to trigger events with corresponding
+    // methods if the method exists
+    triggerMethod: Marionette.triggerMethod,
+  
+    // A handy way to merge options onto the instance
+    mergeOptions: Marionette.mergeOptions,
+  
+    // Proxy `getOption` to enable getting options from this or this.options by name.
+    getOption: Marionette.proxyGetOption
+  
+  });
+  
+  // Object
+  // ------
+  
+  // A Base Class that other Classes should descend from.
+  // Object borrows many conventions and utilities from Backbone.
+  Marionette.Object = function(options) {
+    this.options = _.extend({}, _.result(this, 'options'), options);
+  
+    this.initialize.apply(this, arguments);
+  };
+  
+  Marionette.Object.extend = Marionette.extend;
+  
+  // Object Methods
+  // --------------
+  
+  // Ensure it can trigger events with Backbone.Events
+  _.extend(Marionette.Object.prototype, Backbone.Events, {
+  
+    //this is a noop method intended to be overridden by classes that extend from this base
+    initialize: function() {},
+  
+    destroy: function() {
+      this.triggerMethod('before:destroy');
+      this.triggerMethod('destroy');
+      this.stopListening();
+  
+      return this;
+    },
+  
+    // Import the `triggerMethod` to trigger events with corresponding
+    // methods if the method exists
+    triggerMethod: Marionette.triggerMethod,
+  
+    // A handy way to merge options onto the instance
+    mergeOptions: Marionette.mergeOptions,
+  
+    // Proxy `getOption` to enable getting options from this or this.options by name.
+    getOption: Marionette.proxyGetOption,
+  
+    // Proxy `bindEntityEvents` to enable binding view's events from another entity.
+    bindEntityEvents: Marionette.proxyBindEntityEvents,
+  
+    // Proxy `unbindEntityEvents` to enable unbinding view's events from another entity.
+    unbindEntityEvents: Marionette.proxyUnbindEntityEvents
+  });
+  
+  /* jshint maxcomplexity: 16, maxstatements: 45, maxlen: 120 */
+  
+  // Region
+  // ------
+  
+  // Manage the visual regions of your composite application. See
+  // http://lostechies.com/derickbailey/2011/12/12/composite-js-apps-regions-and-region-managers/
+  
+  Marionette.Region = Marionette.Object.extend({
+    constructor: function(options) {
+  
+      // set options temporarily so that we can get `el`.
+      // options will be overriden by Object.constructor
+      this.options = options || {};
+      this.el = this.getOption('el');
+  
+      // Handle when this.el is passed in as a $ wrapped element.
+      this.el = this.el instanceof Backbone.$ ? this.el[0] : this.el;
+  
+      if (!this.el) {
+        throw new Marionette.Error({
+          name: 'NoElError',
+          message: 'An "el" must be specified for a region.'
+        });
+      }
+  
+      this.$el = this.getEl(this.el);
+      Marionette.Object.call(this, options);
+    },
+  
+    // Displays a backbone view instance inside of the region.
+    // Handles calling the `render` method for you. Reads content
+    // directly from the `el` attribute. Also calls an optional
+    // `onShow` and `onDestroy` method on your view, just after showing
+    // or just before destroying the view, respectively.
+    // The `preventDestroy` option can be used to prevent a view from
+    // the old view being destroyed on show.
+    // The `forceShow` option can be used to force a view to be
+    // re-rendered if it's already shown in the region.
+    show: function(view, options) {
+      if (!this._ensureElement()) {
+        return;
+      }
+  
+      this._ensureViewIsIntact(view);
+      Marionette.MonitorDOMRefresh(view);
+  
+      var showOptions     = options || {};
+      var isDifferentView = view !== this.currentView;
+      var preventDestroy  = !!showOptions.preventDestroy;
+      var forceShow       = !!showOptions.forceShow;
+  
+      // We are only changing the view if there is a current view to change to begin with
+      var isChangingView = !!this.currentView;
+  
+      // Only destroy the current view if we don't want to `preventDestroy` and if
+      // the view given in the first argument is different than `currentView`
+      var _shouldDestroyView = isDifferentView && !preventDestroy;
+  
+      // Only show the view given in the first argument if it is different than
+      // the current view or if we want to re-show the view. Note that if
+      // `_shouldDestroyView` is true, then `_shouldShowView` is also necessarily true.
+      var _shouldShowView = isDifferentView || forceShow;
+  
+      if (isChangingView) {
+        this.triggerMethod('before:swapOut', this.currentView, this, options);
+      }
+  
+      if (this.currentView) {
+        delete this.currentView._parent;
+      }
+  
+      if (_shouldDestroyView) {
+        this.empty();
+  
+      // A `destroy` event is attached to the clean up manually removed views.
+      // We need to detach this event when a new view is going to be shown as it
+      // is no longer relevant.
+      } else if (isChangingView && _shouldShowView) {
+        this.currentView.off('destroy', this.empty, this);
+      }
+  
+      if (_shouldShowView) {
+  
+        // We need to listen for if a view is destroyed
+        // in a way other than through the region.
+        // If this happens we need to remove the reference
+        // to the currentView since once a view has been destroyed
+        // we can not reuse it.
+        view.once('destroy', this.empty, this);
+  
+        this._renderView(view);
+  
+        view._parent = this;
+  
+        if (isChangingView) {
+          this.triggerMethod('before:swap', view, this, options);
+        }
+  
+        this.triggerMethod('before:show', view, this, options);
+        Marionette.triggerMethodOn(view, 'before:show', view, this, options);
+  
+        if (isChangingView) {
+          this.triggerMethod('swapOut', this.currentView, this, options);
+        }
+  
+        // An array of views that we're about to display
+        var attachedRegion = Marionette.isNodeAttached(this.el);
+  
+        // The views that we're about to attach to the document
+        // It's important that we prevent _getNestedViews from being executed unnecessarily
+        // as it's a potentially-slow method
+        var displayedViews = [];
+  
+        var attachOptions = _.extend({
+          triggerBeforeAttach: this.triggerBeforeAttach,
+          triggerAttach: this.triggerAttach
+        }, showOptions);
+  
+        if (attachedRegion && attachOptions.triggerBeforeAttach) {
+          displayedViews = this._displayedViews(view);
+          this._triggerAttach(displayedViews, 'before:');
+        }
+  
+        this.attachHtml(view);
+        this.currentView = view;
+  
+        if (attachedRegion && attachOptions.triggerAttach) {
+          displayedViews = this._displayedViews(view);
+          this._triggerAttach(displayedViews);
+        }
+  
+        if (isChangingView) {
+          this.triggerMethod('swap', view, this, options);
+        }
+  
+        this.triggerMethod('show', view, this, options);
+        Marionette.triggerMethodOn(view, 'show', view, this, options);
+  
+        return this;
+      }
+  
+      return this;
+    },
+  
+    triggerBeforeAttach: true,
+    triggerAttach: true,
+  
+    _triggerAttach: function(views, prefix) {
+      var eventName = (prefix || '') + 'attach';
+      _.each(views, function(view) {
+        Marionette.triggerMethodOn(view, eventName, view, this);
+      }, this);
+    },
+  
+    _displayedViews: function(view) {
+      return _.union([view], _.result(view, '_getNestedViews') || []);
+    },
+  
+    _renderView: function(view) {
+      if (!view.supportsRenderLifecycle) {
+        Marionette.triggerMethodOn(view, 'before:render', view);
+      }
+      view.render();
+      if (!view.supportsRenderLifecycle) {
+        Marionette.triggerMethodOn(view, 'render', view);
+      }
+    },
+  
+    _ensureElement: function() {
+      if (!_.isObject(this.el)) {
+        this.$el = this.getEl(this.el);
+        this.el = this.$el[0];
+      }
+  
+      if (!this.$el || this.$el.length === 0) {
+        if (this.getOption('allowMissingEl')) {
+          return false;
+        } else {
+          throw new Marionette.Error('An "el" ' + this.$el.selector + ' must exist in DOM');
+        }
+      }
+      return true;
+    },
+  
+    _ensureViewIsIntact: function(view) {
+      if (!view) {
+        throw new Marionette.Error({
+          name: 'ViewNotValid',
+          message: 'The view passed is undefined and therefore invalid. You must pass a view instance to show.'
+        });
+      }
+  
+      if (view.isDestroyed) {
+        throw new Marionette.Error({
+          name: 'ViewDestroyedError',
+          message: 'View (cid: "' + view.cid + '") has already been destroyed and cannot be used.'
+        });
+      }
+    },
+  
+    // Override this method to change how the region finds the DOM
+    // element that it manages. Return a jQuery selector object scoped
+    // to a provided parent el or the document if none exists.
+    getEl: function(el) {
+      return Backbone.$(el, Marionette._getValue(this.options.parentEl, this));
+    },
+  
+    // Override this method to change how the new view is
+    // appended to the `$el` that the region is managing
+    attachHtml: function(view) {
+      this.$el.contents().detach();
+  
+      this.el.appendChild(view.el);
+    },
+  
+    // Destroy the current view, if there is one. If there is no
+    // current view, it does nothing and returns immediately.
+    empty: function(options) {
+      var view = this.currentView;
+  
+      var emptyOptions = options || {};
+      var preventDestroy  = !!emptyOptions.preventDestroy;
+      // If there is no view in the region
+      // we should not remove anything
+      if (!view) { return; }
+  
+      view.off('destroy', this.empty, this);
+      this.triggerMethod('before:empty', view);
+      if (!preventDestroy) {
+        this._destroyView();
+      }
+      this.triggerMethod('empty', view);
+  
+      // Remove region pointer to the currentView
+      delete this.currentView;
+  
+      if (preventDestroy) {
+        this.$el.contents().detach();
+      }
+  
+      return this;
+    },
+  
+    // call 'destroy' or 'remove', depending on which is found
+    // on the view (if showing a raw Backbone view or a Marionette View)
+    _destroyView: function() {
+      var view = this.currentView;
+      if (view.isDestroyed) { return; }
+  
+      if (!view.supportsDestroyLifecycle) {
+        Marionette.triggerMethodOn(view, 'before:destroy', view);
+      }
+      if (view.destroy) {
+        view.destroy();
+      } else {
+        view.remove();
+  
+        // appending isDestroyed to raw Backbone View allows regions
+        // to throw a ViewDestroyedError for this view
+        view.isDestroyed = true;
+      }
+      if (!view.supportsDestroyLifecycle) {
+        Marionette.triggerMethodOn(view, 'destroy', view);
+      }
+    },
+  
+    // Attach an existing view to the region. This
+    // will not call `render` or `onShow` for the new view,
+    // and will not replace the current HTML for the `el`
+    // of the region.
+    attachView: function(view) {
+      if (this.currentView) {
+        delete this.currentView._parent;
+      }
+      view._parent = this;
+      this.currentView = view;
+      return this;
+    },
+  
+    // Checks whether a view is currently present within
+    // the region. Returns `true` if there is and `false` if
+    // no view is present.
+    hasView: function() {
+      return !!this.currentView;
+    },
+  
+    // Reset the region by destroying any existing view and
+    // clearing out the cached `$el`. The next time a view
+    // is shown via this region, the region will re-query the
+    // DOM for the region's `el`.
+    reset: function() {
+      this.empty();
+  
+      if (this.$el) {
+        this.el = this.$el.selector;
+      }
+  
+      delete this.$el;
+      return this;
+    }
+  
+  },
+  
+  // Static Methods
+  {
+  
+    // Build an instance of a region by passing in a configuration object
+    // and a default region class to use if none is specified in the config.
+    //
+    // The config object should either be a string as a jQuery DOM selector,
+    // a Region class directly, or an object literal that specifies a selector,
+    // a custom regionClass, and any options to be supplied to the region:
+    //
+    // ```js
+    // {
+    //   selector: "#foo",
+    //   regionClass: MyCustomRegion,
+    //   allowMissingEl: false
+    // }
+    // ```
+    //
+    buildRegion: function(regionConfig, DefaultRegionClass) {
+      if (_.isString(regionConfig)) {
+        return this._buildRegionFromSelector(regionConfig, DefaultRegionClass);
+      }
+  
+      if (regionConfig.selector || regionConfig.el || regionConfig.regionClass) {
+        return this._buildRegionFromObject(regionConfig, DefaultRegionClass);
+      }
+  
+      if (_.isFunction(regionConfig)) {
+        return this._buildRegionFromRegionClass(regionConfig);
+      }
+  
+      throw new Marionette.Error({
+        message: 'Improper region configuration type.',
+        url: 'marionette.region.html#region-configuration-types'
+      });
+    },
+  
+    // Build the region from a string selector like '#foo-region'
+    _buildRegionFromSelector: function(selector, DefaultRegionClass) {
+      return new DefaultRegionClass({el: selector});
+    },
+  
+    // Build the region from a configuration object
+    // ```js
+    // { selector: '#foo', regionClass: FooRegion, allowMissingEl: false }
+    // ```
+    _buildRegionFromObject: function(regionConfig, DefaultRegionClass) {
+      var RegionClass = regionConfig.regionClass || DefaultRegionClass;
+      var options = _.omit(regionConfig, 'selector', 'regionClass');
+  
+      if (regionConfig.selector && !options.el) {
+        options.el = regionConfig.selector;
+      }
+  
+      return new RegionClass(options);
+    },
+  
+    // Build the region directly from a given `RegionClass`
+    _buildRegionFromRegionClass: function(RegionClass) {
+      return new RegionClass();
+    }
+  });
+  
+  // Region Manager
+  // --------------
+  
+  // Manage one or more related `Marionette.Region` objects.
+  Marionette.RegionManager = Marionette.Controller.extend({
+    constructor: function(options) {
+      this._regions = {};
+      this.length = 0;
+  
+      Marionette.Controller.call(this, options);
+  
+      this.addRegions(this.getOption('regions'));
+    },
+  
+    // Add multiple regions using an object literal or a
+    // function that returns an object literal, where
+    // each key becomes the region name, and each value is
+    // the region definition.
+    addRegions: function(regionDefinitions, defaults) {
+      regionDefinitions = Marionette._getValue(regionDefinitions, this, arguments);
+  
+      return _.reduce(regionDefinitions, function(regions, definition, name) {
+        if (_.isString(definition)) {
+          definition = {selector: definition};
+        }
+        if (definition.selector) {
+          definition = _.defaults({}, definition, defaults);
+        }
+  
+        regions[name] = this.addRegion(name, definition);
+        return regions;
+      }, {}, this);
+    },
+  
+    // Add an individual region to the region manager,
+    // and return the region instance
+    addRegion: function(name, definition) {
+      var region;
+  
+      if (definition instanceof Marionette.Region) {
+        region = definition;
+      } else {
+        region = Marionette.Region.buildRegion(definition, Marionette.Region);
+      }
+  
+      this.triggerMethod('before:add:region', name, region);
+  
+      region._parent = this;
+      this._store(name, region);
+  
+      this.triggerMethod('add:region', name, region);
+      return region;
+    },
+  
+    // Get a region by name
+    get: function(name) {
+      return this._regions[name];
+    },
+  
+    // Gets all the regions contained within
+    // the `regionManager` instance.
+    getRegions: function() {
+      return _.clone(this._regions);
+    },
+  
+    // Remove a region by name
+    removeRegion: function(name) {
+      var region = this._regions[name];
+      this._remove(name, region);
+  
+      return region;
+    },
+  
+    // Empty all regions in the region manager, and
+    // remove them
+    removeRegions: function() {
+      var regions = this.getRegions();
+      _.each(this._regions, function(region, name) {
+        this._remove(name, region);
+      }, this);
+  
+      return regions;
+    },
+  
+    // Empty all regions in the region manager, but
+    // leave them attached
+    emptyRegions: function() {
+      var regions = this.getRegions();
+      _.invoke(regions, 'empty');
+      return regions;
+    },
+  
+    // Destroy all regions and shut down the region
+    // manager entirely
+    destroy: function() {
+      this.removeRegions();
+      return Marionette.Controller.prototype.destroy.apply(this, arguments);
+    },
+  
+    // internal method to store regions
+    _store: function(name, region) {
+      if (!this._regions[name]) {
+        this.length++;
+      }
+  
+      this._regions[name] = region;
+    },
+  
+    // internal method to remove a region
+    _remove: function(name, region) {
+      this.triggerMethod('before:remove:region', name, region);
+      region.empty();
+      region.stopListening();
+  
+      delete region._parent;
+      delete this._regions[name];
+      this.length--;
+      this.triggerMethod('remove:region', name, region);
+    }
+  });
+  
+  Marionette.actAsCollection(Marionette.RegionManager.prototype, '_regions');
+  
+
+  // Template Cache
+  // --------------
+  
+  // Manage templates stored in `<script>` blocks,
+  // caching them for faster access.
+  Marionette.TemplateCache = function(templateId) {
+    this.templateId = templateId;
+  };
+  
+  // TemplateCache object-level methods. Manage the template
+  // caches from these method calls instead of creating
+  // your own TemplateCache instances
+  _.extend(Marionette.TemplateCache, {
+    templateCaches: {},
+  
+    // Get the specified template by id. Either
+    // retrieves the cached version, or loads it
+    // from the DOM.
+    get: function(templateId, options) {
+      var cachedTemplate = this.templateCaches[templateId];
+  
+      if (!cachedTemplate) {
+        cachedTemplate = new Marionette.TemplateCache(templateId);
+        this.templateCaches[templateId] = cachedTemplate;
+      }
+  
+      return cachedTemplate.load(options);
+    },
+  
+    // Clear templates from the cache. If no arguments
+    // are specified, clears all templates:
+    // `clear()`
+    //
+    // If arguments are specified, clears each of the
+    // specified templates from the cache:
+    // `clear("#t1", "#t2", "...")`
+    clear: function() {
+      var i;
+      var args = _.toArray(arguments);
+      var length = args.length;
+  
+      if (length > 0) {
+        for (i = 0; i < length; i++) {
+          delete this.templateCaches[args[i]];
+        }
+      } else {
+        this.templateCaches = {};
+      }
+    }
+  });
+  
+  // TemplateCache instance methods, allowing each
+  // template cache object to manage its own state
+  // and know whether or not it has been loaded
+  _.extend(Marionette.TemplateCache.prototype, {
+  
+    // Internal method to load the template
+    load: function(options) {
+      // Guard clause to prevent loading this template more than once
+      if (this.compiledTemplate) {
+        return this.compiledTemplate;
+      }
+  
+      // Load the template and compile it
+      var template = this.loadTemplate(this.templateId, options);
+      this.compiledTemplate = this.compileTemplate(template, options);
+  
+      return this.compiledTemplate;
+    },
+  
+    // Load a template from the DOM, by default. Override
+    // this method to provide your own template retrieval
+    // For asynchronous loading with AMD/RequireJS, consider
+    // using a template-loader plugin as described here:
+    // https://github.com/marionettejs/backbone.marionette/wiki/Using-marionette-with-requirejs
+    loadTemplate: function(templateId, options) {
+      var $template = Backbone.$(templateId);
+  
+      if (!$template.length) {
+        throw new Marionette.Error({
+          name: 'NoTemplateError',
+          message: 'Could not find template: "' + templateId + '"'
+        });
+      }
+      return $template.html();
+    },
+  
+    // Pre-compile the template before caching it. Override
+    // this method if you do not need to pre-compile a template
+    // (JST / RequireJS for example) or if you want to change
+    // the template engine used (Handebars, etc).
+    compileTemplate: function(rawTemplate, options) {
+      return _.template(rawTemplate, options);
+    }
+  });
+  
+  // Renderer
+  // --------
+  
+  // Render a template with data by passing in the template
+  // selector and the data to render.
+  Marionette.Renderer = {
+  
+    // Render a template with data. The `template` parameter is
+    // passed to the `TemplateCache` object to retrieve the
+    // template function. Override this method to provide your own
+    // custom rendering and template handling for all of Marionette.
+    render: function(template, data) {
+      if (!template) {
+        throw new Marionette.Error({
+          name: 'TemplateNotFoundError',
+          message: 'Cannot render the template since its false, null or undefined.'
+        });
+      }
+  
+      var templateFunc = _.isFunction(template) ? template : Marionette.TemplateCache.get(template);
+  
+      return templateFunc(data);
+    }
+  };
+  
+
+  /* jshint maxlen: 114, nonew: false */
+  // View
+  // ----
+  
+  // The core view class that other Marionette views extend from.
+  Marionette.View = Backbone.View.extend({
+    isDestroyed: false,
+    supportsRenderLifecycle: true,
+    supportsDestroyLifecycle: true,
+  
+    constructor: function(options) {
+      this.render = _.bind(this.render, this);
+  
+      options = Marionette._getValue(options, this);
+  
+      // this exposes view options to the view initializer
+      // this is a backfill since backbone removed the assignment
+      // of this.options
+      // at some point however this may be removed
+      this.options = _.extend({}, _.result(this, 'options'), options);
+  
+      this._behaviors = Marionette.Behaviors(this);
+  
+      Backbone.View.call(this, this.options);
+  
+      Marionette.MonitorDOMRefresh(this);
+    },
+  
+    // Get the template for this view
+    // instance. You can set a `template` attribute in the view
+    // definition or pass a `template: "whatever"` parameter in
+    // to the constructor options.
+    getTemplate: function() {
+      return this.getOption('template');
+    },
+  
+    // Serialize a model by returning its attributes. Clones
+    // the attributes to allow modification.
+    serializeModel: function(model) {
+      return model.toJSON.apply(model, _.rest(arguments));
+    },
+  
+    // Mix in template helper methods. Looks for a
+    // `templateHelpers` attribute, which can either be an
+    // object literal, or a function that returns an object
+    // literal. All methods and attributes from this object
+    // are copies to the object passed in.
+    mixinTemplateHelpers: function(target) {
+      target = target || {};
+      var templateHelpers = this.getOption('templateHelpers');
+      templateHelpers = Marionette._getValue(templateHelpers, this);
+      return _.extend(target, templateHelpers);
+    },
+  
+    // normalize the keys of passed hash with the views `ui` selectors.
+    // `{"@ui.foo": "bar"}`
+    normalizeUIKeys: function(hash) {
+      var uiBindings = _.result(this, '_uiBindings');
+      return Marionette.normalizeUIKeys(hash, uiBindings || _.result(this, 'ui'));
+    },
+  
+    // normalize the values of passed hash with the views `ui` selectors.
+    // `{foo: "@ui.bar"}`
+    normalizeUIValues: function(hash, properties) {
+      var ui = _.result(this, 'ui');
+      var uiBindings = _.result(this, '_uiBindings');
+      return Marionette.normalizeUIValues(hash, uiBindings || ui, properties);
+    },
+  
+    // Configure `triggers` to forward DOM events to view
+    // events. `triggers: {"click .foo": "do:foo"}`
+    configureTriggers: function() {
+      if (!this.triggers) { return; }
+  
+      // Allow `triggers` to be configured as a function
+      var triggers = this.normalizeUIKeys(_.result(this, 'triggers'));
+  
+      // Configure the triggers, prevent default
+      // action and stop propagation of DOM events
+      return _.reduce(triggers, function(events, value, key) {
+        events[key] = this._buildViewTrigger(value);
+        return events;
+      }, {}, this);
+    },
+  
+    // Overriding Backbone.View's delegateEvents to handle
+    // the `triggers`, `modelEvents`, and `collectionEvents` configuration
+    delegateEvents: function(events) {
+      this._delegateDOMEvents(events);
+      this.bindEntityEvents(this.model, this.getOption('modelEvents'));
+      this.bindEntityEvents(this.collection, this.getOption('collectionEvents'));
+  
+      _.each(this._behaviors, function(behavior) {
+        behavior.bindEntityEvents(this.model, behavior.getOption('modelEvents'));
+        behavior.bindEntityEvents(this.collection, behavior.getOption('collectionEvents'));
+      }, this);
+  
+      return this;
+    },
+  
+    // internal method to delegate DOM events and triggers
+    _delegateDOMEvents: function(eventsArg) {
+      var events = Marionette._getValue(eventsArg || this.events, this);
+  
+      // normalize ui keys
+      events = this.normalizeUIKeys(events);
+      if (_.isUndefined(eventsArg)) {this.events = events;}
+  
+      var combinedEvents = {};
+  
+      // look up if this view has behavior events
+      var behaviorEvents = _.result(this, 'behaviorEvents') || {};
+      var triggers = this.configureTriggers();
+      var behaviorTriggers = _.result(this, 'behaviorTriggers') || {};
+  
+      // behavior events will be overriden by view events and or triggers
+      _.extend(combinedEvents, behaviorEvents, events, triggers, behaviorTriggers);
+  
+      Backbone.View.prototype.delegateEvents.call(this, combinedEvents);
+    },
+  
+    // Overriding Backbone.View's undelegateEvents to handle unbinding
+    // the `triggers`, `modelEvents`, and `collectionEvents` config
+    undelegateEvents: function() {
+      Backbone.View.prototype.undelegateEvents.apply(this, arguments);
+  
+      this.unbindEntityEvents(this.model, this.getOption('modelEvents'));
+      this.unbindEntityEvents(this.collection, this.getOption('collectionEvents'));
+  
+      _.each(this._behaviors, function(behavior) {
+        behavior.unbindEntityEvents(this.model, behavior.getOption('modelEvents'));
+        behavior.unbindEntityEvents(this.collection, behavior.getOption('collectionEvents'));
+      }, this);
+  
+      return this;
+    },
+  
+    // Internal helper method to verify whether the view hasn't been destroyed
+    _ensureViewIsIntact: function() {
+      if (this.isDestroyed) {
+        throw new Marionette.Error({
+          name: 'ViewDestroyedError',
+          message: 'View (cid: "' + this.cid + '") has already been destroyed and cannot be used.'
+        });
+      }
+    },
+  
+    // Default `destroy` implementation, for removing a view from the
+    // DOM and unbinding it. Regions will call this method
+    // for you. You can specify an `onDestroy` method in your view to
+    // add custom code that is called after the view is destroyed.
+    destroy: function() {
+      if (this.isDestroyed) { return this; }
+  
+      var args = _.toArray(arguments);
+  
+      this.triggerMethod.apply(this, ['before:destroy'].concat(args));
+  
+      // mark as destroyed before doing the actual destroy, to
+      // prevent infinite loops within "destroy" event handlers
+      // that are trying to destroy other views
+      this.isDestroyed = true;
+      this.triggerMethod.apply(this, ['destroy'].concat(args));
+  
+      // unbind UI elements
+      this.unbindUIElements();
+  
+      this.isRendered = false;
+  
+      // remove the view from the DOM
+      this.remove();
+  
+      // Call destroy on each behavior after
+      // destroying the view.
+      // This unbinds event listeners
+      // that behaviors have registered for.
+      _.invoke(this._behaviors, 'destroy', args);
+  
+      return this;
+    },
+  
+    bindUIElements: function() {
+      this._bindUIElements();
+      _.invoke(this._behaviors, this._bindUIElements);
+    },
+  
+    // This method binds the elements specified in the "ui" hash inside the view's code with
+    // the associated jQuery selectors.
+    _bindUIElements: function() {
+      if (!this.ui) { return; }
+  
+      // store the ui hash in _uiBindings so they can be reset later
+      // and so re-rendering the view will be able to find the bindings
+      if (!this._uiBindings) {
+        this._uiBindings = this.ui;
+      }
+  
+      // get the bindings result, as a function or otherwise
+      var bindings = _.result(this, '_uiBindings');
+  
+      // empty the ui so we don't have anything to start with
+      this.ui = {};
+  
+      // bind each of the selectors
+      _.each(bindings, function(selector, key) {
+        this.ui[key] = this.$(selector);
+      }, this);
+    },
+  
+    // This method unbinds the elements specified in the "ui" hash
+    unbindUIElements: function() {
+      this._unbindUIElements();
+      _.invoke(this._behaviors, this._unbindUIElements);
+    },
+  
+    _unbindUIElements: function() {
+      if (!this.ui || !this._uiBindings) { return; }
+  
+      // delete all of the existing ui bindings
+      _.each(this.ui, function($el, name) {
+        delete this.ui[name];
+      }, this);
+  
+      // reset the ui element to the original bindings configuration
+      this.ui = this._uiBindings;
+      delete this._uiBindings;
+    },
+  
+    // Internal method to create an event handler for a given `triggerDef` like
+    // 'click:foo'
+    _buildViewTrigger: function(triggerDef) {
+  
+      var options = _.defaults({}, triggerDef, {
+        preventDefault: true,
+        stopPropagation: true
+      });
+  
+      var eventName = _.isObject(triggerDef) ? options.event : triggerDef;
+  
+      return function(e) {
+        if (e) {
+          if (e.preventDefault && options.preventDefault) {
+            e.preventDefault();
+          }
+  
+          if (e.stopPropagation && options.stopPropagation) {
+            e.stopPropagation();
+          }
+        }
+  
+        var args = {
+          view: this,
+          model: this.model,
+          collection: this.collection
+        };
+  
+        this.triggerMethod(eventName, args);
+      };
+    },
+  
+    setElement: function() {
+      var ret = Backbone.View.prototype.setElement.apply(this, arguments);
+  
+      // proxy behavior $el to the view's $el.
+      // This is needed because a view's $el proxy
+      // is not set until after setElement is called.
+      _.invoke(this._behaviors, 'proxyViewProperties', this);
+  
+      return ret;
+    },
+  
+    // import the `triggerMethod` to trigger events with corresponding
+    // methods if the method exists
+    triggerMethod: function() {
+      var ret = Marionette._triggerMethod(this, arguments);
+  
+      this._triggerEventOnBehaviors(arguments);
+      this._triggerEventOnParentLayout(arguments[0], _.rest(arguments));
+  
+      return ret;
+    },
+  
+    _triggerEventOnBehaviors: function(args) {
+      var triggerMethod = Marionette._triggerMethod;
+      var behaviors = this._behaviors;
+      // Use good ol' for as this is a very hot function
+      for (var i = 0, length = behaviors && behaviors.length; i < length; i++) {
+        triggerMethod(behaviors[i], args);
+      }
+    },
+  
+    _triggerEventOnParentLayout: function(eventName, args) {
+      var layoutView = this._parentLayoutView();
+      if (!layoutView) {
+        return;
+      }
+  
+      // invoke triggerMethod on parent view
+      var eventPrefix = Marionette.getOption(layoutView, 'childViewEventPrefix');
+      var prefixedEventName = eventPrefix + ':' + eventName;
+      var callArgs = [this].concat(args);
+  
+      Marionette._triggerMethod(layoutView, prefixedEventName, callArgs);
+  
+      // call the parent view's childEvents handler
+      var childEvents = Marionette.getOption(layoutView, 'childEvents');
+      var normalizedChildEvents = layoutView.normalizeMethods(childEvents);
+  
+      if (normalizedChildEvents && _.isFunction(normalizedChildEvents[eventName])) {
+        normalizedChildEvents[eventName].apply(layoutView, callArgs);
+      }
+    },
+  
+    // This method returns any views that are immediate
+    // children of this view
+    _getImmediateChildren: function() {
+      return [];
+    },
+  
+    // Returns an array of every nested view within this view
+    _getNestedViews: function() {
+      var children = this._getImmediateChildren();
+  
+      if (!children.length) { return children; }
+  
+      return _.reduce(children, function(memo, view) {
+        if (!view._getNestedViews) { return memo; }
+        return memo.concat(view._getNestedViews());
+      }, children);
+    },
+  
+    // Internal utility for building an ancestor
+    // view tree list.
+    _getAncestors: function() {
+      var ancestors = [];
+      var parent  = this._parent;
+  
+      while (parent) {
+        ancestors.push(parent);
+        parent = parent._parent;
+      }
+  
+      return ancestors;
+    },
+  
+    // Returns the containing parent view.
+    _parentLayoutView: function() {
+      var ancestors = this._getAncestors();
+      return _.find(ancestors, function(parent) {
+        return parent instanceof Marionette.LayoutView;
+      });
+    },
+  
+    // Imports the "normalizeMethods" to transform hashes of
+    // events=>function references/names to a hash of events=>function references
+    normalizeMethods: Marionette.normalizeMethods,
+  
+    // A handy way to merge passed-in options onto the instance
+    mergeOptions: Marionette.mergeOptions,
+  
+    // Proxy `getOption` to enable getting options from this or this.options by name.
+    getOption: Marionette.proxyGetOption,
+  
+    // Proxy `bindEntityEvents` to enable binding view's events from another entity.
+    bindEntityEvents: Marionette.proxyBindEntityEvents,
+  
+    // Proxy `unbindEntityEvents` to enable unbinding view's events from another entity.
+    unbindEntityEvents: Marionette.proxyUnbindEntityEvents
+  });
+  
+  // Item View
+  // ---------
+  
+  // A single item view implementation that contains code for rendering
+  // with underscore.js templates, serializing the view's model or collection,
+  // and calling several methods on extended views, such as `onRender`.
+  Marionette.ItemView = Marionette.View.extend({
+  
+    // Setting up the inheritance chain which allows changes to
+    // Marionette.View.prototype.constructor which allows overriding
+    constructor: function() {
+      Marionette.View.apply(this, arguments);
+    },
+  
+    // Serialize the model or collection for the view. If a model is
+    // found, the view's `serializeModel` is called. If a collection is found,
+    // each model in the collection is serialized by calling
+    // the view's `serializeCollection` and put into an `items` array in
+    // the resulting data. If both are found, defaults to the model.
+    // You can override the `serializeData` method in your own view definition,
+    // to provide custom serialization for your view's data.
+    serializeData: function() {
+      if (!this.model && !this.collection) {
+        return {};
+      }
+  
+      var args = [this.model || this.collection];
+      if (arguments.length) {
+        args.push.apply(args, arguments);
+      }
+  
+      if (this.model) {
+        return this.serializeModel.apply(this, args);
+      } else {
+        return {
+          items: this.serializeCollection.apply(this, args)
+        };
+      }
+    },
+  
+    // Serialize a collection by serializing each of its models.
+    serializeCollection: function(collection) {
+      return collection.toJSON.apply(collection, _.rest(arguments));
+    },
+  
+    // Render the view, defaulting to underscore.js templates.
+    // You can override this in your view definition to provide
+    // a very specific rendering for your view. In general, though,
+    // you should override the `Marionette.Renderer` object to
+    // change how Marionette renders views.
+    render: function() {
+      this._ensureViewIsIntact();
+  
+      this.triggerMethod('before:render', this);
+  
+      this._renderTemplate();
+      this.isRendered = true;
+      this.bindUIElements();
+  
+      this.triggerMethod('render', this);
+  
+      return this;
+    },
+  
+    // Internal method to render the template with the serialized data
+    // and template helpers via the `Marionette.Renderer` object.
+    // Throws an `UndefinedTemplateError` error if the template is
+    // any falsely value but literal `false`.
+    _renderTemplate: function() {
+      var template = this.getTemplate();
+  
+      // Allow template-less item views
+      if (template === false) {
+        return;
+      }
+  
+      if (!template) {
+        throw new Marionette.Error({
+          name: 'UndefinedTemplateError',
+          message: 'Cannot render the template since it is null or undefined.'
+        });
+      }
+  
+      // Add in entity data and template helpers
+      var data = this.mixinTemplateHelpers(this.serializeData());
+  
+      // Render and add to el
+      var html = Marionette.Renderer.render(template, data, this);
+      this.attachElContent(html);
+  
+      return this;
+    },
+  
+    // Attaches the content of a given view.
+    // This method can be overridden to optimize rendering,
+    // or to render in a non standard way.
+    //
+    // For example, using `innerHTML` instead of `$el.html`
+    //
+    // ```js
+    // attachElContent: function(html) {
+    //   this.el.innerHTML = html;
+    //   return this;
+    // }
+    // ```
+    attachElContent: function(html) {
+      this.$el.html(html);
+  
+      return this;
+    }
+  });
+  
+  /* jshint maxstatements: 20, maxcomplexity: 7 */
+  
+  // Collection View
+  // ---------------
+  
+  // A view that iterates over a Backbone.Collection
+  // and renders an individual child view for each model.
+  Marionette.CollectionView = Marionette.View.extend({
+  
+    // used as the prefix for child view events
+    // that are forwarded through the collectionview
+    childViewEventPrefix: 'childview',
+  
+    // flag for maintaining the sorted order of the collection
+    sort: true,
+  
+    // constructor
+    // option to pass `{sort: false}` to prevent the `CollectionView` from
+    // maintaining the sorted order of the collection.
+    // This will fallback onto appending childView's to the end.
+    //
+    // option to pass `{comparator: compFunction()}` to allow the `CollectionView`
+    // to use a custom sort order for the collection.
+    constructor: function(options) {
+      this.once('render', this._initialEvents);
+      this._initChildViewStorage();
+  
+      Marionette.View.apply(this, arguments);
+  
+      this.on({
+        'before:show':   this._onBeforeShowCalled,
+        'show':          this._onShowCalled,
+        'before:attach': this._onBeforeAttachCalled,
+        'attach':        this._onAttachCalled
+      });
+      this.initRenderBuffer();
+    },
+  
+    // Instead of inserting elements one by one into the page,
+    // it's much more performant to insert elements into a document
+    // fragment and then insert that document fragment into the page
+    initRenderBuffer: function() {
+      this._bufferedChildren = [];
+    },
+  
+    startBuffering: function() {
+      this.initRenderBuffer();
+      this.isBuffering = true;
+    },
+  
+    endBuffering: function() {
+      // Only trigger attach if already shown and attached, otherwise Region#show() handles this.
+      var canTriggerAttach = this._isShown && Marionette.isNodeAttached(this.el);
+      var nestedViews;
+  
+      this.isBuffering = false;
+  
+      if (this._isShown) {
+        this._triggerMethodMany(this._bufferedChildren, this, 'before:show');
+      }
+      if (canTriggerAttach && this._triggerBeforeAttach) {
+        nestedViews = this._getNestedViews();
+        this._triggerMethodMany(nestedViews, this, 'before:attach');
+      }
+  
+      this.attachBuffer(this, this._createBuffer());
+  
+      if (canTriggerAttach && this._triggerAttach) {
+        nestedViews = this._getNestedViews();
+        this._triggerMethodMany(nestedViews, this, 'attach');
+      }
+      if (this._isShown) {
+        this._triggerMethodMany(this._bufferedChildren, this, 'show');
+      }
+      this.initRenderBuffer();
+    },
+  
+    _triggerMethodMany: function(targets, source, eventName) {
+      var args = _.drop(arguments, 3);
+  
+      _.each(targets, function(target) {
+        Marionette.triggerMethodOn.apply(target, [target, eventName, target, source].concat(args));
+      });
+    },
+  
+    // Configured the initial events that the collection view
+    // binds to.
+    _initialEvents: function() {
+      if (this.collection) {
+        this.listenTo(this.collection, 'add', this._onCollectionAdd);
+        this.listenTo(this.collection, 'remove', this._onCollectionRemove);
+        this.listenTo(this.collection, 'reset', this.render);
+  
+        if (this.getOption('sort')) {
+          this.listenTo(this.collection, 'sort', this._sortViews);
+        }
+      }
+    },
+  
+    // Handle a child added to the collection
+    _onCollectionAdd: function(child, collection, opts) {
+      // `index` is present when adding with `at` since BB 1.2; indexOf fallback for < 1.2
+      var index = opts.at !== undefined && (opts.index || collection.indexOf(child));
+  
+      // When filtered or when there is no initial index, calculate index.
+      if (this.getOption('filter') || index === false) {
+        index = _.indexOf(this._filteredSortedModels(index), child);
+      }
+  
+      if (this._shouldAddChild(child, index)) {
+        this.destroyEmptyView();
+        var ChildView = this.getChildView(child);
+        this.addChild(child, ChildView, index);
+      }
+    },
+  
+    // get the child view by model it holds, and remove it
+    _onCollectionRemove: function(model) {
+      var view = this.children.findByModel(model);
+      this.removeChildView(view);
+      this.checkEmpty();
+    },
+  
+    _onBeforeShowCalled: function() {
+      // Reset attach event flags at the top of the Region#show() event lifecycle; if the Region's
+      // show() options permit onBeforeAttach/onAttach events, these flags will be set true again.
+      this._triggerBeforeAttach = this._triggerAttach = false;
+      this.children.each(function(childView) {
+        Marionette.triggerMethodOn(childView, 'before:show', childView);
+      });
+    },
+  
+    _onShowCalled: function() {
+      this.children.each(function(childView) {
+        Marionette.triggerMethodOn(childView, 'show', childView);
+      });
+    },
+  
+    // If during Region#show() onBeforeAttach was fired, continue firing it for child views
+    _onBeforeAttachCalled: function() {
+      this._triggerBeforeAttach = true;
+    },
+  
+    // If during Region#show() onAttach was fired, continue firing it for child views
+    _onAttachCalled: function() {
+      this._triggerAttach = true;
+    },
+  
+    // Render children views. Override this method to
+    // provide your own implementation of a render function for
+    // the collection view.
+    render: function() {
+      this._ensureViewIsIntact();
+      this.triggerMethod('before:render', this);
+      this._renderChildren();
+      this.isRendered = true;
+      this.triggerMethod('render', this);
+      return this;
+    },
+  
+    // Reorder DOM after sorting. When your element's rendering
+    // do not use their index, you can pass reorderOnSort: true
+    // to only reorder the DOM after a sort instead of rendering
+    // all the collectionView
+    reorder: function() {
+      var children = this.children;
+      var models = this._filteredSortedModels();
+      var modelsChanged = _.find(models, function(model) {
+        return !children.findByModel(model);
+      });
+  
+      // If the models we're displaying have changed due to filtering
+      // We need to add and/or remove child views
+      // So render as normal
+      if (modelsChanged) {
+        this.render();
+      } else {
+        // get the DOM nodes in the same order as the models
+        var els = _.map(models, function(model, index) {
+          var view = children.findByModel(model);
+          view._index = index;
+          return view.el;
+        });
+  
+        // since append moves elements that are already in the DOM,
+        // appending the elements will effectively reorder them
+        this.triggerMethod('before:reorder');
+        this._appendReorderedChildren(els);
+        this.triggerMethod('reorder');
+      }
+    },
+  
+    // Render view after sorting. Override this method to
+    // change how the view renders after a `sort` on the collection.
+    // An example of this would be to only `renderChildren` in a `CompositeView`
+    // rather than the full view.
+    resortView: function() {
+      if (Marionette.getOption(this, 'reorderOnSort')) {
+        this.reorder();
+      } else {
+        this.render();
+      }
+    },
+  
+    // Internal method. This checks for any changes in the order of the collection.
+    // If the index of any view doesn't match, it will render.
+    _sortViews: function() {
+      var models = this._filteredSortedModels();
+  
+      // check for any changes in sort order of views
+      var orderChanged = _.find(models, function(item, index) {
+        var view = this.children.findByModel(item);
+        return !view || view._index !== index;
+      }, this);
+  
+      if (orderChanged) {
+        this.resortView();
+      }
+    },
+  
+    // Internal reference to what index a `emptyView` is.
+    _emptyViewIndex: -1,
+  
+    // Internal method. Separated so that CompositeView can append to the childViewContainer
+    // if necessary
+    _appendReorderedChildren: function(children) {
+      this.$el.append(children);
+    },
+  
+    // Internal method. Separated so that CompositeView can have
+    // more control over events being triggered, around the rendering
+    // process
+    _renderChildren: function() {
+      this.destroyEmptyView();
+      this.destroyChildren({checkEmpty: false});
+  
+      if (this.isEmpty(this.collection)) {
+        this.showEmptyView();
+      } else {
+        this.triggerMethod('before:render:collection', this);
+        this.startBuffering();
+        this.showCollection();
+        this.endBuffering();
+        this.triggerMethod('render:collection', this);
+  
+        // If we have shown children and none have passed the filter, show the empty view
+        if (this.children.isEmpty() && this.getOption('filter')) {
+          this.showEmptyView();
+        }
+      }
+    },
+  
+    // Internal method to loop through collection and show each child view.
+    showCollection: function() {
+      var ChildView;
+  
+      var models = this._filteredSortedModels();
+  
+      _.each(models, function(child, index) {
+        ChildView = this.getChildView(child);
+        this.addChild(child, ChildView, index);
+      }, this);
+    },
+  
+    // Allow the collection to be sorted by a custom view comparator
+    _filteredSortedModels: function(addedAt) {
+      var viewComparator = this.getViewComparator();
+      var models = this.collection.models;
+      addedAt = Math.min(Math.max(addedAt, 0), models.length - 1);
+  
+      if (viewComparator) {
+        var addedModel;
+        // Preserve `at` location, even for a sorted view
+        if (addedAt) {
+          addedModel = models[addedAt];
+          models = models.slice(0, addedAt).concat(models.slice(addedAt + 1));
+        }
+        models = this._sortModelsBy(models, viewComparator);
+        if (addedModel) {
+          models.splice(addedAt, 0, addedModel);
+        }
+      }
+  
+      // Filter after sorting in case the filter uses the index
+      if (this.getOption('filter')) {
+        models = _.filter(models, function(model, index) {
+          return this._shouldAddChild(model, index);
+        }, this);
+      }
+  
+      return models;
+    },
+  
+    _sortModelsBy: function(models, comparator) {
+      if (typeof comparator === 'string') {
+        return _.sortBy(models, function(model) {
+          return model.get(comparator);
+        }, this);
+      } else if (comparator.length === 1) {
+        return _.sortBy(models, comparator, this);
+      } else {
+        return models.sort(_.bind(comparator, this));
+      }
+    },
+  
+    // Internal method to show an empty view in place of
+    // a collection of child views, when the collection is empty
+    showEmptyView: function() {
+      var EmptyView = this.getEmptyView();
+  
+      if (EmptyView && !this._showingEmptyView) {
+        this.triggerMethod('before:render:empty');
+  
+        this._showingEmptyView = true;
+        var model = new Backbone.Model();
+        this.addEmptyView(model, EmptyView);
+  
+        this.triggerMethod('render:empty');
+      }
+    },
+  
+    // Internal method to destroy an existing emptyView instance
+    // if one exists. Called when a collection view has been
+    // rendered empty, and then a child is added to the collection.
+    destroyEmptyView: function() {
+      if (this._showingEmptyView) {
+        this.triggerMethod('before:remove:empty');
+  
+        this.destroyChildren();
+        delete this._showingEmptyView;
+  
+        this.triggerMethod('remove:empty');
+      }
+    },
+  
+    // Retrieve the empty view class
+    getEmptyView: function() {
+      return this.getOption('emptyView');
+    },
+  
+    // Render and show the emptyView. Similar to addChild method
+    // but "add:child" events are not fired, and the event from
+    // emptyView are not forwarded
+    addEmptyView: function(child, EmptyView) {
+      // Only trigger attach if already shown, attached, and not buffering, otherwise endBuffer() or
+      // Region#show() handles this.
+      var canTriggerAttach = this._isShown && !this.isBuffering && Marionette.isNodeAttached(this.el);
+      var nestedViews;
+  
+      // get the emptyViewOptions, falling back to childViewOptions
+      var emptyViewOptions = this.getOption('emptyViewOptions') ||
+                            this.getOption('childViewOptions');
+  
+      if (_.isFunction(emptyViewOptions)) {
+        emptyViewOptions = emptyViewOptions.call(this, child, this._emptyViewIndex);
+      }
+  
+      // build the empty view
+      var view = this.buildChildView(child, EmptyView, emptyViewOptions);
+  
+      view._parent = this;
+  
+      // Proxy emptyView events
+      this.proxyChildEvents(view);
+  
+      view.once('render', function() {
+        // trigger the 'before:show' event on `view` if the collection view has already been shown
+        if (this._isShown) {
+          Marionette.triggerMethodOn(view, 'before:show', view);
+        }
+  
+        // Trigger `before:attach` following `render` to avoid adding logic and event triggers
+        // to public method `renderChildView()`.
+        if (canTriggerAttach && this._triggerBeforeAttach) {
+          nestedViews = this._getViewAndNested(view);
+          this._triggerMethodMany(nestedViews, this, 'before:attach');
+        }
+      }, this);
+  
+      // Store the `emptyView` like a `childView` so we can properly remove and/or close it later
+      this.children.add(view);
+      this.renderChildView(view, this._emptyViewIndex);
+  
+      // Trigger `attach`
+      if (canTriggerAttach && this._triggerAttach) {
+        nestedViews = this._getViewAndNested(view);
+        this._triggerMethodMany(nestedViews, this, 'attach');
+      }
+      // call the 'show' method if the collection view has already been shown
+      if (this._isShown) {
+        Marionette.triggerMethodOn(view, 'show', view);
+      }
+    },
+  
+    // Retrieve the `childView` class, either from `this.options.childView`
+    // or from the `childView` in the object definition. The "options"
+    // takes precedence.
+    // This method receives the model that will be passed to the instance
+    // created from this `childView`. Overriding methods may use the child
+    // to determine what `childView` class to return.
+    getChildView: function(child) {
+      var childView = this.getOption('childView');
+  
+      if (!childView) {
+        throw new Marionette.Error({
+          name: 'NoChildViewError',
+          message: 'A "childView" must be specified'
+        });
+      }
+  
+      return childView;
+    },
+  
+    // Render the child's view and add it to the
+    // HTML for the collection view at a given index.
+    // This will also update the indices of later views in the collection
+    // in order to keep the children in sync with the collection.
+    addChild: function(child, ChildView, index) {
+      var childViewOptions = this.getOption('childViewOptions');
+      childViewOptions = Marionette._getValue(childViewOptions, this, [child, index]);
+  
+      var view = this.buildChildView(child, ChildView, childViewOptions);
+  
+      // increment indices of views after this one
+      this._updateIndices(view, true, index);
+  
+      this.triggerMethod('before:add:child', view);
+      this._addChildView(view, index);
+      this.triggerMethod('add:child', view);
+  
+      view._parent = this;
+  
+      return view;
+    },
+  
+    // Internal method. This decrements or increments the indices of views after the
+    // added/removed view to keep in sync with the collection.
+    _updateIndices: function(view, increment, index) {
+      if (!this.getOption('sort')) {
+        return;
+      }
+  
+      if (increment) {
+        // assign the index to the view
+        view._index = index;
+      }
+  
+      // update the indexes of views after this one
+      this.children.each(function(laterView) {
+        if (laterView._index >= view._index) {
+          laterView._index += increment ? 1 : -1;
+        }
+      });
+    },
+  
+    // Internal Method. Add the view to children and render it at
+    // the given index.
+    _addChildView: function(view, index) {
+      // Only trigger attach if already shown, attached, and not buffering, otherwise endBuffer() or
+      // Region#show() handles this.
+      var canTriggerAttach = this._isShown && !this.isBuffering && Marionette.isNodeAttached(this.el);
+      var nestedViews;
+  
+      // set up the child view event forwarding
+      this.proxyChildEvents(view);
+  
+      view.once('render', function() {
+        // trigger the 'before:show' event on `view` if the collection view has already been shown
+        if (this._isShown && !this.isBuffering) {
+          Marionette.triggerMethodOn(view, 'before:show', view);
+        }
+  
+        // Trigger `before:attach` following `render` to avoid adding logic and event triggers
+        // to public method `renderChildView()`.
+        if (canTriggerAttach && this._triggerBeforeAttach) {
+          nestedViews = this._getViewAndNested(view);
+          this._triggerMethodMany(nestedViews, this, 'before:attach');
+        }
+      }, this);
+  
+      // Store the child view itself so we can properly remove and/or destroy it later
+      this.children.add(view);
+      this.renderChildView(view, index);
+  
+      // Trigger `attach`
+      if (canTriggerAttach && this._triggerAttach) {
+        nestedViews = this._getViewAndNested(view);
+        this._triggerMethodMany(nestedViews, this, 'attach');
+      }
+      // Trigger `show`
+      if (this._isShown && !this.isBuffering) {
+        Marionette.triggerMethodOn(view, 'show', view);
+      }
+    },
+  
+    // render the child view
+    renderChildView: function(view, index) {
+      if (!view.supportsRenderLifecycle) {
+        Marionette.triggerMethodOn(view, 'before:render', view);
+      }
+      view.render();
+      if (!view.supportsRenderLifecycle) {
+        Marionette.triggerMethodOn(view, 'render', view);
+      }
+      this.attachHtml(this, view, index);
+      return view;
+    },
+  
+    // Build a `childView` for a model in the collection.
+    buildChildView: function(child, ChildViewClass, childViewOptions) {
+      var options = _.extend({model: child}, childViewOptions);
+      var childView = new ChildViewClass(options);
+      Marionette.MonitorDOMRefresh(childView);
+      return childView;
+    },
+  
+    // Remove the child view and destroy it.
+    // This function also updates the indices of
+    // later views in the collection in order to keep
+    // the children in sync with the collection.
+    removeChildView: function(view) {
+      if (!view) { return view; }
+  
+      this.triggerMethod('before:remove:child', view);
+  
+      if (!view.supportsDestroyLifecycle) {
+        Marionette.triggerMethodOn(view, 'before:destroy', view);
+      }
+      // call 'destroy' or 'remove', depending on which is found
+      if (view.destroy) {
+        view.destroy();
+      } else {
+        view.remove();
+      }
+      if (!view.supportsDestroyLifecycle) {
+        Marionette.triggerMethodOn(view, 'destroy', view);
+      }
+  
+      delete view._parent;
+      this.stopListening(view);
+      this.children.remove(view);
+      this.triggerMethod('remove:child', view);
+  
+      // decrement the index of views after this one
+      this._updateIndices(view, false);
+  
+      return view;
+    },
+  
+    // check if the collection is empty
+    isEmpty: function() {
+      return !this.collection || this.collection.length === 0;
+    },
+  
+    // If empty, show the empty view
+    checkEmpty: function() {
+      if (this.isEmpty(this.collection)) {
+        this.showEmptyView();
+      }
+    },
+  
+    // You might need to override this if you've overridden attachHtml
+    attachBuffer: function(collectionView, buffer) {
+      collectionView.$el.append(buffer);
+    },
+  
+    // Create a fragment buffer from the currently buffered children
+    _createBuffer: function() {
+      var elBuffer = document.createDocumentFragment();
+      _.each(this._bufferedChildren, function(b) {
+        elBuffer.appendChild(b.el);
+      });
+      return elBuffer;
+    },
+  
+    // Append the HTML to the collection's `el`.
+    // Override this method to do something other
+    // than `.append`.
+    attachHtml: function(collectionView, childView, index) {
+      if (collectionView.isBuffering) {
+        // buffering happens on reset events and initial renders
+        // in order to reduce the number of inserts into the
+        // document, which are expensive.
+        collectionView._bufferedChildren.splice(index, 0, childView);
+      } else {
+        // If we've already rendered the main collection, append
+        // the new child into the correct order if we need to. Otherwise
+        // append to the end.
+        if (!collectionView._insertBefore(childView, index)) {
+          collectionView._insertAfter(childView);
+        }
+      }
+    },
+  
+    // Internal method. Check whether we need to insert the view into
+    // the correct position.
+    _insertBefore: function(childView, index) {
+      var currentView;
+      var findPosition = this.getOption('sort') && (index < this.children.length - 1);
+      if (findPosition) {
+        // Find the view after this one
+        currentView = this.children.find(function(view) {
+          return view._index === index + 1;
+        });
+      }
+  
+      if (currentView) {
+        currentView.$el.before(childView.el);
+        return true;
+      }
+  
+      return false;
+    },
+  
+    // Internal method. Append a view to the end of the $el
+    _insertAfter: function(childView) {
+      this.$el.append(childView.el);
+    },
+  
+    // Internal method to set up the `children` object for
+    // storing all of the child views
+    _initChildViewStorage: function() {
+      this.children = new Backbone.ChildViewContainer();
+    },
+  
+    // Handle cleanup and other destroying needs for the collection of views
+    destroy: function() {
+      if (this.isDestroyed) { return this; }
+  
+      this.triggerMethod('before:destroy:collection');
+      this.destroyChildren({checkEmpty: false});
+      this.triggerMethod('destroy:collection');
+  
+      return Marionette.View.prototype.destroy.apply(this, arguments);
+    },
+  
+    // Destroy the child views that this collection view
+    // is holding on to, if any
+    destroyChildren: function(options) {
+      var destroyOptions = options || {};
+      var shouldCheckEmpty = true;
+      var childViews = this.children.map(_.identity);
+  
+      if (!_.isUndefined(destroyOptions.checkEmpty)) {
+        shouldCheckEmpty = destroyOptions.checkEmpty;
+      }
+  
+      this.children.each(this.removeChildView, this);
+  
+      if (shouldCheckEmpty) {
+        this.checkEmpty();
+      }
+      return childViews;
+    },
+  
+    // Return true if the given child should be shown
+    // Return false otherwise
+    // The filter will be passed (child, index, collection)
+    // Where
+    //  'child' is the given model
+    //  'index' is the index of that model in the collection
+    //  'collection' is the collection referenced by this CollectionView
+    _shouldAddChild: function(child, index) {
+      var filter = this.getOption('filter');
+      return !_.isFunction(filter) || filter.call(this, child, index, this.collection);
+    },
+  
+    // Set up the child view event forwarding. Uses a "childview:"
+    // prefix in front of all forwarded events.
+    proxyChildEvents: function(view) {
+      var prefix = this.getOption('childViewEventPrefix');
+  
+      // Forward all child view events through the parent,
+      // prepending "childview:" to the event name
+      this.listenTo(view, 'all', function() {
+        var args = _.toArray(arguments);
+        var rootEvent = args[0];
+        var childEvents = this.normalizeMethods(_.result(this, 'childEvents'));
+  
+        args[0] = prefix + ':' + rootEvent;
+        args.splice(1, 0, view);
+  
+        // call collectionView childEvent if defined
+        if (typeof childEvents !== 'undefined' && _.isFunction(childEvents[rootEvent])) {
+          childEvents[rootEvent].apply(this, args.slice(1));
+        }
+  
+        this.triggerMethod.apply(this, args);
+      });
+    },
+  
+    _getImmediateChildren: function() {
+      return _.values(this.children._views);
+    },
+  
+    _getViewAndNested: function(view) {
+      // This will not fail on Backbone.View which does not have #_getNestedViews.
+      return [view].concat(_.result(view, '_getNestedViews') || []);
+    },
+  
+    getViewComparator: function() {
+      return this.getOption('viewComparator');
+    }
+  });
+  
+  /* jshint maxstatements: 17, maxlen: 117 */
+  
+  // Composite View
+  // --------------
+  
+  // Used for rendering a branch-leaf, hierarchical structure.
+  // Extends directly from CollectionView and also renders an
+  // a child view as `modelView`, for the top leaf
+  Marionette.CompositeView = Marionette.CollectionView.extend({
+  
+    // Setting up the inheritance chain which allows changes to
+    // Marionette.CollectionView.prototype.constructor which allows overriding
+    // option to pass '{sort: false}' to prevent the CompositeView from
+    // maintaining the sorted order of the collection.
+    // This will fallback onto appending childView's to the end.
+    constructor: function() {
+      Marionette.CollectionView.apply(this, arguments);
+    },
+  
+    // Configured the initial events that the composite view
+    // binds to. Override this method to prevent the initial
+    // events, or to add your own initial events.
+    _initialEvents: function() {
+  
+      // Bind only after composite view is rendered to avoid adding child views
+      // to nonexistent childViewContainer
+  
+      if (this.collection) {
+        this.listenTo(this.collection, 'add', this._onCollectionAdd);
+        this.listenTo(this.collection, 'remove', this._onCollectionRemove);
+        this.listenTo(this.collection, 'reset', this._renderChildren);
+  
+        if (this.getOption('sort')) {
+          this.listenTo(this.collection, 'sort', this._sortViews);
+        }
+      }
+    },
+  
+    // Retrieve the `childView` to be used when rendering each of
+    // the items in the collection. The default is to return
+    // `this.childView` or Marionette.CompositeView if no `childView`
+    // has been defined
+    getChildView: function(child) {
+      var childView = this.getOption('childView') || this.constructor;
+  
+      return childView;
+    },
+  
+    // Serialize the model for the view.
+    // You can override the `serializeData` method in your own view
+    // definition, to provide custom serialization for your view's data.
+    serializeData: function() {
+      var data = {};
+  
+      if (this.model) {
+        data = _.partial(this.serializeModel, this.model).apply(this, arguments);
+      }
+  
+      return data;
+    },
+  
+    // Renders the model and the collection.
+    render: function() {
+      this._ensureViewIsIntact();
+      this._isRendering = true;
+      this.resetChildViewContainer();
+  
+      this.triggerMethod('before:render', this);
+  
+      this._renderTemplate();
+      this._renderChildren();
+  
+      this._isRendering = false;
+      this.isRendered = true;
+      this.triggerMethod('render', this);
+      return this;
+    },
+  
+    _renderChildren: function() {
+      if (this.isRendered || this._isRendering) {
+        Marionette.CollectionView.prototype._renderChildren.call(this);
+      }
+    },
+  
+    // Render the root template that the children
+    // views are appended to
+    _renderTemplate: function() {
+      var data = {};
+      data = this.serializeData();
+      data = this.mixinTemplateHelpers(data);
+  
+      this.triggerMethod('before:render:template');
+  
+      var template = this.getTemplate();
+      var html = Marionette.Renderer.render(template, data, this);
+      this.attachElContent(html);
+  
+      // the ui bindings is done here and not at the end of render since they
+      // will not be available until after the model is rendered, but should be
+      // available before the collection is rendered.
+      this.bindUIElements();
+      this.triggerMethod('render:template');
+    },
+  
+    // Attaches the content of the root.
+    // This method can be overridden to optimize rendering,
+    // or to render in a non standard way.
+    //
+    // For example, using `innerHTML` instead of `$el.html`
+    //
+    // ```js
+    // attachElContent: function(html) {
+    //   this.el.innerHTML = html;
+    //   return this;
+    // }
+    // ```
+    attachElContent: function(html) {
+      this.$el.html(html);
+  
+      return this;
+    },
+  
+    // You might need to override this if you've overridden attachHtml
+    attachBuffer: function(compositeView, buffer) {
+      var $container = this.getChildViewContainer(compositeView);
+      $container.append(buffer);
+    },
+  
+    // Internal method. Append a view to the end of the $el.
+    // Overidden from CollectionView to ensure view is appended to
+    // childViewContainer
+    _insertAfter: function(childView) {
+      var $container = this.getChildViewContainer(this, childView);
+      $container.append(childView.el);
+    },
+  
+    // Internal method. Append reordered childView'.
+    // Overidden from CollectionView to ensure reordered views
+    // are appended to childViewContainer
+    _appendReorderedChildren: function(children) {
+      var $container = this.getChildViewContainer(this);
+      $container.append(children);
+    },
+  
+    // Internal method to ensure an `$childViewContainer` exists, for the
+    // `attachHtml` method to use.
+    getChildViewContainer: function(containerView, childView) {
+      if (!!containerView.$childViewContainer) {
+        return containerView.$childViewContainer;
+      }
+  
+      var container;
+      var childViewContainer = Marionette.getOption(containerView, 'childViewContainer');
+      if (childViewContainer) {
+  
+        var selector = Marionette._getValue(childViewContainer, containerView);
+  
+        if (selector.charAt(0) === '@' && containerView.ui) {
+          container = containerView.ui[selector.substr(4)];
+        } else {
+          container = containerView.$(selector);
+        }
+  
+        if (container.length <= 0) {
+          throw new Marionette.Error({
+            name: 'ChildViewContainerMissingError',
+            message: 'The specified "childViewContainer" was not found: ' + containerView.childViewContainer
+          });
+        }
+  
+      } else {
+        container = containerView.$el;
+      }
+  
+      containerView.$childViewContainer = container;
+      return container;
+    },
+  
+    // Internal method to reset the `$childViewContainer` on render
+    resetChildViewContainer: function() {
+      if (this.$childViewContainer) {
+        this.$childViewContainer = undefined;
+      }
+    }
+  });
+  
+  // Layout View
+  // -----------
+  
+  // Used for managing application layoutViews, nested layoutViews and
+  // multiple regions within an application or sub-application.
+  //
+  // A specialized view class that renders an area of HTML and then
+  // attaches `Region` instances to the specified `regions`.
+  // Used for composite view management and sub-application areas.
+  Marionette.LayoutView = Marionette.ItemView.extend({
+    regionClass: Marionette.Region,
+  
+    options: {
+      destroyImmediate: false
+    },
+  
+    // used as the prefix for child view events
+    // that are forwarded through the layoutview
+    childViewEventPrefix: 'childview',
+  
+    // Ensure the regions are available when the `initialize` method
+    // is called.
+    constructor: function(options) {
+      options = options || {};
+  
+      this._firstRender = true;
+      this._initializeRegions(options);
+  
+      Marionette.ItemView.call(this, options);
+    },
+  
+    // LayoutView's render will use the existing region objects the
+    // first time it is called. Subsequent calls will destroy the
+    // views that the regions are showing and then reset the `el`
+    // for the regions to the newly rendered DOM elements.
+    render: function() {
+      this._ensureViewIsIntact();
+  
+      if (this._firstRender) {
+        // if this is the first render, don't do anything to
+        // reset the regions
+        this._firstRender = false;
+      } else {
+        // If this is not the first render call, then we need to
+        // re-initialize the `el` for each region
+        this._reInitializeRegions();
+      }
+  
+      return Marionette.ItemView.prototype.render.apply(this, arguments);
+    },
+  
+    // Handle destroying regions, and then destroy the view itself.
+    destroy: function() {
+      if (this.isDestroyed) { return this; }
+      // #2134: remove parent element before destroying the child views, so
+      // removing the child views doesn't retrigger repaints
+      if (this.getOption('destroyImmediate') === true) {
+        this.$el.remove();
+      }
+      this.regionManager.destroy();
+      return Marionette.ItemView.prototype.destroy.apply(this, arguments);
+    },
+  
+    showChildView: function(regionName, view) {
+      return this.getRegion(regionName).show(view);
+    },
+  
+    getChildView: function(regionName) {
+      return this.getRegion(regionName).currentView;
+    },
+  
+    // Add a single region, by name, to the layoutView
+    addRegion: function(name, definition) {
+      var regions = {};
+      regions[name] = definition;
+      return this._buildRegions(regions)[name];
+    },
+  
+    // Add multiple regions as a {name: definition, name2: def2} object literal
+    addRegions: function(regions) {
+      this.regions = _.extend({}, this.regions, regions);
+      return this._buildRegions(regions);
+    },
+  
+    // Remove a single region from the LayoutView, by name
+    removeRegion: function(name) {
+      delete this.regions[name];
+      return this.regionManager.removeRegion(name);
+    },
+  
+    // Provides alternative access to regions
+    // Accepts the region name
+    // getRegion('main')
+    getRegion: function(region) {
+      return this.regionManager.get(region);
+    },
+  
+    // Get all regions
+    getRegions: function() {
+      return this.regionManager.getRegions();
+    },
+  
+    // internal method to build regions
+    _buildRegions: function(regions) {
+      var defaults = {
+        regionClass: this.getOption('regionClass'),
+        parentEl: _.partial(_.result, this, 'el')
+      };
+  
+      return this.regionManager.addRegions(regions, defaults);
+    },
+  
+    // Internal method to initialize the regions that have been defined in a
+    // `regions` attribute on this layoutView.
+    _initializeRegions: function(options) {
+      var regions;
+      this._initRegionManager();
+  
+      regions = Marionette._getValue(this.regions, this, [options]) || {};
+  
+      // Enable users to define `regions` as instance options.
+      var regionOptions = this.getOption.call(options, 'regions');
+  
+      // enable region options to be a function
+      regionOptions = Marionette._getValue(regionOptions, this, [options]);
+  
+      _.extend(regions, regionOptions);
+  
+      // Normalize region selectors hash to allow
+      // a user to use the @ui. syntax.
+      regions = this.normalizeUIValues(regions, ['selector', 'el']);
+  
+      this.addRegions(regions);
+    },
+  
+    // Internal method to re-initialize all of the regions by updating the `el` that
+    // they point to
+    _reInitializeRegions: function() {
+      this.regionManager.invoke('reset');
+    },
+  
+    // Enable easy overriding of the default `RegionManager`
+    // for customized region interactions and business specific
+    // view logic for better control over single regions.
+    getRegionManager: function() {
+      return new Marionette.RegionManager();
+    },
+  
+    // Internal method to initialize the region manager
+    // and all regions in it
+    _initRegionManager: function() {
+      this.regionManager = this.getRegionManager();
+      this.regionManager._parent = this;
+  
+      this.listenTo(this.regionManager, 'before:add:region', function(name) {
+        this.triggerMethod('before:add:region', name);
+      });
+  
+      this.listenTo(this.regionManager, 'add:region', function(name, region) {
+        this[name] = region;
+        this.triggerMethod('add:region', name, region);
+      });
+  
+      this.listenTo(this.regionManager, 'before:remove:region', function(name) {
+        this.triggerMethod('before:remove:region', name);
+      });
+  
+      this.listenTo(this.regionManager, 'remove:region', function(name, region) {
+        delete this[name];
+        this.triggerMethod('remove:region', name, region);
+      });
+    },
+  
+    _getImmediateChildren: function() {
+      return _.chain(this.regionManager.getRegions())
+        .pluck('currentView')
+        .compact()
+        .value();
+    }
+  });
+  
+
+  // Behavior
+  // --------
+  
+  // A Behavior is an isolated set of DOM /
+  // user interactions that can be mixed into any View.
+  // Behaviors allow you to blackbox View specific interactions
+  // into portable logical chunks, keeping your views simple and your code DRY.
+  
+  Marionette.Behavior = Marionette.Object.extend({
+    constructor: function(options, view) {
+      // Setup reference to the view.
+      // this comes in handle when a behavior
+      // wants to directly talk up the chain
+      // to the view.
+      this.view = view;
+      this.defaults = _.result(this, 'defaults') || {};
+      this.options  = _.extend({}, this.defaults, options);
+      // Construct an internal UI hash using
+      // the views UI hash and then the behaviors UI hash.
+      // This allows the user to use UI hash elements
+      // defined in the parent view as well as those
+      // defined in the given behavior.
+      this.ui = _.extend({}, _.result(view, 'ui'), _.result(this, 'ui'));
+  
+      Marionette.Object.apply(this, arguments);
+    },
+  
+    // proxy behavior $ method to the view
+    // this is useful for doing jquery DOM lookups
+    // scoped to behaviors view.
+    $: function() {
+      return this.view.$.apply(this.view, arguments);
+    },
+  
+    // Stops the behavior from listening to events.
+    // Overrides Object#destroy to prevent additional events from being triggered.
+    destroy: function() {
+      this.stopListening();
+  
+      return this;
+    },
+  
+    proxyViewProperties: function(view) {
+      this.$el = view.$el;
+      this.el = view.el;
+    }
+  });
+  
+  /* jshint maxlen: 143 */
+  // Behaviors
+  // ---------
+  
+  // Behaviors is a utility class that takes care of
+  // gluing your behavior instances to their given View.
+  // The most important part of this class is that you
+  // **MUST** override the class level behaviorsLookup
+  // method for things to work properly.
+  
+  Marionette.Behaviors = (function(Marionette, _) {
+    // Borrow event splitter from Backbone
+    var delegateEventSplitter = /^(\S+)\s*(.*)$/;
+  
+    function Behaviors(view, behaviors) {
+  
+      if (!_.isObject(view.behaviors)) {
+        return {};
+      }
+  
+      // Behaviors defined on a view can be a flat object literal
+      // or it can be a function that returns an object.
+      behaviors = Behaviors.parseBehaviors(view, behaviors || _.result(view, 'behaviors'));
+  
+      // Wraps several of the view's methods
+      // calling the methods first on each behavior
+      // and then eventually calling the method on the view.
+      Behaviors.wrap(view, behaviors, _.keys(methods));
+      return behaviors;
+    }
+  
+    var methods = {
+      behaviorTriggers: function(behaviorTriggers, behaviors) {
+        var triggerBuilder = new BehaviorTriggersBuilder(this, behaviors);
+        return triggerBuilder.buildBehaviorTriggers();
+      },
+  
+      behaviorEvents: function(behaviorEvents, behaviors) {
+        var _behaviorsEvents = {};
+  
+        _.each(behaviors, function(b, i) {
+          var _events = {};
+          var behaviorEvents = _.clone(_.result(b, 'events')) || {};
+  
+          // Normalize behavior events hash to allow
+          // a user to use the @ui. syntax.
+          behaviorEvents = Marionette.normalizeUIKeys(behaviorEvents, getBehaviorsUI(b));
+  
+          var j = 0;
+          _.each(behaviorEvents, function(behaviour, key) {
+            var match     = key.match(delegateEventSplitter);
+  
+            // Set event name to be namespaced using the view cid,
+            // the behavior index, and the behavior event index
+            // to generate a non colliding event namespace
+            // http://api.jquery.com/event.namespace/
+            var eventName = match[1] + '.' + [this.cid, i, j++, ' '].join('');
+            var selector  = match[2];
+  
+            var eventKey  = eventName + selector;
+            var handler   = _.isFunction(behaviour) ? behaviour : b[behaviour];
+  
+            _events[eventKey] = _.bind(handler, b);
+          }, this);
+  
+          _behaviorsEvents = _.extend(_behaviorsEvents, _events);
+        }, this);
+  
+        return _behaviorsEvents;
+      }
+    };
+  
+    _.extend(Behaviors, {
+  
+      // Placeholder method to be extended by the user.
+      // The method should define the object that stores the behaviors.
+      // i.e.
+      //
+      // ```js
+      // Marionette.Behaviors.behaviorsLookup: function() {
+      //   return App.Behaviors
+      // }
+      // ```
+      behaviorsLookup: function() {
+        throw new Marionette.Error({
+          message: 'You must define where your behaviors are stored.',
+          url: 'marionette.behaviors.html#behaviorslookup'
+        });
+      },
+  
+      // Takes care of getting the behavior class
+      // given options and a key.
+      // If a user passes in options.behaviorClass
+      // default to using that. Otherwise delegate
+      // the lookup to the users `behaviorsLookup` implementation.
+      getBehaviorClass: function(options, key) {
+        if (options.behaviorClass) {
+          return options.behaviorClass;
+        }
+  
+        // Get behavior class can be either a flat object or a method
+        return Marionette._getValue(Behaviors.behaviorsLookup, this, [options, key])[key];
+      },
+  
+      // Iterate over the behaviors object, for each behavior
+      // instantiate it and get its grouped behaviors.
+      parseBehaviors: function(view, behaviors) {
+        return _.chain(behaviors).map(function(options, key) {
+          var BehaviorClass = Behaviors.getBehaviorClass(options, key);
+  
+          var behavior = new BehaviorClass(options, view);
+          var nestedBehaviors = Behaviors.parseBehaviors(view, _.result(behavior, 'behaviors'));
+  
+          return [behavior].concat(nestedBehaviors);
+        }).flatten().value();
+      },
+  
+      // Wrap view internal methods so that they delegate to behaviors. For example,
+      // `onDestroy` should trigger destroy on all of the behaviors and then destroy itself.
+      // i.e.
+      //
+      // `view.delegateEvents = _.partial(methods.delegateEvents, view.delegateEvents, behaviors);`
+      wrap: function(view, behaviors, methodNames) {
+        _.each(methodNames, function(methodName) {
+          view[methodName] = _.partial(methods[methodName], view[methodName], behaviors);
+        });
+      }
+    });
+  
+    // Class to build handlers for `triggers` on behaviors
+    // for views
+    function BehaviorTriggersBuilder(view, behaviors) {
+      this._view      = view;
+      this._behaviors = behaviors;
+      this._triggers  = {};
+    }
+  
+    _.extend(BehaviorTriggersBuilder.prototype, {
+      // Main method to build the triggers hash with event keys and handlers
+      buildBehaviorTriggers: function() {
+        _.each(this._behaviors, this._buildTriggerHandlersForBehavior, this);
+        return this._triggers;
+      },
+  
+      // Internal method to build all trigger handlers for a given behavior
+      _buildTriggerHandlersForBehavior: function(behavior, i) {
+        var triggersHash = _.clone(_.result(behavior, 'triggers')) || {};
+  
+        triggersHash = Marionette.normalizeUIKeys(triggersHash, getBehaviorsUI(behavior));
+  
+        _.each(triggersHash, _.bind(this._setHandlerForBehavior, this, behavior, i));
+      },
+  
+      // Internal method to create and assign the trigger handler for a given
+      // behavior
+      _setHandlerForBehavior: function(behavior, i, eventName, trigger) {
+        // Unique identifier for the `this._triggers` hash
+        var triggerKey = trigger.replace(/^\S+/, function(triggerName) {
+          return triggerName + '.' + 'behaviortriggers' + i;
+        });
+  
+        this._triggers[triggerKey] = this._view._buildViewTrigger(eventName);
+      }
+    });
+  
+    function getBehaviorsUI(behavior) {
+      return behavior._uiBindings || behavior.ui;
+    }
+  
+    return Behaviors;
+  
+  })(Marionette, _);
+  
+
+  // App Router
+  // ----------
+  
+  // Reduce the boilerplate code of handling route events
+  // and then calling a single method on another object.
+  // Have your routers configured to call the method on
+  // your object, directly.
+  //
+  // Configure an AppRouter with `appRoutes`.
+  //
+  // App routers can only take one `controller` object.
+  // It is recommended that you divide your controller
+  // objects in to smaller pieces of related functionality
+  // and have multiple routers / controllers, instead of
+  // just one giant router and controller.
+  //
+  // You can also add standard routes to an AppRouter.
+  
+  Marionette.AppRouter = Backbone.Router.extend({
+  
+    constructor: function(options) {
+      this.options = options || {};
+  
+      Backbone.Router.apply(this, arguments);
+  
+      var appRoutes = this.getOption('appRoutes');
+      var controller = this._getController();
+      this.processAppRoutes(controller, appRoutes);
+      this.on('route', this._processOnRoute, this);
+    },
+  
+    // Similar to route method on a Backbone Router but
+    // method is called on the controller
+    appRoute: function(route, methodName) {
+      var controller = this._getController();
+      this._addAppRoute(controller, route, methodName);
+    },
+  
+    // process the route event and trigger the onRoute
+    // method call, if it exists
+    _processOnRoute: function(routeName, routeArgs) {
+      // make sure an onRoute before trying to call it
+      if (_.isFunction(this.onRoute)) {
+        // find the path that matches the current route
+        var routePath = _.invert(this.getOption('appRoutes'))[routeName];
+        this.onRoute(routeName, routePath, routeArgs);
+      }
+    },
+  
+    // Internal method to process the `appRoutes` for the
+    // router, and turn them in to routes that trigger the
+    // specified method on the specified `controller`.
+    processAppRoutes: function(controller, appRoutes) {
+      if (!appRoutes) { return; }
+  
+      var routeNames = _.keys(appRoutes).reverse(); // Backbone requires reverted order of routes
+  
+      _.each(routeNames, function(route) {
+        this._addAppRoute(controller, route, appRoutes[route]);
+      }, this);
+    },
+  
+    _getController: function() {
+      return this.getOption('controller');
+    },
+  
+    _addAppRoute: function(controller, route, methodName) {
+      var method = controller[methodName];
+  
+      if (!method) {
+        throw new Marionette.Error('Method "' + methodName + '" was not found on the controller');
+      }
+  
+      this.route(route, methodName, _.bind(method, controller));
+    },
+  
+    mergeOptions: Marionette.mergeOptions,
+  
+    // Proxy `getOption` to enable getting options from this or this.options by name.
+    getOption: Marionette.proxyGetOption,
+  
+    triggerMethod: Marionette.triggerMethod,
+  
+    bindEntityEvents: Marionette.proxyBindEntityEvents,
+  
+    unbindEntityEvents: Marionette.proxyUnbindEntityEvents
+  });
+  
+  // Application
+  // -----------
+  
+  // Contain and manage the composite application as a whole.
+  // Stores and starts up `Region` objects, includes an
+  // event aggregator as `app.vent`
+  Marionette.Application = Marionette.Object.extend({
+    constructor: function(options) {
+      this._initializeRegions(options);
+      this._initCallbacks = new Marionette.Callbacks();
+      this.submodules = {};
+      _.extend(this, options);
+      this._initChannel();
+      Marionette.Object.apply(this, arguments);
+    },
+  
+    // Command execution, facilitated by Backbone.Wreqr.Commands
+    execute: function() {
+      this.commands.execute.apply(this.commands, arguments);
+    },
+  
+    // Request/response, facilitated by Backbone.Wreqr.RequestResponse
+    request: function() {
+      return this.reqres.request.apply(this.reqres, arguments);
+    },
+  
+    // Add an initializer that is either run at when the `start`
+    // method is called, or run immediately if added after `start`
+    // has already been called.
+    addInitializer: function(initializer) {
+      this._initCallbacks.add(initializer);
+    },
+  
+    // kick off all of the application's processes.
+    // initializes all of the regions that have been added
+    // to the app, and runs all of the initializer functions
+    start: function(options) {
+      this.triggerMethod('before:start', options);
+      this._initCallbacks.run(options, this);
+      this.triggerMethod('start', options);
+    },
+  
+    // Add regions to your app.
+    // Accepts a hash of named strings or Region objects
+    // addRegions({something: "#someRegion"})
+    // addRegions({something: Region.extend({el: "#someRegion"}) });
+    addRegions: function(regions) {
+      return this._regionManager.addRegions(regions);
+    },
+  
+    // Empty all regions in the app, without removing them
+    emptyRegions: function() {
+      return this._regionManager.emptyRegions();
+    },
+  
+    // Removes a region from your app, by name
+    // Accepts the regions name
+    // removeRegion('myRegion')
+    removeRegion: function(region) {
+      return this._regionManager.removeRegion(region);
+    },
+  
+    // Provides alternative access to regions
+    // Accepts the region name
+    // getRegion('main')
+    getRegion: function(region) {
+      return this._regionManager.get(region);
+    },
+  
+    // Get all the regions from the region manager
+    getRegions: function() {
+      return this._regionManager.getRegions();
+    },
+  
+    // Create a module, attached to the application
+    module: function(moduleNames, moduleDefinition) {
+  
+      // Overwrite the module class if the user specifies one
+      var ModuleClass = Marionette.Module.getClass(moduleDefinition);
+  
+      var args = _.toArray(arguments);
+      args.unshift(this);
+  
+      // see the Marionette.Module object for more information
+      return ModuleClass.create.apply(ModuleClass, args);
+    },
+  
+    // Enable easy overriding of the default `RegionManager`
+    // for customized region interactions and business-specific
+    // view logic for better control over single regions.
+    getRegionManager: function() {
+      return new Marionette.RegionManager();
+    },
+  
+    // Internal method to initialize the regions that have been defined in a
+    // `regions` attribute on the application instance
+    _initializeRegions: function(options) {
+      var regions = _.isFunction(this.regions) ? this.regions(options) : this.regions || {};
+  
+      this._initRegionManager();
+  
+      // Enable users to define `regions` in instance options.
+      var optionRegions = Marionette.getOption(options, 'regions');
+  
+      // Enable region options to be a function
+      if (_.isFunction(optionRegions)) {
+        optionRegions = optionRegions.call(this, options);
+      }
+  
+      // Overwrite current regions with those passed in options
+      _.extend(regions, optionRegions);
+  
+      this.addRegions(regions);
+  
+      return this;
+    },
+  
+    // Internal method to set up the region manager
+    _initRegionManager: function() {
+      this._regionManager = this.getRegionManager();
+      this._regionManager._parent = this;
+  
+      this.listenTo(this._regionManager, 'before:add:region', function() {
+        Marionette._triggerMethod(this, 'before:add:region', arguments);
+      });
+  
+      this.listenTo(this._regionManager, 'add:region', function(name, region) {
+        this[name] = region;
+        Marionette._triggerMethod(this, 'add:region', arguments);
+      });
+  
+      this.listenTo(this._regionManager, 'before:remove:region', function() {
+        Marionette._triggerMethod(this, 'before:remove:region', arguments);
+      });
+  
+      this.listenTo(this._regionManager, 'remove:region', function(name) {
+        delete this[name];
+        Marionette._triggerMethod(this, 'remove:region', arguments);
+      });
+    },
+  
+    // Internal method to setup the Wreqr.radio channel
+    _initChannel: function() {
+      this.channelName = _.result(this, 'channelName') || 'global';
+      this.channel = _.result(this, 'channel') || Backbone.Wreqr.radio.channel(this.channelName);
+      this.vent = _.result(this, 'vent') || this.channel.vent;
+      this.commands = _.result(this, 'commands') || this.channel.commands;
+      this.reqres = _.result(this, 'reqres') || this.channel.reqres;
+    }
+  });
+  
+  /* jshint maxparams: 9 */
+  
+  // Module
+  // ------
+  
+  // A simple module system, used to create privacy and encapsulation in
+  // Marionette applications
+  Marionette.Module = function(moduleName, app, options) {
+    this.moduleName = moduleName;
+    this.options = _.extend({}, this.options, options);
+    // Allow for a user to overide the initialize
+    // for a given module instance.
+    this.initialize = options.initialize || this.initialize;
+  
+    // Set up an internal store for sub-modules.
+    this.submodules = {};
+  
+    this._setupInitializersAndFinalizers();
+  
+    // Set an internal reference to the app
+    // within a module.
+    this.app = app;
+  
+    if (_.isFunction(this.initialize)) {
+      this.initialize(moduleName, app, this.options);
+    }
+  };
+  
+  Marionette.Module.extend = Marionette.extend;
+  
+  // Extend the Module prototype with events / listenTo, so that the module
+  // can be used as an event aggregator or pub/sub.
+  _.extend(Marionette.Module.prototype, Backbone.Events, {
+  
+    // By default modules start with their parents.
+    startWithParent: true,
+  
+    // Initialize is an empty function by default. Override it with your own
+    // initialization logic when extending Marionette.Module.
+    initialize: function() {},
+  
+    // Initializer for a specific module. Initializers are run when the
+    // module's `start` method is called.
+    addInitializer: function(callback) {
+      this._initializerCallbacks.add(callback);
+    },
+  
+    // Finalizers are run when a module is stopped. They are used to teardown
+    // and finalize any variables, references, events and other code that the
+    // module had set up.
+    addFinalizer: function(callback) {
+      this._finalizerCallbacks.add(callback);
+    },
+  
+    // Start the module, and run all of its initializers
+    start: function(options) {
+      // Prevent re-starting a module that is already started
+      if (this._isInitialized) { return; }
+  
+      // start the sub-modules (depth-first hierarchy)
+      _.each(this.submodules, function(mod) {
+        // check to see if we should start the sub-module with this parent
+        if (mod.startWithParent) {
+          mod.start(options);
+        }
+      });
+  
+      // run the callbacks to "start" the current module
+      this.triggerMethod('before:start', options);
+  
+      this._initializerCallbacks.run(options, this);
+      this._isInitialized = true;
+  
+      this.triggerMethod('start', options);
+    },
+  
+    // Stop this module by running its finalizers and then stop all of
+    // the sub-modules for this module
+    stop: function() {
+      // if we are not initialized, don't bother finalizing
+      if (!this._isInitialized) { return; }
+      this._isInitialized = false;
+  
+      this.triggerMethod('before:stop');
+  
+      // stop the sub-modules; depth-first, to make sure the
+      // sub-modules are stopped / finalized before parents
+      _.invoke(this.submodules, 'stop');
+  
+      // run the finalizers
+      this._finalizerCallbacks.run(undefined, this);
+  
+      // reset the initializers and finalizers
+      this._initializerCallbacks.reset();
+      this._finalizerCallbacks.reset();
+  
+      this.triggerMethod('stop');
+    },
+  
+    // Configure the module with a definition function and any custom args
+    // that are to be passed in to the definition function
+    addDefinition: function(moduleDefinition, customArgs) {
+      this._runModuleDefinition(moduleDefinition, customArgs);
+    },
+  
+    // Internal method: run the module definition function with the correct
+    // arguments
+    _runModuleDefinition: function(definition, customArgs) {
+      // If there is no definition short circut the method.
+      if (!definition) { return; }
+  
+      // build the correct list of arguments for the module definition
+      var args = _.flatten([
+        this,
+        this.app,
+        Backbone,
+        Marionette,
+        Backbone.$, _,
+        customArgs
+      ]);
+  
+      definition.apply(this, args);
+    },
+  
+    // Internal method: set up new copies of initializers and finalizers.
+    // Calling this method will wipe out all existing initializers and
+    // finalizers.
+    _setupInitializersAndFinalizers: function() {
+      this._initializerCallbacks = new Marionette.Callbacks();
+      this._finalizerCallbacks = new Marionette.Callbacks();
+    },
+  
+    // import the `triggerMethod` to trigger events with corresponding
+    // methods if the method exists
+    triggerMethod: Marionette.triggerMethod
+  });
+  
+  // Class methods to create modules
+  _.extend(Marionette.Module, {
+  
+    // Create a module, hanging off the app parameter as the parent object.
+    create: function(app, moduleNames, moduleDefinition) {
+      var module = app;
+  
+      // get the custom args passed in after the module definition and
+      // get rid of the module name and definition function
+      var customArgs = _.drop(arguments, 3);
+  
+      // Split the module names and get the number of submodules.
+      // i.e. an example module name of `Doge.Wow.Amaze` would
+      // then have the potential for 3 module definitions.
+      moduleNames = moduleNames.split('.');
+      var length = moduleNames.length;
+  
+      // store the module definition for the last module in the chain
+      var moduleDefinitions = [];
+      moduleDefinitions[length - 1] = moduleDefinition;
+  
+      // Loop through all the parts of the module definition
+      _.each(moduleNames, function(moduleName, i) {
+        var parentModule = module;
+        module = this._getModule(parentModule, moduleName, app, moduleDefinition);
+        this._addModuleDefinition(parentModule, module, moduleDefinitions[i], customArgs);
+      }, this);
+  
+      // Return the last module in the definition chain
+      return module;
+    },
+  
+    _getModule: function(parentModule, moduleName, app, def, args) {
+      var options = _.extend({}, def);
+      var ModuleClass = this.getClass(def);
+  
+      // Get an existing module of this name if we have one
+      var module = parentModule[moduleName];
+  
+      if (!module) {
+        // Create a new module if we don't have one
+        module = new ModuleClass(moduleName, app, options);
+        parentModule[moduleName] = module;
+        // store the module on the parent
+        parentModule.submodules[moduleName] = module;
+      }
+  
+      return module;
+    },
+  
+    // ## Module Classes
+    //
+    // Module classes can be used as an alternative to the define pattern.
+    // The extend function of a Module is identical to the extend functions
+    // on other Backbone and Marionette classes.
+    // This allows module lifecyle events like `onStart` and `onStop` to be called directly.
+    getClass: function(moduleDefinition) {
+      var ModuleClass = Marionette.Module;
+  
+      if (!moduleDefinition) {
+        return ModuleClass;
+      }
+  
+      // If all of the module's functionality is defined inside its class,
+      // then the class can be passed in directly. `MyApp.module("Foo", FooModule)`.
+      if (moduleDefinition.prototype instanceof ModuleClass) {
+        return moduleDefinition;
+      }
+  
+      return moduleDefinition.moduleClass || ModuleClass;
+    },
+  
+    // Add the module definition and add a startWithParent initializer function.
+    // This is complicated because module definitions are heavily overloaded
+    // and support an anonymous function, module class, or options object
+    _addModuleDefinition: function(parentModule, module, def, args) {
+      var fn = this._getDefine(def);
+      var startWithParent = this._getStartWithParent(def, module);
+  
+      if (fn) {
+        module.addDefinition(fn, args);
+      }
+  
+      this._addStartWithParent(parentModule, module, startWithParent);
+    },
+  
+    _getStartWithParent: function(def, module) {
+      var swp;
+  
+      if (_.isFunction(def) && (def.prototype instanceof Marionette.Module)) {
+        swp = module.constructor.prototype.startWithParent;
+        return _.isUndefined(swp) ? true : swp;
+      }
+  
+      if (_.isObject(def)) {
+        swp = def.startWithParent;
+        return _.isUndefined(swp) ? true : swp;
+      }
+  
+      return true;
+    },
+  
+    _getDefine: function(def) {
+      if (_.isFunction(def) && !(def.prototype instanceof Marionette.Module)) {
+        return def;
+      }
+  
+      if (_.isObject(def)) {
+        return def.define;
+      }
+  
+      return null;
+    },
+  
+    _addStartWithParent: function(parentModule, module, startWithParent) {
+      module.startWithParent = module.startWithParent && startWithParent;
+  
+      if (!module.startWithParent || !!module.startWithParentIsConfigured) {
+        return;
+      }
+  
+      module.startWithParentIsConfigured = true;
+  
+      parentModule.addInitializer(function(options) {
+        if (module.startWithParent) {
+          module.start(options);
+        }
+      });
+    }
+  });
+  
+
+  return Marionette;
+}));
+
+},{"backbone":4,"backbone.babysitter":2,"backbone.wreqr":3,"underscore":192}],2:[function(require,module,exports){
+// Backbone.BabySitter
+// -------------------
+// v0.1.10
+//
+// Copyright (c)2015 Derick Bailey, Muted Solutions, LLC.
+// Distributed under MIT license
+//
+// http://github.com/marionettejs/backbone.babysitter
+
+(function(root, factory) {
+
+  if (typeof define === 'function' && define.amd) {
+    define(['backbone', 'underscore'], function(Backbone, _) {
+      return factory(Backbone, _);
+    });
+  } else if (typeof exports !== 'undefined') {
+    var Backbone = require('backbone');
+    var _ = require('underscore');
+    module.exports = factory(Backbone, _);
+  } else {
+    factory(root.Backbone, root._);
+  }
+
+}(this, function(Backbone, _) {
+  'use strict';
+
+  var previousChildViewContainer = Backbone.ChildViewContainer;
+
+  // BabySitter.ChildViewContainer
+  // -----------------------------
+  //
+  // Provide a container to store, retrieve and
+  // shut down child views.
+  
+  Backbone.ChildViewContainer = (function (Backbone, _) {
+  
+    // Container Constructor
+    // ---------------------
+  
+    var Container = function(views){
+      this._views = {};
+      this._indexByModel = {};
+      this._indexByCustom = {};
+      this._updateLength();
+  
+      _.each(views, this.add, this);
+    };
+  
+    // Container Methods
+    // -----------------
+  
+    _.extend(Container.prototype, {
+  
+      // Add a view to this container. Stores the view
+      // by `cid` and makes it searchable by the model
+      // cid (and model itself). Optionally specify
+      // a custom key to store an retrieve the view.
+      add: function(view, customIndex){
+        var viewCid = view.cid;
+  
+        // store the view
+        this._views[viewCid] = view;
+  
+        // index it by model
+        if (view.model){
+          this._indexByModel[view.model.cid] = viewCid;
+        }
+  
+        // index by custom
+        if (customIndex){
+          this._indexByCustom[customIndex] = viewCid;
+        }
+  
+        this._updateLength();
+        return this;
+      },
+  
+      // Find a view by the model that was attached to
+      // it. Uses the model's `cid` to find it.
+      findByModel: function(model){
+        return this.findByModelCid(model.cid);
+      },
+  
+      // Find a view by the `cid` of the model that was attached to
+      // it. Uses the model's `cid` to find the view `cid` and
+      // retrieve the view using it.
+      findByModelCid: function(modelCid){
+        var viewCid = this._indexByModel[modelCid];
+        return this.findByCid(viewCid);
+      },
+  
+      // Find a view by a custom indexer.
+      findByCustom: function(index){
+        var viewCid = this._indexByCustom[index];
+        return this.findByCid(viewCid);
+      },
+  
+      // Find by index. This is not guaranteed to be a
+      // stable index.
+      findByIndex: function(index){
+        return _.values(this._views)[index];
+      },
+  
+      // retrieve a view by its `cid` directly
+      findByCid: function(cid){
+        return this._views[cid];
+      },
+  
+      // Remove a view
+      remove: function(view){
+        var viewCid = view.cid;
+  
+        // delete model index
+        if (view.model){
+          delete this._indexByModel[view.model.cid];
+        }
+  
+        // delete custom index
+        _.any(this._indexByCustom, function(cid, key) {
+          if (cid === viewCid) {
+            delete this._indexByCustom[key];
+            return true;
+          }
+        }, this);
+  
+        // remove the view from the container
+        delete this._views[viewCid];
+  
+        // update the length
+        this._updateLength();
+        return this;
+      },
+  
+      // Call a method on every view in the container,
+      // passing parameters to the call method one at a
+      // time, like `function.call`.
+      call: function(method){
+        this.apply(method, _.tail(arguments));
+      },
+  
+      // Apply a method on every view in the container,
+      // passing parameters to the call method one at a
+      // time, like `function.apply`.
+      apply: function(method, args){
+        _.each(this._views, function(view){
+          if (_.isFunction(view[method])){
+            view[method].apply(view, args || []);
+          }
+        });
+      },
+  
+      // Update the `.length` attribute on this container
+      _updateLength: function(){
+        this.length = _.size(this._views);
+      }
+    });
+  
+    // Borrowing this code from Backbone.Collection:
+    // http://backbonejs.org/docs/backbone.html#section-106
+    //
+    // Mix in methods from Underscore, for iteration, and other
+    // collection related features.
+    var methods = ['forEach', 'each', 'map', 'find', 'detect', 'filter',
+      'select', 'reject', 'every', 'all', 'some', 'any', 'include',
+      'contains', 'invoke', 'toArray', 'first', 'initial', 'rest',
+      'last', 'without', 'isEmpty', 'pluck', 'reduce'];
+  
+    _.each(methods, function(method) {
+      Container.prototype[method] = function() {
+        var views = _.values(this._views);
+        var args = [views].concat(_.toArray(arguments));
+        return _[method].apply(_, args);
+      };
+    });
+  
+    // return the public API
+    return Container;
+  })(Backbone, _);
+  
+
+  Backbone.ChildViewContainer.VERSION = '0.1.10';
+
+  Backbone.ChildViewContainer.noConflict = function () {
+    Backbone.ChildViewContainer = previousChildViewContainer;
+    return this;
+  };
+
+  return Backbone.ChildViewContainer;
+
+}));
+
+},{"backbone":4,"underscore":192}],3:[function(require,module,exports){
+// Backbone.Wreqr (Backbone.Marionette)
+// ----------------------------------
+// v1.3.5
+//
+// Copyright (c)2015 Derick Bailey, Muted Solutions, LLC.
+// Distributed under MIT license
+//
+// http://github.com/marionettejs/backbone.wreqr
+
+
+(function(root, factory) {
+
+  if (typeof define === 'function' && define.amd) {
+    define(['backbone', 'underscore'], function(Backbone, _) {
+      return factory(Backbone, _);
+    });
+  } else if (typeof exports !== 'undefined') {
+    var Backbone = require('backbone');
+    var _ = require('underscore');
+    module.exports = factory(Backbone, _);
+  } else {
+    factory(root.Backbone, root._);
+  }
+
+}(this, function(Backbone, _) {
+  "use strict";
+
+  var previousWreqr = Backbone.Wreqr;
+
+  var Wreqr = Backbone.Wreqr = {};
+
+  Backbone.Wreqr.VERSION = '1.3.5';
+
+  Backbone.Wreqr.noConflict = function () {
+    Backbone.Wreqr = previousWreqr;
+    return this;
+  };
+
+  // Handlers
+  // --------
+  // A registry of functions to call, given a name
+  
+  Wreqr.Handlers = (function(Backbone, _){
+    "use strict";
+    
+    // Constructor
+    // -----------
+  
+    var Handlers = function(options){
+      this.options = options;
+      this._wreqrHandlers = {};
+      
+      if (_.isFunction(this.initialize)){
+        this.initialize(options);
+      }
+    };
+  
+    Handlers.extend = Backbone.Model.extend;
+  
+    // Instance Members
+    // ----------------
+  
+    _.extend(Handlers.prototype, Backbone.Events, {
+  
+      // Add multiple handlers using an object literal configuration
+      setHandlers: function(handlers){
+        _.each(handlers, function(handler, name){
+          var context = null;
+  
+          if (_.isObject(handler) && !_.isFunction(handler)){
+            context = handler.context;
+            handler = handler.callback;
+          }
+  
+          this.setHandler(name, handler, context);
+        }, this);
+      },
+  
+      // Add a handler for the given name, with an
+      // optional context to run the handler within
+      setHandler: function(name, handler, context){
+        var config = {
+          callback: handler,
+          context: context
+        };
+  
+        this._wreqrHandlers[name] = config;
+  
+        this.trigger("handler:add", name, handler, context);
+      },
+  
+      // Determine whether or not a handler is registered
+      hasHandler: function(name){
+        return !! this._wreqrHandlers[name];
+      },
+  
+      // Get the currently registered handler for
+      // the specified name. Throws an exception if
+      // no handler is found.
+      getHandler: function(name){
+        var config = this._wreqrHandlers[name];
+  
+        if (!config){
+          return;
+        }
+  
+        return function(){
+          return config.callback.apply(config.context, arguments);
+        };
+      },
+  
+      // Remove a handler for the specified name
+      removeHandler: function(name){
+        delete this._wreqrHandlers[name];
+      },
+  
+      // Remove all handlers from this registry
+      removeAllHandlers: function(){
+        this._wreqrHandlers = {};
+      }
+    });
+  
+    return Handlers;
+  })(Backbone, _);
+  
+  // Wreqr.CommandStorage
+  // --------------------
+  //
+  // Store and retrieve commands for execution.
+  Wreqr.CommandStorage = (function(){
+    "use strict";
+  
+    // Constructor function
+    var CommandStorage = function(options){
+      this.options = options;
+      this._commands = {};
+  
+      if (_.isFunction(this.initialize)){
+        this.initialize(options);
+      }
+    };
+  
+    // Instance methods
+    _.extend(CommandStorage.prototype, Backbone.Events, {
+  
+      // Get an object literal by command name, that contains
+      // the `commandName` and the `instances` of all commands
+      // represented as an array of arguments to process
+      getCommands: function(commandName){
+        var commands = this._commands[commandName];
+  
+        // we don't have it, so add it
+        if (!commands){
+  
+          // build the configuration
+          commands = {
+            command: commandName, 
+            instances: []
+          };
+  
+          // store it
+          this._commands[commandName] = commands;
+        }
+  
+        return commands;
+      },
+  
+      // Add a command by name, to the storage and store the
+      // args for the command
+      addCommand: function(commandName, args){
+        var command = this.getCommands(commandName);
+        command.instances.push(args);
+      },
+  
+      // Clear all commands for the given `commandName`
+      clearCommands: function(commandName){
+        var command = this.getCommands(commandName);
+        command.instances = [];
+      }
+    });
+  
+    return CommandStorage;
+  })();
+  
+  // Wreqr.Commands
+  // --------------
+  //
+  // A simple command pattern implementation. Register a command
+  // handler and execute it.
+  Wreqr.Commands = (function(Wreqr, _){
+    "use strict";
+  
+    return Wreqr.Handlers.extend({
+      // default storage type
+      storageType: Wreqr.CommandStorage,
+  
+      constructor: function(options){
+        this.options = options || {};
+  
+        this._initializeStorage(this.options);
+        this.on("handler:add", this._executeCommands, this);
+  
+        Wreqr.Handlers.prototype.constructor.apply(this, arguments);
+      },
+  
+      // Execute a named command with the supplied args
+      execute: function(name){
+        name = arguments[0];
+        var args = _.rest(arguments);
+  
+        if (this.hasHandler(name)){
+          this.getHandler(name).apply(this, args);
+        } else {
+          this.storage.addCommand(name, args);
+        }
+  
+      },
+  
+      // Internal method to handle bulk execution of stored commands
+      _executeCommands: function(name, handler, context){
+        var command = this.storage.getCommands(name);
+  
+        // loop through and execute all the stored command instances
+        _.each(command.instances, function(args){
+          handler.apply(context, args);
+        });
+  
+        this.storage.clearCommands(name);
+      },
+  
+      // Internal method to initialize storage either from the type's
+      // `storageType` or the instance `options.storageType`.
+      _initializeStorage: function(options){
+        var storage;
+  
+        var StorageType = options.storageType || this.storageType;
+        if (_.isFunction(StorageType)){
+          storage = new StorageType();
+        } else {
+          storage = StorageType;
+        }
+  
+        this.storage = storage;
+      }
+    });
+  
+  })(Wreqr, _);
+  
+  // Wreqr.RequestResponse
+  // ---------------------
+  //
+  // A simple request/response implementation. Register a
+  // request handler, and return a response from it
+  Wreqr.RequestResponse = (function(Wreqr, _){
+    "use strict";
+  
+    return Wreqr.Handlers.extend({
+      request: function(name){
+        if (this.hasHandler(name)) {
+          return this.getHandler(name).apply(this, _.rest(arguments));
+        }
+      }
+    });
+  
+  })(Wreqr, _);
+  
+  // Event Aggregator
+  // ----------------
+  // A pub-sub object that can be used to decouple various parts
+  // of an application through event-driven architecture.
+  
+  Wreqr.EventAggregator = (function(Backbone, _){
+    "use strict";
+    var EA = function(){};
+  
+    // Copy the `extend` function used by Backbone's classes
+    EA.extend = Backbone.Model.extend;
+  
+    // Copy the basic Backbone.Events on to the event aggregator
+    _.extend(EA.prototype, Backbone.Events);
+  
+    return EA;
+  })(Backbone, _);
+  
+  // Wreqr.Channel
+  // --------------
+  //
+  // An object that wraps the three messaging systems:
+  // EventAggregator, RequestResponse, Commands
+  Wreqr.Channel = (function(Wreqr){
+    "use strict";
+  
+    var Channel = function(channelName) {
+      this.vent        = new Backbone.Wreqr.EventAggregator();
+      this.reqres      = new Backbone.Wreqr.RequestResponse();
+      this.commands    = new Backbone.Wreqr.Commands();
+      this.channelName = channelName;
+    };
+  
+    _.extend(Channel.prototype, {
+  
+      // Remove all handlers from the messaging systems of this channel
+      reset: function() {
+        this.vent.off();
+        this.vent.stopListening();
+        this.reqres.removeAllHandlers();
+        this.commands.removeAllHandlers();
+        return this;
+      },
+  
+      // Connect a hash of events; one for each messaging system
+      connectEvents: function(hash, context) {
+        this._connect('vent', hash, context);
+        return this;
+      },
+  
+      connectCommands: function(hash, context) {
+        this._connect('commands', hash, context);
+        return this;
+      },
+  
+      connectRequests: function(hash, context) {
+        this._connect('reqres', hash, context);
+        return this;
+      },
+  
+      // Attach the handlers to a given message system `type`
+      _connect: function(type, hash, context) {
+        if (!hash) {
+          return;
+        }
+  
+        context = context || this;
+        var method = (type === 'vent') ? 'on' : 'setHandler';
+  
+        _.each(hash, function(fn, eventName) {
+          this[type][method](eventName, _.bind(fn, context));
+        }, this);
+      }
+    });
+  
+  
+    return Channel;
+  })(Wreqr);
+  
+  // Wreqr.Radio
+  // --------------
+  //
+  // An object that lets you communicate with many channels.
+  Wreqr.radio = (function(Wreqr, _){
+    "use strict";
+  
+    var Radio = function() {
+      this._channels = {};
+      this.vent = {};
+      this.commands = {};
+      this.reqres = {};
+      this._proxyMethods();
+    };
+  
+    _.extend(Radio.prototype, {
+  
+      channel: function(channelName) {
+        if (!channelName) {
+          throw new Error('Channel must receive a name');
+        }
+  
+        return this._getChannel( channelName );
+      },
+  
+      _getChannel: function(channelName) {
+        var channel = this._channels[channelName];
+  
+        if(!channel) {
+          channel = new Wreqr.Channel(channelName);
+          this._channels[channelName] = channel;
+        }
+  
+        return channel;
+      },
+  
+      _proxyMethods: function() {
+        _.each(['vent', 'commands', 'reqres'], function(system) {
+          _.each( messageSystems[system], function(method) {
+            this[system][method] = proxyMethod(this, system, method);
+          }, this);
+        }, this);
+      }
+    });
+  
+  
+    var messageSystems = {
+      vent: [
+        'on',
+        'off',
+        'trigger',
+        'once',
+        'stopListening',
+        'listenTo',
+        'listenToOnce'
+      ],
+  
+      commands: [
+        'execute',
+        'setHandler',
+        'setHandlers',
+        'removeHandler',
+        'removeAllHandlers'
+      ],
+  
+      reqres: [
+        'request',
+        'setHandler',
+        'setHandlers',
+        'removeHandler',
+        'removeAllHandlers'
+      ]
+    };
+  
+    var proxyMethod = function(radio, system, method) {
+      return function(channelName) {
+        var messageSystem = radio._getChannel(channelName)[system];
+  
+        return messageSystem[method].apply(messageSystem, _.rest(arguments));
+      };
+    };
+  
+    return new Radio();
+  
+  })(Wreqr, _);
+  
+
+  return Backbone.Wreqr;
+
+}));
+
+},{"backbone":4,"underscore":192}],4:[function(require,module,exports){
 (function (global){
 //     Backbone.js 1.2.3
 
@@ -1896,7 +6020,7 @@
 }));
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"jquery":4,"underscore":189}],2:[function(require,module,exports){
+},{"jquery":7,"underscore":192}],5:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -2199,7 +6323,7 @@ function isUndefined(arg) {
   return arg === void 0;
 }
 
-},{}],3:[function(require,module,exports){
+},{}],6:[function(require,module,exports){
 // shim for using process in browser
 
 var process = module.exports = {};
@@ -2292,7 +6416,7 @@ process.chdir = function (dir) {
 };
 process.umask = function() { return 0; };
 
-},{}],4:[function(require,module,exports){
+},{}],7:[function(require,module,exports){
 /*!
  * jQuery JavaScript Library v2.1.4
  * http://jquery.com/
@@ -11504,7 +15628,7 @@ return jQuery;
 
 }));
 
-},{}],5:[function(require,module,exports){
+},{}],8:[function(require,module,exports){
 'use strict';
 
 var assign = require('react/lib/Object.assign');
@@ -11547,7 +15671,7 @@ Canvas.poolSize = 30;
 
 module.exports = Canvas;
 
-},{"react/lib/Object.assign":59}],6:[function(require,module,exports){
+},{"react/lib/Object.assign":62}],9:[function(require,module,exports){
 'use strict';
 
 var FontFace = require('./FontFace');
@@ -11754,7 +15878,7 @@ module.exports = {
 };
 
 
-},{"./FontFace":11,"./clamp":25,"./measureText":29}],7:[function(require,module,exports){
+},{"./FontFace":14,"./clamp":28,"./measureText":32}],10:[function(require,module,exports){
 'use strict';
 
 // Adapted from ReactART:
@@ -11885,7 +16009,7 @@ var ContainerMixin = assign({}, ReactMultiChild.Mixin, {
 
 module.exports = ContainerMixin;
 
-},{"react":188,"react/lib/Object.assign":59,"react/lib/ReactMultiChild":104,"react/lib/emptyObject":148}],8:[function(require,module,exports){
+},{"react":191,"react/lib/Object.assign":62,"react/lib/ReactMultiChild":107,"react/lib/emptyObject":151}],11:[function(require,module,exports){
 'use strict';
 
 var ImageCache = require('./ImageCache');
@@ -12305,7 +16429,7 @@ module.exports = {
   layerContainsFontFace: layerContainsFontFace
 };
 
-},{"./Canvas":5,"./CanvasUtils":6,"./FontFace":11,"./FontUtils":12,"./FrameUtils":13,"./ImageCache":16}],9:[function(require,module,exports){
+},{"./Canvas":8,"./CanvasUtils":9,"./FontFace":14,"./FontUtils":15,"./FrameUtils":16,"./ImageCache":19}],12:[function(require,module,exports){
 // Penner easing equations
 // https://gist.github.com/gre/1650294
 
@@ -12343,7 +16467,7 @@ var Easing = {
 
 module.exports = Easing;
 
-},{}],10:[function(require,module,exports){
+},{}],13:[function(require,module,exports){
 'use strict';
 
 // Supported events that RenderLayer's can subscribe to.
@@ -12356,7 +16480,7 @@ module.exports = {
   onClick: 'click'
 };
 
-},{}],11:[function(require,module,exports){
+},{}],14:[function(require,module,exports){
 'use strict';
 
 var _fontFaces = {};
@@ -12411,7 +16535,7 @@ function getCacheKey (family, url, attributes) {
 
 module.exports = FontFace;
 
-},{}],12:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
 'use strict';
 
 var FontFace = require('./FontFace');
@@ -12598,7 +16722,7 @@ module.exports = {
   loadFont: _useNativeImpl ? loadFontNative : loadFont
 };
 
-},{"./FontFace":11}],13:[function(require,module,exports){
+},{"./FontFace":14}],16:[function(require,module,exports){
 'use strict';
 
 function Frame (x, y, width, height) {
@@ -12731,7 +16855,7 @@ module.exports = {
 };
 
 
-},{}],14:[function(require,module,exports){
+},{}],17:[function(require,module,exports){
 'use strict';
 
 var createComponent = require('./createComponent');
@@ -12768,7 +16892,7 @@ var Group = createComponent('Group', LayerMixin, ContainerMixin, {
 
 module.exports = Group;
 
-},{"./ContainerMixin":7,"./LayerMixin":18,"./RenderLayer":22,"./createComponent":26}],15:[function(require,module,exports){
+},{"./ContainerMixin":10,"./LayerMixin":21,"./RenderLayer":25,"./createComponent":29}],18:[function(require,module,exports){
 'use strict';
 
 var React = require('react');
@@ -12883,7 +17007,7 @@ var Image = React.createClass({
 
 module.exports = Image;
 
-},{"./Easing":9,"./Group":14,"./ImageCache":16,"./Layer":17,"./LayerMixin":18,"./clamp":25,"./createComponent":26,"react":188,"react/lib/Object.assign":59}],16:[function(require,module,exports){
+},{"./Easing":12,"./Group":17,"./ImageCache":19,"./Layer":20,"./LayerMixin":21,"./clamp":28,"./createComponent":29,"react":191,"react/lib/Object.assign":62}],19:[function(require,module,exports){
 'use strict';
 
 var EventEmitter = require('events');
@@ -12998,7 +17122,7 @@ var ImageCache = {
 
 module.exports = ImageCache;
 
-},{"events":2,"react/lib/Object.assign":59}],17:[function(require,module,exports){
+},{"events":5,"react/lib/Object.assign":62}],20:[function(require,module,exports){
 'use strict';
 
 var createComponent = require('./createComponent');
@@ -13024,7 +17148,7 @@ var Layer = createComponent('Layer', LayerMixin, {
 
 module.exports = Layer;
 
-},{"./LayerMixin":18,"./createComponent":26}],18:[function(require,module,exports){
+},{"./LayerMixin":21,"./createComponent":29}],21:[function(require,module,exports){
 'use strict';
 
 // Adapted from ReactART:
@@ -13119,7 +17243,7 @@ var LayerMixin = {
 
 module.exports = LayerMixin;
 
-},{"./DrawingUtils":8,"./EventTypes":10,"./FrameUtils":13}],19:[function(require,module,exports){
+},{"./DrawingUtils":11,"./EventTypes":13,"./FrameUtils":16}],22:[function(require,module,exports){
 // https://github.com/facebook/css-layout
 
 /**
@@ -13781,7 +17905,7 @@ if (typeof module === 'object') {
   module.exports = computeLayout;
 }
 
-},{}],20:[function(require,module,exports){
+},{}],23:[function(require,module,exports){
 'use strict';
 
 var React = require('react');
@@ -13969,7 +18093,7 @@ var ListView = React.createClass({
 
 module.exports = ListView;
 
-},{"./Group":14,"./clamp":25,"react":188,"react/lib/Object.assign":59,"scroller":30}],21:[function(require,module,exports){
+},{"./Group":17,"./clamp":28,"react":191,"react/lib/Object.assign":62,"scroller":33}],24:[function(require,module,exports){
 'use strict';
 
 var ReactCanvas = {
@@ -13987,7 +18111,7 @@ var ReactCanvas = {
 
 module.exports = ReactCanvas;
 
-},{"./FontFace":11,"./Group":14,"./Image":15,"./Layer":17,"./ListView":20,"./Surface":23,"./Text":24,"./measureText":29}],22:[function(require,module,exports){
+},{"./FontFace":14,"./Group":17,"./Image":18,"./Layer":20,"./ListView":23,"./Surface":26,"./Text":27,"./measureText":32}],25:[function(require,module,exports){
 'use strict';
 
 var FrameUtils = require('./FrameUtils');
@@ -14177,7 +18301,7 @@ RenderLayer.prototype = {
 
 module.exports = RenderLayer;
 
-},{"./DrawingUtils":8,"./EventTypes":10,"./FrameUtils":13}],23:[function(require,module,exports){
+},{"./DrawingUtils":11,"./EventTypes":13,"./FrameUtils":16}],26:[function(require,module,exports){
 (function (process){
 'use strict';
 
@@ -14400,7 +18524,7 @@ var Surface = React.createClass({
 module.exports = Surface;
 
 }).call(this,require('_process'))
-},{"./ContainerMixin":7,"./DrawingUtils":8,"./FrameUtils":13,"./RenderLayer":22,"./hitTest":27,"./layoutNode":28,"_process":3,"react":188,"react/lib/ReactUpdates":120,"react/lib/invariant":168}],24:[function(require,module,exports){
+},{"./ContainerMixin":10,"./DrawingUtils":11,"./FrameUtils":16,"./RenderLayer":25,"./hitTest":30,"./layoutNode":31,"_process":6,"react":191,"react/lib/ReactUpdates":123,"react/lib/invariant":171}],27:[function(require,module,exports){
 'use strict';
 
 var createComponent = require('./createComponent');
@@ -14454,7 +18578,7 @@ function childrenAsString(children) {
 }
 
 module.exports = Text;
-},{"./LayerMixin":18,"./createComponent":26}],25:[function(require,module,exports){
+},{"./LayerMixin":21,"./createComponent":29}],28:[function(require,module,exports){
 'use strict';
 
 /**
@@ -14469,7 +18593,7 @@ module.exports = function (number, min, max) {
 };
 
 
-},{}],26:[function(require,module,exports){
+},{}],29:[function(require,module,exports){
 'use strict';
 
 // Adapted from ReactART:
@@ -14498,7 +18622,7 @@ function createComponent (name) {
 
 module.exports = createComponent;
 
-},{"./RenderLayer":22,"react/lib/Object.assign":59}],27:[function(require,module,exports){
+},{"./RenderLayer":25,"react/lib/Object.assign":62}],30:[function(require,module,exports){
 'use strict';
 
 var FrameUtils = require('./FrameUtils');
@@ -14591,7 +18715,7 @@ module.exports = hitTest;
 module.exports.getHitHandle = getHitHandle;
 
 
-},{"./EventTypes":10,"./FrameUtils":13}],28:[function(require,module,exports){
+},{"./EventTypes":13,"./FrameUtils":16}],31:[function(require,module,exports){
 'use strict';
 
 var computeLayout = require('./Layout');
@@ -14638,7 +18762,7 @@ function walkNode (node, parentLeft, parentTop) {
 
 module.exports = layoutNode;
 
-},{"./Layout":19}],29:[function(require,module,exports){
+},{"./Layout":22}],32:[function(require,module,exports){
 'use strict';
 
 var FontFace = require('./FontFace');
@@ -14733,9 +18857,9 @@ module.exports = function measureText (text, width, fontFace, fontSize, lineHeig
   return measuredSize;
 };
 
-},{"./FontFace":11,"./FontUtils":12}],30:[function(require,module,exports){
+},{"./FontFace":14,"./FontUtils":15}],33:[function(require,module,exports){
 module.exports = require('./src/Scroller');
-},{"./src/Scroller":32}],31:[function(require,module,exports){
+},{"./src/Scroller":35}],34:[function(require,module,exports){
 /*
  * Scroller
  * http://github.com/zynga/scroller
@@ -14976,7 +19100,7 @@ module.exports = require('./src/Scroller');
 })(typeof window !== 'undefined' ? window : this);
 
 
-},{}],32:[function(require,module,exports){
+},{}],35:[function(require,module,exports){
 /*
  * Scroller
  * http://github.com/zynga/scroller
@@ -16342,7 +20466,7 @@ var Scroller;
 	module.exports = Scroller;
 })();
 
-},{"./Animate":31}],33:[function(require,module,exports){
+},{"./Animate":34}],36:[function(require,module,exports){
 (function(root, factory) {
     if (typeof exports === 'object') {
         // CommonJS
@@ -16488,7 +20612,7 @@ var Scroller;
     return React;
 }));
 
-},{"backbone":1,"react":188,"underscore":189}],34:[function(require,module,exports){
+},{"backbone":4,"react":191,"underscore":192}],37:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -16515,7 +20639,7 @@ var AutoFocusMixin = {
 
 module.exports = AutoFocusMixin;
 
-},{"./focusNode":152}],35:[function(require,module,exports){
+},{"./focusNode":155}],38:[function(require,module,exports){
 /**
  * Copyright 2013-2015 Facebook, Inc.
  * All rights reserved.
@@ -17010,7 +21134,7 @@ var BeforeInputEventPlugin = {
 
 module.exports = BeforeInputEventPlugin;
 
-},{"./EventConstants":47,"./EventPropagators":52,"./ExecutionEnvironment":53,"./FallbackCompositionState":54,"./SyntheticCompositionEvent":126,"./SyntheticInputEvent":130,"./keyOf":174}],36:[function(require,module,exports){
+},{"./EventConstants":50,"./EventPropagators":55,"./ExecutionEnvironment":56,"./FallbackCompositionState":57,"./SyntheticCompositionEvent":129,"./SyntheticInputEvent":133,"./keyOf":177}],39:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -17135,7 +21259,7 @@ var CSSProperty = {
 
 module.exports = CSSProperty;
 
-},{}],37:[function(require,module,exports){
+},{}],40:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -17317,7 +21441,7 @@ var CSSPropertyOperations = {
 module.exports = CSSPropertyOperations;
 
 }).call(this,require('_process'))
-},{"./CSSProperty":36,"./ExecutionEnvironment":53,"./camelizeStyleName":141,"./dangerousStyleValue":146,"./hyphenateStyleName":166,"./memoizeStringOnly":176,"./warning":187,"_process":3}],38:[function(require,module,exports){
+},{"./CSSProperty":39,"./ExecutionEnvironment":56,"./camelizeStyleName":144,"./dangerousStyleValue":149,"./hyphenateStyleName":169,"./memoizeStringOnly":179,"./warning":190,"_process":6}],41:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -17417,7 +21541,7 @@ PooledClass.addPoolingTo(CallbackQueue);
 module.exports = CallbackQueue;
 
 }).call(this,require('_process'))
-},{"./Object.assign":59,"./PooledClass":60,"./invariant":168,"_process":3}],39:[function(require,module,exports){
+},{"./Object.assign":62,"./PooledClass":63,"./invariant":171,"_process":6}],42:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -17799,7 +21923,7 @@ var ChangeEventPlugin = {
 
 module.exports = ChangeEventPlugin;
 
-},{"./EventConstants":47,"./EventPluginHub":49,"./EventPropagators":52,"./ExecutionEnvironment":53,"./ReactUpdates":120,"./SyntheticEvent":128,"./isEventSupported":169,"./isTextInputElement":171,"./keyOf":174}],40:[function(require,module,exports){
+},{"./EventConstants":50,"./EventPluginHub":52,"./EventPropagators":55,"./ExecutionEnvironment":56,"./ReactUpdates":123,"./SyntheticEvent":131,"./isEventSupported":172,"./isTextInputElement":174,"./keyOf":177}],43:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -17824,7 +21948,7 @@ var ClientReactRootIndex = {
 
 module.exports = ClientReactRootIndex;
 
-},{}],41:[function(require,module,exports){
+},{}],44:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -17962,7 +22086,7 @@ var DOMChildrenOperations = {
 module.exports = DOMChildrenOperations;
 
 }).call(this,require('_process'))
-},{"./Danger":44,"./ReactMultiChildUpdateTypes":105,"./invariant":168,"./setTextContent":182,"_process":3}],42:[function(require,module,exports){
+},{"./Danger":47,"./ReactMultiChildUpdateTypes":108,"./invariant":171,"./setTextContent":185,"_process":6}],45:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -18261,7 +22385,7 @@ var DOMProperty = {
 module.exports = DOMProperty;
 
 }).call(this,require('_process'))
-},{"./invariant":168,"_process":3}],43:[function(require,module,exports){
+},{"./invariant":171,"_process":6}],46:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -18453,7 +22577,7 @@ var DOMPropertyOperations = {
 module.exports = DOMPropertyOperations;
 
 }).call(this,require('_process'))
-},{"./DOMProperty":42,"./quoteAttributeValueForBrowser":180,"./warning":187,"_process":3}],44:[function(require,module,exports){
+},{"./DOMProperty":45,"./quoteAttributeValueForBrowser":183,"./warning":190,"_process":6}],47:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -18640,7 +22764,7 @@ var Danger = {
 module.exports = Danger;
 
 }).call(this,require('_process'))
-},{"./ExecutionEnvironment":53,"./createNodesFromMarkup":145,"./emptyFunction":147,"./getMarkupWrap":160,"./invariant":168,"_process":3}],45:[function(require,module,exports){
+},{"./ExecutionEnvironment":56,"./createNodesFromMarkup":148,"./emptyFunction":150,"./getMarkupWrap":163,"./invariant":171,"_process":6}],48:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -18679,7 +22803,7 @@ var DefaultEventPluginOrder = [
 
 module.exports = DefaultEventPluginOrder;
 
-},{"./keyOf":174}],46:[function(require,module,exports){
+},{"./keyOf":177}],49:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -18819,7 +22943,7 @@ var EnterLeaveEventPlugin = {
 
 module.exports = EnterLeaveEventPlugin;
 
-},{"./EventConstants":47,"./EventPropagators":52,"./ReactMount":103,"./SyntheticMouseEvent":132,"./keyOf":174}],47:[function(require,module,exports){
+},{"./EventConstants":50,"./EventPropagators":55,"./ReactMount":106,"./SyntheticMouseEvent":135,"./keyOf":177}],50:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -18891,7 +23015,7 @@ var EventConstants = {
 
 module.exports = EventConstants;
 
-},{"./keyMirror":173}],48:[function(require,module,exports){
+},{"./keyMirror":176}],51:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -18981,7 +23105,7 @@ var EventListener = {
 module.exports = EventListener;
 
 }).call(this,require('_process'))
-},{"./emptyFunction":147,"_process":3}],49:[function(require,module,exports){
+},{"./emptyFunction":150,"_process":6}],52:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -19259,7 +23383,7 @@ var EventPluginHub = {
 module.exports = EventPluginHub;
 
 }).call(this,require('_process'))
-},{"./EventPluginRegistry":50,"./EventPluginUtils":51,"./accumulateInto":138,"./forEachAccumulated":153,"./invariant":168,"_process":3}],50:[function(require,module,exports){
+},{"./EventPluginRegistry":53,"./EventPluginUtils":54,"./accumulateInto":141,"./forEachAccumulated":156,"./invariant":171,"_process":6}],53:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -19539,7 +23663,7 @@ var EventPluginRegistry = {
 module.exports = EventPluginRegistry;
 
 }).call(this,require('_process'))
-},{"./invariant":168,"_process":3}],51:[function(require,module,exports){
+},{"./invariant":171,"_process":6}],54:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -19760,7 +23884,7 @@ var EventPluginUtils = {
 module.exports = EventPluginUtils;
 
 }).call(this,require('_process'))
-},{"./EventConstants":47,"./invariant":168,"_process":3}],52:[function(require,module,exports){
+},{"./EventConstants":50,"./invariant":171,"_process":6}],55:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -19902,7 +24026,7 @@ var EventPropagators = {
 module.exports = EventPropagators;
 
 }).call(this,require('_process'))
-},{"./EventConstants":47,"./EventPluginHub":49,"./accumulateInto":138,"./forEachAccumulated":153,"_process":3}],53:[function(require,module,exports){
+},{"./EventConstants":50,"./EventPluginHub":52,"./accumulateInto":141,"./forEachAccumulated":156,"_process":6}],56:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -19946,7 +24070,7 @@ var ExecutionEnvironment = {
 
 module.exports = ExecutionEnvironment;
 
-},{}],54:[function(require,module,exports){
+},{}],57:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20037,7 +24161,7 @@ PooledClass.addPoolingTo(FallbackCompositionState);
 
 module.exports = FallbackCompositionState;
 
-},{"./Object.assign":59,"./PooledClass":60,"./getTextContentAccessor":163}],55:[function(require,module,exports){
+},{"./Object.assign":62,"./PooledClass":63,"./getTextContentAccessor":166}],58:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20248,7 +24372,7 @@ var HTMLDOMPropertyConfig = {
 
 module.exports = HTMLDOMPropertyConfig;
 
-},{"./DOMProperty":42,"./ExecutionEnvironment":53}],56:[function(require,module,exports){
+},{"./DOMProperty":45,"./ExecutionEnvironment":56}],59:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -20404,7 +24528,7 @@ var LinkedValueUtils = {
 module.exports = LinkedValueUtils;
 
 }).call(this,require('_process'))
-},{"./ReactPropTypes":111,"./invariant":168,"_process":3}],57:[function(require,module,exports){
+},{"./ReactPropTypes":114,"./invariant":171,"_process":6}],60:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -20461,7 +24585,7 @@ var LocalEventTrapMixin = {
 module.exports = LocalEventTrapMixin;
 
 }).call(this,require('_process'))
-},{"./ReactBrowserEventEmitter":63,"./accumulateInto":138,"./forEachAccumulated":153,"./invariant":168,"_process":3}],58:[function(require,module,exports){
+},{"./ReactBrowserEventEmitter":66,"./accumulateInto":141,"./forEachAccumulated":156,"./invariant":171,"_process":6}],61:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20519,7 +24643,7 @@ var MobileSafariClickEventPlugin = {
 
 module.exports = MobileSafariClickEventPlugin;
 
-},{"./EventConstants":47,"./emptyFunction":147}],59:[function(require,module,exports){
+},{"./EventConstants":50,"./emptyFunction":150}],62:[function(require,module,exports){
 /**
  * Copyright 2014-2015, Facebook, Inc.
  * All rights reserved.
@@ -20568,7 +24692,7 @@ function assign(target, sources) {
 
 module.exports = assign;
 
-},{}],60:[function(require,module,exports){
+},{}],63:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -20684,7 +24808,7 @@ var PooledClass = {
 module.exports = PooledClass;
 
 }).call(this,require('_process'))
-},{"./invariant":168,"_process":3}],61:[function(require,module,exports){
+},{"./invariant":171,"_process":6}],64:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -20836,7 +24960,7 @@ React.version = '0.13.3';
 module.exports = React;
 
 }).call(this,require('_process'))
-},{"./EventPluginUtils":51,"./ExecutionEnvironment":53,"./Object.assign":59,"./ReactChildren":65,"./ReactClass":66,"./ReactComponent":67,"./ReactContext":71,"./ReactCurrentOwner":72,"./ReactDOM":73,"./ReactDOMTextComponent":84,"./ReactDefaultInjection":87,"./ReactElement":90,"./ReactElementValidator":91,"./ReactInstanceHandles":99,"./ReactMount":103,"./ReactPerf":108,"./ReactPropTypes":111,"./ReactReconciler":114,"./ReactServerRendering":117,"./findDOMNode":150,"./onlyChild":177,"_process":3}],62:[function(require,module,exports){
+},{"./EventPluginUtils":54,"./ExecutionEnvironment":56,"./Object.assign":62,"./ReactChildren":68,"./ReactClass":69,"./ReactComponent":70,"./ReactContext":74,"./ReactCurrentOwner":75,"./ReactDOM":76,"./ReactDOMTextComponent":87,"./ReactDefaultInjection":90,"./ReactElement":93,"./ReactElementValidator":94,"./ReactInstanceHandles":102,"./ReactMount":106,"./ReactPerf":111,"./ReactPropTypes":114,"./ReactReconciler":117,"./ReactServerRendering":120,"./findDOMNode":153,"./onlyChild":180,"_process":6}],65:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -20867,7 +24991,7 @@ var ReactBrowserComponentMixin = {
 
 module.exports = ReactBrowserComponentMixin;
 
-},{"./findDOMNode":150}],63:[function(require,module,exports){
+},{"./findDOMNode":153}],66:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -21220,7 +25344,7 @@ var ReactBrowserEventEmitter = assign({}, ReactEventEmitterMixin, {
 
 module.exports = ReactBrowserEventEmitter;
 
-},{"./EventConstants":47,"./EventPluginHub":49,"./EventPluginRegistry":50,"./Object.assign":59,"./ReactEventEmitterMixin":94,"./ViewportMetrics":137,"./isEventSupported":169}],64:[function(require,module,exports){
+},{"./EventConstants":50,"./EventPluginHub":52,"./EventPluginRegistry":53,"./Object.assign":62,"./ReactEventEmitterMixin":97,"./ViewportMetrics":140,"./isEventSupported":172}],67:[function(require,module,exports){
 /**
  * Copyright 2014-2015, Facebook, Inc.
  * All rights reserved.
@@ -21347,7 +25471,7 @@ var ReactChildReconciler = {
 
 module.exports = ReactChildReconciler;
 
-},{"./ReactReconciler":114,"./flattenChildren":151,"./instantiateReactComponent":167,"./shouldUpdateReactComponent":184}],65:[function(require,module,exports){
+},{"./ReactReconciler":117,"./flattenChildren":154,"./instantiateReactComponent":170,"./shouldUpdateReactComponent":187}],68:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -21500,7 +25624,7 @@ var ReactChildren = {
 module.exports = ReactChildren;
 
 }).call(this,require('_process'))
-},{"./PooledClass":60,"./ReactFragment":96,"./traverseAllChildren":186,"./warning":187,"_process":3}],66:[function(require,module,exports){
+},{"./PooledClass":63,"./ReactFragment":99,"./traverseAllChildren":189,"./warning":190,"_process":6}],69:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -22446,7 +26570,7 @@ var ReactClass = {
 module.exports = ReactClass;
 
 }).call(this,require('_process'))
-},{"./Object.assign":59,"./ReactComponent":67,"./ReactCurrentOwner":72,"./ReactElement":90,"./ReactErrorUtils":93,"./ReactInstanceMap":100,"./ReactLifeCycle":101,"./ReactPropTypeLocationNames":109,"./ReactPropTypeLocations":110,"./ReactUpdateQueue":119,"./invariant":168,"./keyMirror":173,"./keyOf":174,"./warning":187,"_process":3}],67:[function(require,module,exports){
+},{"./Object.assign":62,"./ReactComponent":70,"./ReactCurrentOwner":75,"./ReactElement":93,"./ReactErrorUtils":96,"./ReactInstanceMap":103,"./ReactLifeCycle":104,"./ReactPropTypeLocationNames":112,"./ReactPropTypeLocations":113,"./ReactUpdateQueue":122,"./invariant":171,"./keyMirror":176,"./keyOf":177,"./warning":190,"_process":6}],70:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -22600,7 +26724,7 @@ if ("production" !== process.env.NODE_ENV) {
 module.exports = ReactComponent;
 
 }).call(this,require('_process'))
-},{"./ReactUpdateQueue":119,"./invariant":168,"./warning":187,"_process":3}],68:[function(require,module,exports){
+},{"./ReactUpdateQueue":122,"./invariant":171,"./warning":190,"_process":6}],71:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -22647,7 +26771,7 @@ var ReactComponentBrowserEnvironment = {
 
 module.exports = ReactComponentBrowserEnvironment;
 
-},{"./ReactDOMIDOperations":77,"./ReactMount":103}],69:[function(require,module,exports){
+},{"./ReactDOMIDOperations":80,"./ReactMount":106}],72:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -22708,7 +26832,7 @@ var ReactComponentEnvironment = {
 module.exports = ReactComponentEnvironment;
 
 }).call(this,require('_process'))
-},{"./invariant":168,"_process":3}],70:[function(require,module,exports){
+},{"./invariant":171,"_process":6}],73:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -23621,7 +27745,7 @@ var ReactCompositeComponent = {
 module.exports = ReactCompositeComponent;
 
 }).call(this,require('_process'))
-},{"./Object.assign":59,"./ReactComponentEnvironment":69,"./ReactContext":71,"./ReactCurrentOwner":72,"./ReactElement":90,"./ReactElementValidator":91,"./ReactInstanceMap":100,"./ReactLifeCycle":101,"./ReactNativeComponent":106,"./ReactPerf":108,"./ReactPropTypeLocationNames":109,"./ReactPropTypeLocations":110,"./ReactReconciler":114,"./ReactUpdates":120,"./emptyObject":148,"./invariant":168,"./shouldUpdateReactComponent":184,"./warning":187,"_process":3}],71:[function(require,module,exports){
+},{"./Object.assign":62,"./ReactComponentEnvironment":72,"./ReactContext":74,"./ReactCurrentOwner":75,"./ReactElement":93,"./ReactElementValidator":94,"./ReactInstanceMap":103,"./ReactLifeCycle":104,"./ReactNativeComponent":109,"./ReactPerf":111,"./ReactPropTypeLocationNames":112,"./ReactPropTypeLocations":113,"./ReactReconciler":117,"./ReactUpdates":123,"./emptyObject":151,"./invariant":171,"./shouldUpdateReactComponent":187,"./warning":190,"_process":6}],74:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -23699,7 +27823,7 @@ var ReactContext = {
 module.exports = ReactContext;
 
 }).call(this,require('_process'))
-},{"./Object.assign":59,"./emptyObject":148,"./warning":187,"_process":3}],72:[function(require,module,exports){
+},{"./Object.assign":62,"./emptyObject":151,"./warning":190,"_process":6}],75:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -23733,7 +27857,7 @@ var ReactCurrentOwner = {
 
 module.exports = ReactCurrentOwner;
 
-},{}],73:[function(require,module,exports){
+},{}],76:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -23912,7 +28036,7 @@ var ReactDOM = mapObject({
 module.exports = ReactDOM;
 
 }).call(this,require('_process'))
-},{"./ReactElement":90,"./ReactElementValidator":91,"./mapObject":175,"_process":3}],74:[function(require,module,exports){
+},{"./ReactElement":93,"./ReactElementValidator":94,"./mapObject":178,"_process":6}],77:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -23976,7 +28100,7 @@ var ReactDOMButton = ReactClass.createClass({
 
 module.exports = ReactDOMButton;
 
-},{"./AutoFocusMixin":34,"./ReactBrowserComponentMixin":62,"./ReactClass":66,"./ReactElement":90,"./keyMirror":173}],75:[function(require,module,exports){
+},{"./AutoFocusMixin":37,"./ReactBrowserComponentMixin":65,"./ReactClass":69,"./ReactElement":93,"./keyMirror":176}],78:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -24486,7 +28610,7 @@ ReactDOMComponent.injection = {
 module.exports = ReactDOMComponent;
 
 }).call(this,require('_process'))
-},{"./CSSPropertyOperations":37,"./DOMProperty":42,"./DOMPropertyOperations":43,"./Object.assign":59,"./ReactBrowserEventEmitter":63,"./ReactComponentBrowserEnvironment":68,"./ReactMount":103,"./ReactMultiChild":104,"./ReactPerf":108,"./escapeTextContentForBrowser":149,"./invariant":168,"./isEventSupported":169,"./keyOf":174,"./warning":187,"_process":3}],76:[function(require,module,exports){
+},{"./CSSPropertyOperations":40,"./DOMProperty":45,"./DOMPropertyOperations":46,"./Object.assign":62,"./ReactBrowserEventEmitter":66,"./ReactComponentBrowserEnvironment":71,"./ReactMount":106,"./ReactMultiChild":107,"./ReactPerf":111,"./escapeTextContentForBrowser":152,"./invariant":171,"./isEventSupported":172,"./keyOf":177,"./warning":190,"_process":6}],79:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -24535,7 +28659,7 @@ var ReactDOMForm = ReactClass.createClass({
 
 module.exports = ReactDOMForm;
 
-},{"./EventConstants":47,"./LocalEventTrapMixin":57,"./ReactBrowserComponentMixin":62,"./ReactClass":66,"./ReactElement":90}],77:[function(require,module,exports){
+},{"./EventConstants":50,"./LocalEventTrapMixin":60,"./ReactBrowserComponentMixin":65,"./ReactClass":69,"./ReactElement":93}],80:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -24703,7 +28827,7 @@ ReactPerf.measureMethods(ReactDOMIDOperations, 'ReactDOMIDOperations', {
 module.exports = ReactDOMIDOperations;
 
 }).call(this,require('_process'))
-},{"./CSSPropertyOperations":37,"./DOMChildrenOperations":41,"./DOMPropertyOperations":43,"./ReactMount":103,"./ReactPerf":108,"./invariant":168,"./setInnerHTML":181,"_process":3}],78:[function(require,module,exports){
+},{"./CSSPropertyOperations":40,"./DOMChildrenOperations":44,"./DOMPropertyOperations":46,"./ReactMount":106,"./ReactPerf":111,"./invariant":171,"./setInnerHTML":184,"_process":6}],81:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -24748,7 +28872,7 @@ var ReactDOMIframe = ReactClass.createClass({
 
 module.exports = ReactDOMIframe;
 
-},{"./EventConstants":47,"./LocalEventTrapMixin":57,"./ReactBrowserComponentMixin":62,"./ReactClass":66,"./ReactElement":90}],79:[function(require,module,exports){
+},{"./EventConstants":50,"./LocalEventTrapMixin":60,"./ReactBrowserComponentMixin":65,"./ReactClass":69,"./ReactElement":93}],82:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -24794,7 +28918,7 @@ var ReactDOMImg = ReactClass.createClass({
 
 module.exports = ReactDOMImg;
 
-},{"./EventConstants":47,"./LocalEventTrapMixin":57,"./ReactBrowserComponentMixin":62,"./ReactClass":66,"./ReactElement":90}],80:[function(require,module,exports){
+},{"./EventConstants":50,"./LocalEventTrapMixin":60,"./ReactBrowserComponentMixin":65,"./ReactClass":69,"./ReactElement":93}],83:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -24971,7 +29095,7 @@ var ReactDOMInput = ReactClass.createClass({
 module.exports = ReactDOMInput;
 
 }).call(this,require('_process'))
-},{"./AutoFocusMixin":34,"./DOMPropertyOperations":43,"./LinkedValueUtils":56,"./Object.assign":59,"./ReactBrowserComponentMixin":62,"./ReactClass":66,"./ReactElement":90,"./ReactMount":103,"./ReactUpdates":120,"./invariant":168,"_process":3}],81:[function(require,module,exports){
+},{"./AutoFocusMixin":37,"./DOMPropertyOperations":46,"./LinkedValueUtils":59,"./Object.assign":62,"./ReactBrowserComponentMixin":65,"./ReactClass":69,"./ReactElement":93,"./ReactMount":106,"./ReactUpdates":123,"./invariant":171,"_process":6}],84:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -25023,7 +29147,7 @@ var ReactDOMOption = ReactClass.createClass({
 module.exports = ReactDOMOption;
 
 }).call(this,require('_process'))
-},{"./ReactBrowserComponentMixin":62,"./ReactClass":66,"./ReactElement":90,"./warning":187,"_process":3}],82:[function(require,module,exports){
+},{"./ReactBrowserComponentMixin":65,"./ReactClass":69,"./ReactElement":93,"./warning":190,"_process":6}],85:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -25201,7 +29325,7 @@ var ReactDOMSelect = ReactClass.createClass({
 
 module.exports = ReactDOMSelect;
 
-},{"./AutoFocusMixin":34,"./LinkedValueUtils":56,"./Object.assign":59,"./ReactBrowserComponentMixin":62,"./ReactClass":66,"./ReactElement":90,"./ReactUpdates":120}],83:[function(require,module,exports){
+},{"./AutoFocusMixin":37,"./LinkedValueUtils":59,"./Object.assign":62,"./ReactBrowserComponentMixin":65,"./ReactClass":69,"./ReactElement":93,"./ReactUpdates":123}],86:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -25414,7 +29538,7 @@ var ReactDOMSelection = {
 
 module.exports = ReactDOMSelection;
 
-},{"./ExecutionEnvironment":53,"./getNodeForCharacterOffset":161,"./getTextContentAccessor":163}],84:[function(require,module,exports){
+},{"./ExecutionEnvironment":56,"./getNodeForCharacterOffset":164,"./getTextContentAccessor":166}],87:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -25531,7 +29655,7 @@ assign(ReactDOMTextComponent.prototype, {
 
 module.exports = ReactDOMTextComponent;
 
-},{"./DOMPropertyOperations":43,"./Object.assign":59,"./ReactComponentBrowserEnvironment":68,"./ReactDOMComponent":75,"./escapeTextContentForBrowser":149}],85:[function(require,module,exports){
+},{"./DOMPropertyOperations":46,"./Object.assign":62,"./ReactComponentBrowserEnvironment":71,"./ReactDOMComponent":78,"./escapeTextContentForBrowser":152}],88:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -25671,7 +29795,7 @@ var ReactDOMTextarea = ReactClass.createClass({
 module.exports = ReactDOMTextarea;
 
 }).call(this,require('_process'))
-},{"./AutoFocusMixin":34,"./DOMPropertyOperations":43,"./LinkedValueUtils":56,"./Object.assign":59,"./ReactBrowserComponentMixin":62,"./ReactClass":66,"./ReactElement":90,"./ReactUpdates":120,"./invariant":168,"./warning":187,"_process":3}],86:[function(require,module,exports){
+},{"./AutoFocusMixin":37,"./DOMPropertyOperations":46,"./LinkedValueUtils":59,"./Object.assign":62,"./ReactBrowserComponentMixin":65,"./ReactClass":69,"./ReactElement":93,"./ReactUpdates":123,"./invariant":171,"./warning":190,"_process":6}],89:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -25744,7 +29868,7 @@ var ReactDefaultBatchingStrategy = {
 
 module.exports = ReactDefaultBatchingStrategy;
 
-},{"./Object.assign":59,"./ReactUpdates":120,"./Transaction":136,"./emptyFunction":147}],87:[function(require,module,exports){
+},{"./Object.assign":62,"./ReactUpdates":123,"./Transaction":139,"./emptyFunction":150}],90:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -25903,7 +30027,7 @@ module.exports = {
 };
 
 }).call(this,require('_process'))
-},{"./BeforeInputEventPlugin":35,"./ChangeEventPlugin":39,"./ClientReactRootIndex":40,"./DefaultEventPluginOrder":45,"./EnterLeaveEventPlugin":46,"./ExecutionEnvironment":53,"./HTMLDOMPropertyConfig":55,"./MobileSafariClickEventPlugin":58,"./ReactBrowserComponentMixin":62,"./ReactClass":66,"./ReactComponentBrowserEnvironment":68,"./ReactDOMButton":74,"./ReactDOMComponent":75,"./ReactDOMForm":76,"./ReactDOMIDOperations":77,"./ReactDOMIframe":78,"./ReactDOMImg":79,"./ReactDOMInput":80,"./ReactDOMOption":81,"./ReactDOMSelect":82,"./ReactDOMTextComponent":84,"./ReactDOMTextarea":85,"./ReactDefaultBatchingStrategy":86,"./ReactDefaultPerf":88,"./ReactElement":90,"./ReactEventListener":95,"./ReactInjection":97,"./ReactInstanceHandles":99,"./ReactMount":103,"./ReactReconcileTransaction":113,"./SVGDOMPropertyConfig":121,"./SelectEventPlugin":122,"./ServerReactRootIndex":123,"./SimpleEventPlugin":124,"./createFullPageComponent":144,"_process":3}],88:[function(require,module,exports){
+},{"./BeforeInputEventPlugin":38,"./ChangeEventPlugin":42,"./ClientReactRootIndex":43,"./DefaultEventPluginOrder":48,"./EnterLeaveEventPlugin":49,"./ExecutionEnvironment":56,"./HTMLDOMPropertyConfig":58,"./MobileSafariClickEventPlugin":61,"./ReactBrowserComponentMixin":65,"./ReactClass":69,"./ReactComponentBrowserEnvironment":71,"./ReactDOMButton":77,"./ReactDOMComponent":78,"./ReactDOMForm":79,"./ReactDOMIDOperations":80,"./ReactDOMIframe":81,"./ReactDOMImg":82,"./ReactDOMInput":83,"./ReactDOMOption":84,"./ReactDOMSelect":85,"./ReactDOMTextComponent":87,"./ReactDOMTextarea":88,"./ReactDefaultBatchingStrategy":89,"./ReactDefaultPerf":91,"./ReactElement":93,"./ReactEventListener":98,"./ReactInjection":100,"./ReactInstanceHandles":102,"./ReactMount":106,"./ReactReconcileTransaction":116,"./SVGDOMPropertyConfig":124,"./SelectEventPlugin":125,"./ServerReactRootIndex":126,"./SimpleEventPlugin":127,"./createFullPageComponent":147,"_process":6}],91:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -26169,7 +30293,7 @@ var ReactDefaultPerf = {
 
 module.exports = ReactDefaultPerf;
 
-},{"./DOMProperty":42,"./ReactDefaultPerfAnalysis":89,"./ReactMount":103,"./ReactPerf":108,"./performanceNow":179}],89:[function(require,module,exports){
+},{"./DOMProperty":45,"./ReactDefaultPerfAnalysis":92,"./ReactMount":106,"./ReactPerf":111,"./performanceNow":182}],92:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -26375,7 +30499,7 @@ var ReactDefaultPerfAnalysis = {
 
 module.exports = ReactDefaultPerfAnalysis;
 
-},{"./Object.assign":59}],90:[function(require,module,exports){
+},{"./Object.assign":62}],93:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -26683,7 +30807,7 @@ ReactElement.isValidElement = function(object) {
 module.exports = ReactElement;
 
 }).call(this,require('_process'))
-},{"./Object.assign":59,"./ReactContext":71,"./ReactCurrentOwner":72,"./warning":187,"_process":3}],91:[function(require,module,exports){
+},{"./Object.assign":62,"./ReactContext":74,"./ReactCurrentOwner":75,"./warning":190,"_process":6}],94:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -27148,7 +31272,7 @@ var ReactElementValidator = {
 module.exports = ReactElementValidator;
 
 }).call(this,require('_process'))
-},{"./ReactCurrentOwner":72,"./ReactElement":90,"./ReactFragment":96,"./ReactNativeComponent":106,"./ReactPropTypeLocationNames":109,"./ReactPropTypeLocations":110,"./getIteratorFn":159,"./invariant":168,"./warning":187,"_process":3}],92:[function(require,module,exports){
+},{"./ReactCurrentOwner":75,"./ReactElement":93,"./ReactFragment":99,"./ReactNativeComponent":109,"./ReactPropTypeLocationNames":112,"./ReactPropTypeLocations":113,"./getIteratorFn":162,"./invariant":171,"./warning":190,"_process":6}],95:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -27243,7 +31367,7 @@ var ReactEmptyComponent = {
 module.exports = ReactEmptyComponent;
 
 }).call(this,require('_process'))
-},{"./ReactElement":90,"./ReactInstanceMap":100,"./invariant":168,"_process":3}],93:[function(require,module,exports){
+},{"./ReactElement":93,"./ReactInstanceMap":103,"./invariant":171,"_process":6}],96:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -27275,7 +31399,7 @@ var ReactErrorUtils = {
 
 module.exports = ReactErrorUtils;
 
-},{}],94:[function(require,module,exports){
+},{}],97:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -27325,7 +31449,7 @@ var ReactEventEmitterMixin = {
 
 module.exports = ReactEventEmitterMixin;
 
-},{"./EventPluginHub":49}],95:[function(require,module,exports){
+},{"./EventPluginHub":52}],98:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -27508,7 +31632,7 @@ var ReactEventListener = {
 
 module.exports = ReactEventListener;
 
-},{"./EventListener":48,"./ExecutionEnvironment":53,"./Object.assign":59,"./PooledClass":60,"./ReactInstanceHandles":99,"./ReactMount":103,"./ReactUpdates":120,"./getEventTarget":158,"./getUnboundedScrollPosition":164}],96:[function(require,module,exports){
+},{"./EventListener":51,"./ExecutionEnvironment":56,"./Object.assign":62,"./PooledClass":63,"./ReactInstanceHandles":102,"./ReactMount":106,"./ReactUpdates":123,"./getEventTarget":161,"./getUnboundedScrollPosition":167}],99:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2015, Facebook, Inc.
@@ -27693,7 +31817,7 @@ var ReactFragment = {
 module.exports = ReactFragment;
 
 }).call(this,require('_process'))
-},{"./ReactElement":90,"./warning":187,"_process":3}],97:[function(require,module,exports){
+},{"./ReactElement":93,"./warning":190,"_process":6}],100:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -27735,7 +31859,7 @@ var ReactInjection = {
 
 module.exports = ReactInjection;
 
-},{"./DOMProperty":42,"./EventPluginHub":49,"./ReactBrowserEventEmitter":63,"./ReactClass":66,"./ReactComponentEnvironment":69,"./ReactDOMComponent":75,"./ReactEmptyComponent":92,"./ReactNativeComponent":106,"./ReactPerf":108,"./ReactRootIndex":116,"./ReactUpdates":120}],98:[function(require,module,exports){
+},{"./DOMProperty":45,"./EventPluginHub":52,"./ReactBrowserEventEmitter":66,"./ReactClass":69,"./ReactComponentEnvironment":72,"./ReactDOMComponent":78,"./ReactEmptyComponent":95,"./ReactNativeComponent":109,"./ReactPerf":111,"./ReactRootIndex":119,"./ReactUpdates":123}],101:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -27870,7 +31994,7 @@ var ReactInputSelection = {
 
 module.exports = ReactInputSelection;
 
-},{"./ReactDOMSelection":83,"./containsNode":142,"./focusNode":152,"./getActiveElement":154}],99:[function(require,module,exports){
+},{"./ReactDOMSelection":86,"./containsNode":145,"./focusNode":155,"./getActiveElement":157}],102:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -28206,7 +32330,7 @@ var ReactInstanceHandles = {
 module.exports = ReactInstanceHandles;
 
 }).call(this,require('_process'))
-},{"./ReactRootIndex":116,"./invariant":168,"_process":3}],100:[function(require,module,exports){
+},{"./ReactRootIndex":119,"./invariant":171,"_process":6}],103:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -28255,7 +32379,7 @@ var ReactInstanceMap = {
 
 module.exports = ReactInstanceMap;
 
-},{}],101:[function(require,module,exports){
+},{}],104:[function(require,module,exports){
 /**
  * Copyright 2015, Facebook, Inc.
  * All rights reserved.
@@ -28292,7 +32416,7 @@ var ReactLifeCycle = {
 
 module.exports = ReactLifeCycle;
 
-},{}],102:[function(require,module,exports){
+},{}],105:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -28340,7 +32464,7 @@ var ReactMarkupChecksum = {
 
 module.exports = ReactMarkupChecksum;
 
-},{"./adler32":139}],103:[function(require,module,exports){
+},{"./adler32":142}],106:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -29231,7 +33355,7 @@ ReactPerf.measureMethods(ReactMount, 'ReactMount', {
 module.exports = ReactMount;
 
 }).call(this,require('_process'))
-},{"./DOMProperty":42,"./ReactBrowserEventEmitter":63,"./ReactCurrentOwner":72,"./ReactElement":90,"./ReactElementValidator":91,"./ReactEmptyComponent":92,"./ReactInstanceHandles":99,"./ReactInstanceMap":100,"./ReactMarkupChecksum":102,"./ReactPerf":108,"./ReactReconciler":114,"./ReactUpdateQueue":119,"./ReactUpdates":120,"./containsNode":142,"./emptyObject":148,"./getReactRootElementInContainer":162,"./instantiateReactComponent":167,"./invariant":168,"./setInnerHTML":181,"./shouldUpdateReactComponent":184,"./warning":187,"_process":3}],104:[function(require,module,exports){
+},{"./DOMProperty":45,"./ReactBrowserEventEmitter":66,"./ReactCurrentOwner":75,"./ReactElement":93,"./ReactElementValidator":94,"./ReactEmptyComponent":95,"./ReactInstanceHandles":102,"./ReactInstanceMap":103,"./ReactMarkupChecksum":105,"./ReactPerf":111,"./ReactReconciler":117,"./ReactUpdateQueue":122,"./ReactUpdates":123,"./containsNode":145,"./emptyObject":151,"./getReactRootElementInContainer":165,"./instantiateReactComponent":170,"./invariant":171,"./setInnerHTML":184,"./shouldUpdateReactComponent":187,"./warning":190,"_process":6}],107:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -29661,7 +33785,7 @@ var ReactMultiChild = {
 
 module.exports = ReactMultiChild;
 
-},{"./ReactChildReconciler":64,"./ReactComponentEnvironment":69,"./ReactMultiChildUpdateTypes":105,"./ReactReconciler":114}],105:[function(require,module,exports){
+},{"./ReactChildReconciler":67,"./ReactComponentEnvironment":72,"./ReactMultiChildUpdateTypes":108,"./ReactReconciler":117}],108:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -29694,7 +33818,7 @@ var ReactMultiChildUpdateTypes = keyMirror({
 
 module.exports = ReactMultiChildUpdateTypes;
 
-},{"./keyMirror":173}],106:[function(require,module,exports){
+},{"./keyMirror":176}],109:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -29801,7 +33925,7 @@ var ReactNativeComponent = {
 module.exports = ReactNativeComponent;
 
 }).call(this,require('_process'))
-},{"./Object.assign":59,"./invariant":168,"_process":3}],107:[function(require,module,exports){
+},{"./Object.assign":62,"./invariant":171,"_process":6}],110:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -29913,7 +34037,7 @@ var ReactOwner = {
 module.exports = ReactOwner;
 
 }).call(this,require('_process'))
-},{"./invariant":168,"_process":3}],108:[function(require,module,exports){
+},{"./invariant":171,"_process":6}],111:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -30017,7 +34141,7 @@ function _noMeasure(objName, fnName, func) {
 module.exports = ReactPerf;
 
 }).call(this,require('_process'))
-},{"_process":3}],109:[function(require,module,exports){
+},{"_process":6}],112:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -30045,7 +34169,7 @@ if ("production" !== process.env.NODE_ENV) {
 module.exports = ReactPropTypeLocationNames;
 
 }).call(this,require('_process'))
-},{"_process":3}],110:[function(require,module,exports){
+},{"_process":6}],113:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -30069,7 +34193,7 @@ var ReactPropTypeLocations = keyMirror({
 
 module.exports = ReactPropTypeLocations;
 
-},{"./keyMirror":173}],111:[function(require,module,exports){
+},{"./keyMirror":176}],114:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -30418,7 +34542,7 @@ function getPreciseType(propValue) {
 
 module.exports = ReactPropTypes;
 
-},{"./ReactElement":90,"./ReactFragment":96,"./ReactPropTypeLocationNames":109,"./emptyFunction":147}],112:[function(require,module,exports){
+},{"./ReactElement":93,"./ReactFragment":99,"./ReactPropTypeLocationNames":112,"./emptyFunction":150}],115:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -30474,7 +34598,7 @@ PooledClass.addPoolingTo(ReactPutListenerQueue);
 
 module.exports = ReactPutListenerQueue;
 
-},{"./Object.assign":59,"./PooledClass":60,"./ReactBrowserEventEmitter":63}],113:[function(require,module,exports){
+},{"./Object.assign":62,"./PooledClass":63,"./ReactBrowserEventEmitter":66}],116:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -30650,7 +34774,7 @@ PooledClass.addPoolingTo(ReactReconcileTransaction);
 
 module.exports = ReactReconcileTransaction;
 
-},{"./CallbackQueue":38,"./Object.assign":59,"./PooledClass":60,"./ReactBrowserEventEmitter":63,"./ReactInputSelection":98,"./ReactPutListenerQueue":112,"./Transaction":136}],114:[function(require,module,exports){
+},{"./CallbackQueue":41,"./Object.assign":62,"./PooledClass":63,"./ReactBrowserEventEmitter":66,"./ReactInputSelection":101,"./ReactPutListenerQueue":115,"./Transaction":139}],117:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -30774,7 +34898,7 @@ var ReactReconciler = {
 module.exports = ReactReconciler;
 
 }).call(this,require('_process'))
-},{"./ReactElementValidator":91,"./ReactRef":115,"_process":3}],115:[function(require,module,exports){
+},{"./ReactElementValidator":94,"./ReactRef":118,"_process":6}],118:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -30845,7 +34969,7 @@ ReactRef.detachRefs = function(instance, element) {
 
 module.exports = ReactRef;
 
-},{"./ReactOwner":107}],116:[function(require,module,exports){
+},{"./ReactOwner":110}],119:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -30876,7 +35000,7 @@ var ReactRootIndex = {
 
 module.exports = ReactRootIndex;
 
-},{}],117:[function(require,module,exports){
+},{}],120:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -30958,7 +35082,7 @@ module.exports = {
 };
 
 }).call(this,require('_process'))
-},{"./ReactElement":90,"./ReactInstanceHandles":99,"./ReactMarkupChecksum":102,"./ReactServerRenderingTransaction":118,"./emptyObject":148,"./instantiateReactComponent":167,"./invariant":168,"_process":3}],118:[function(require,module,exports){
+},{"./ReactElement":93,"./ReactInstanceHandles":102,"./ReactMarkupChecksum":105,"./ReactServerRenderingTransaction":121,"./emptyObject":151,"./instantiateReactComponent":170,"./invariant":171,"_process":6}],121:[function(require,module,exports){
 /**
  * Copyright 2014-2015, Facebook, Inc.
  * All rights reserved.
@@ -31071,7 +35195,7 @@ PooledClass.addPoolingTo(ReactServerRenderingTransaction);
 
 module.exports = ReactServerRenderingTransaction;
 
-},{"./CallbackQueue":38,"./Object.assign":59,"./PooledClass":60,"./ReactPutListenerQueue":112,"./Transaction":136,"./emptyFunction":147}],119:[function(require,module,exports){
+},{"./CallbackQueue":41,"./Object.assign":62,"./PooledClass":63,"./ReactPutListenerQueue":115,"./Transaction":139,"./emptyFunction":150}],122:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2015, Facebook, Inc.
@@ -31370,7 +35494,7 @@ var ReactUpdateQueue = {
 module.exports = ReactUpdateQueue;
 
 }).call(this,require('_process'))
-},{"./Object.assign":59,"./ReactCurrentOwner":72,"./ReactElement":90,"./ReactInstanceMap":100,"./ReactLifeCycle":101,"./ReactUpdates":120,"./invariant":168,"./warning":187,"_process":3}],120:[function(require,module,exports){
+},{"./Object.assign":62,"./ReactCurrentOwner":75,"./ReactElement":93,"./ReactInstanceMap":103,"./ReactLifeCycle":104,"./ReactUpdates":123,"./invariant":171,"./warning":190,"_process":6}],123:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -31652,7 +35776,7 @@ var ReactUpdates = {
 module.exports = ReactUpdates;
 
 }).call(this,require('_process'))
-},{"./CallbackQueue":38,"./Object.assign":59,"./PooledClass":60,"./ReactCurrentOwner":72,"./ReactPerf":108,"./ReactReconciler":114,"./Transaction":136,"./invariant":168,"./warning":187,"_process":3}],121:[function(require,module,exports){
+},{"./CallbackQueue":41,"./Object.assign":62,"./PooledClass":63,"./ReactCurrentOwner":75,"./ReactPerf":111,"./ReactReconciler":117,"./Transaction":139,"./invariant":171,"./warning":190,"_process":6}],124:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -31746,7 +35870,7 @@ var SVGDOMPropertyConfig = {
 
 module.exports = SVGDOMPropertyConfig;
 
-},{"./DOMProperty":42}],122:[function(require,module,exports){
+},{"./DOMProperty":45}],125:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -31941,7 +36065,7 @@ var SelectEventPlugin = {
 
 module.exports = SelectEventPlugin;
 
-},{"./EventConstants":47,"./EventPropagators":52,"./ReactInputSelection":98,"./SyntheticEvent":128,"./getActiveElement":154,"./isTextInputElement":171,"./keyOf":174,"./shallowEqual":183}],123:[function(require,module,exports){
+},{"./EventConstants":50,"./EventPropagators":55,"./ReactInputSelection":101,"./SyntheticEvent":131,"./getActiveElement":157,"./isTextInputElement":174,"./keyOf":177,"./shallowEqual":186}],126:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -31972,7 +36096,7 @@ var ServerReactRootIndex = {
 
 module.exports = ServerReactRootIndex;
 
-},{}],124:[function(require,module,exports){
+},{}],127:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -32400,7 +36524,7 @@ var SimpleEventPlugin = {
 module.exports = SimpleEventPlugin;
 
 }).call(this,require('_process'))
-},{"./EventConstants":47,"./EventPluginUtils":51,"./EventPropagators":52,"./SyntheticClipboardEvent":125,"./SyntheticDragEvent":127,"./SyntheticEvent":128,"./SyntheticFocusEvent":129,"./SyntheticKeyboardEvent":131,"./SyntheticMouseEvent":132,"./SyntheticTouchEvent":133,"./SyntheticUIEvent":134,"./SyntheticWheelEvent":135,"./getEventCharCode":155,"./invariant":168,"./keyOf":174,"./warning":187,"_process":3}],125:[function(require,module,exports){
+},{"./EventConstants":50,"./EventPluginUtils":54,"./EventPropagators":55,"./SyntheticClipboardEvent":128,"./SyntheticDragEvent":130,"./SyntheticEvent":131,"./SyntheticFocusEvent":132,"./SyntheticKeyboardEvent":134,"./SyntheticMouseEvent":135,"./SyntheticTouchEvent":136,"./SyntheticUIEvent":137,"./SyntheticWheelEvent":138,"./getEventCharCode":158,"./invariant":171,"./keyOf":177,"./warning":190,"_process":6}],128:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -32445,7 +36569,7 @@ SyntheticEvent.augmentClass(SyntheticClipboardEvent, ClipboardEventInterface);
 
 module.exports = SyntheticClipboardEvent;
 
-},{"./SyntheticEvent":128}],126:[function(require,module,exports){
+},{"./SyntheticEvent":131}],129:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -32490,7 +36614,7 @@ SyntheticEvent.augmentClass(
 
 module.exports = SyntheticCompositionEvent;
 
-},{"./SyntheticEvent":128}],127:[function(require,module,exports){
+},{"./SyntheticEvent":131}],130:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -32529,7 +36653,7 @@ SyntheticMouseEvent.augmentClass(SyntheticDragEvent, DragEventInterface);
 
 module.exports = SyntheticDragEvent;
 
-},{"./SyntheticMouseEvent":132}],128:[function(require,module,exports){
+},{"./SyntheticMouseEvent":135}],131:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -32695,7 +36819,7 @@ PooledClass.addPoolingTo(SyntheticEvent, PooledClass.threeArgumentPooler);
 
 module.exports = SyntheticEvent;
 
-},{"./Object.assign":59,"./PooledClass":60,"./emptyFunction":147,"./getEventTarget":158}],129:[function(require,module,exports){
+},{"./Object.assign":62,"./PooledClass":63,"./emptyFunction":150,"./getEventTarget":161}],132:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -32734,7 +36858,7 @@ SyntheticUIEvent.augmentClass(SyntheticFocusEvent, FocusEventInterface);
 
 module.exports = SyntheticFocusEvent;
 
-},{"./SyntheticUIEvent":134}],130:[function(require,module,exports){
+},{"./SyntheticUIEvent":137}],133:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -32780,7 +36904,7 @@ SyntheticEvent.augmentClass(
 
 module.exports = SyntheticInputEvent;
 
-},{"./SyntheticEvent":128}],131:[function(require,module,exports){
+},{"./SyntheticEvent":131}],134:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -32867,7 +36991,7 @@ SyntheticUIEvent.augmentClass(SyntheticKeyboardEvent, KeyboardEventInterface);
 
 module.exports = SyntheticKeyboardEvent;
 
-},{"./SyntheticUIEvent":134,"./getEventCharCode":155,"./getEventKey":156,"./getEventModifierState":157}],132:[function(require,module,exports){
+},{"./SyntheticUIEvent":137,"./getEventCharCode":158,"./getEventKey":159,"./getEventModifierState":160}],135:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -32948,7 +37072,7 @@ SyntheticUIEvent.augmentClass(SyntheticMouseEvent, MouseEventInterface);
 
 module.exports = SyntheticMouseEvent;
 
-},{"./SyntheticUIEvent":134,"./ViewportMetrics":137,"./getEventModifierState":157}],133:[function(require,module,exports){
+},{"./SyntheticUIEvent":137,"./ViewportMetrics":140,"./getEventModifierState":160}],136:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -32996,7 +37120,7 @@ SyntheticUIEvent.augmentClass(SyntheticTouchEvent, TouchEventInterface);
 
 module.exports = SyntheticTouchEvent;
 
-},{"./SyntheticUIEvent":134,"./getEventModifierState":157}],134:[function(require,module,exports){
+},{"./SyntheticUIEvent":137,"./getEventModifierState":160}],137:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -33058,7 +37182,7 @@ SyntheticEvent.augmentClass(SyntheticUIEvent, UIEventInterface);
 
 module.exports = SyntheticUIEvent;
 
-},{"./SyntheticEvent":128,"./getEventTarget":158}],135:[function(require,module,exports){
+},{"./SyntheticEvent":131,"./getEventTarget":161}],138:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -33119,7 +37243,7 @@ SyntheticMouseEvent.augmentClass(SyntheticWheelEvent, WheelEventInterface);
 
 module.exports = SyntheticWheelEvent;
 
-},{"./SyntheticMouseEvent":132}],136:[function(require,module,exports){
+},{"./SyntheticMouseEvent":135}],139:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -33360,7 +37484,7 @@ var Transaction = {
 module.exports = Transaction;
 
 }).call(this,require('_process'))
-},{"./invariant":168,"_process":3}],137:[function(require,module,exports){
+},{"./invariant":171,"_process":6}],140:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -33389,7 +37513,7 @@ var ViewportMetrics = {
 
 module.exports = ViewportMetrics;
 
-},{}],138:[function(require,module,exports){
+},{}],141:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -33455,7 +37579,7 @@ function accumulateInto(current, next) {
 module.exports = accumulateInto;
 
 }).call(this,require('_process'))
-},{"./invariant":168,"_process":3}],139:[function(require,module,exports){
+},{"./invariant":171,"_process":6}],142:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -33489,7 +37613,7 @@ function adler32(data) {
 
 module.exports = adler32;
 
-},{}],140:[function(require,module,exports){
+},{}],143:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -33521,7 +37645,7 @@ function camelize(string) {
 
 module.exports = camelize;
 
-},{}],141:[function(require,module,exports){
+},{}],144:[function(require,module,exports){
 /**
  * Copyright 2014-2015, Facebook, Inc.
  * All rights reserved.
@@ -33563,7 +37687,7 @@ function camelizeStyleName(string) {
 
 module.exports = camelizeStyleName;
 
-},{"./camelize":140}],142:[function(require,module,exports){
+},{"./camelize":143}],145:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -33607,7 +37731,7 @@ function containsNode(outerNode, innerNode) {
 
 module.exports = containsNode;
 
-},{"./isTextNode":172}],143:[function(require,module,exports){
+},{"./isTextNode":175}],146:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -33693,7 +37817,7 @@ function createArrayFromMixed(obj) {
 
 module.exports = createArrayFromMixed;
 
-},{"./toArray":185}],144:[function(require,module,exports){
+},{"./toArray":188}],147:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -33755,7 +37879,7 @@ function createFullPageComponent(tag) {
 module.exports = createFullPageComponent;
 
 }).call(this,require('_process'))
-},{"./ReactClass":66,"./ReactElement":90,"./invariant":168,"_process":3}],145:[function(require,module,exports){
+},{"./ReactClass":69,"./ReactElement":93,"./invariant":171,"_process":6}],148:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -33845,7 +37969,7 @@ function createNodesFromMarkup(markup, handleScript) {
 module.exports = createNodesFromMarkup;
 
 }).call(this,require('_process'))
-},{"./ExecutionEnvironment":53,"./createArrayFromMixed":143,"./getMarkupWrap":160,"./invariant":168,"_process":3}],146:[function(require,module,exports){
+},{"./ExecutionEnvironment":56,"./createArrayFromMixed":146,"./getMarkupWrap":163,"./invariant":171,"_process":6}],149:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -33903,7 +38027,7 @@ function dangerousStyleValue(name, value) {
 
 module.exports = dangerousStyleValue;
 
-},{"./CSSProperty":36}],147:[function(require,module,exports){
+},{"./CSSProperty":39}],150:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -33937,7 +38061,7 @@ emptyFunction.thatReturnsArgument = function(arg) { return arg; };
 
 module.exports = emptyFunction;
 
-},{}],148:[function(require,module,exports){
+},{}],151:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -33961,7 +38085,7 @@ if ("production" !== process.env.NODE_ENV) {
 module.exports = emptyObject;
 
 }).call(this,require('_process'))
-},{"_process":3}],149:[function(require,module,exports){
+},{"_process":6}],152:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -34001,7 +38125,7 @@ function escapeTextContentForBrowser(text) {
 
 module.exports = escapeTextContentForBrowser;
 
-},{}],150:[function(require,module,exports){
+},{}],153:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -34074,7 +38198,7 @@ function findDOMNode(componentOrElement) {
 module.exports = findDOMNode;
 
 }).call(this,require('_process'))
-},{"./ReactCurrentOwner":72,"./ReactInstanceMap":100,"./ReactMount":103,"./invariant":168,"./isNode":170,"./warning":187,"_process":3}],151:[function(require,module,exports){
+},{"./ReactCurrentOwner":75,"./ReactInstanceMap":103,"./ReactMount":106,"./invariant":171,"./isNode":173,"./warning":190,"_process":6}],154:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -34132,7 +38256,7 @@ function flattenChildren(children) {
 module.exports = flattenChildren;
 
 }).call(this,require('_process'))
-},{"./traverseAllChildren":186,"./warning":187,"_process":3}],152:[function(require,module,exports){
+},{"./traverseAllChildren":189,"./warning":190,"_process":6}],155:[function(require,module,exports){
 /**
  * Copyright 2014-2015, Facebook, Inc.
  * All rights reserved.
@@ -34161,7 +38285,7 @@ function focusNode(node) {
 
 module.exports = focusNode;
 
-},{}],153:[function(require,module,exports){
+},{}],156:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -34192,7 +38316,7 @@ var forEachAccumulated = function(arr, cb, scope) {
 
 module.exports = forEachAccumulated;
 
-},{}],154:[function(require,module,exports){
+},{}],157:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -34221,7 +38345,7 @@ function getActiveElement() /*?DOMElement*/ {
 
 module.exports = getActiveElement;
 
-},{}],155:[function(require,module,exports){
+},{}],158:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -34273,7 +38397,7 @@ function getEventCharCode(nativeEvent) {
 
 module.exports = getEventCharCode;
 
-},{}],156:[function(require,module,exports){
+},{}],159:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -34378,7 +38502,7 @@ function getEventKey(nativeEvent) {
 
 module.exports = getEventKey;
 
-},{"./getEventCharCode":155}],157:[function(require,module,exports){
+},{"./getEventCharCode":158}],160:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -34425,7 +38549,7 @@ function getEventModifierState(nativeEvent) {
 
 module.exports = getEventModifierState;
 
-},{}],158:[function(require,module,exports){
+},{}],161:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -34456,7 +38580,7 @@ function getEventTarget(nativeEvent) {
 
 module.exports = getEventTarget;
 
-},{}],159:[function(require,module,exports){
+},{}],162:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -34500,7 +38624,7 @@ function getIteratorFn(maybeIterable) {
 
 module.exports = getIteratorFn;
 
-},{}],160:[function(require,module,exports){
+},{}],163:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -34619,7 +38743,7 @@ function getMarkupWrap(nodeName) {
 module.exports = getMarkupWrap;
 
 }).call(this,require('_process'))
-},{"./ExecutionEnvironment":53,"./invariant":168,"_process":3}],161:[function(require,module,exports){
+},{"./ExecutionEnvironment":56,"./invariant":171,"_process":6}],164:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -34694,7 +38818,7 @@ function getNodeForCharacterOffset(root, offset) {
 
 module.exports = getNodeForCharacterOffset;
 
-},{}],162:[function(require,module,exports){
+},{}],165:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -34729,7 +38853,7 @@ function getReactRootElementInContainer(container) {
 
 module.exports = getReactRootElementInContainer;
 
-},{}],163:[function(require,module,exports){
+},{}],166:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -34766,7 +38890,7 @@ function getTextContentAccessor() {
 
 module.exports = getTextContentAccessor;
 
-},{"./ExecutionEnvironment":53}],164:[function(require,module,exports){
+},{"./ExecutionEnvironment":56}],167:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -34806,7 +38930,7 @@ function getUnboundedScrollPosition(scrollable) {
 
 module.exports = getUnboundedScrollPosition;
 
-},{}],165:[function(require,module,exports){
+},{}],168:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -34839,7 +38963,7 @@ function hyphenate(string) {
 
 module.exports = hyphenate;
 
-},{}],166:[function(require,module,exports){
+},{}],169:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -34880,7 +39004,7 @@ function hyphenateStyleName(string) {
 
 module.exports = hyphenateStyleName;
 
-},{"./hyphenate":165}],167:[function(require,module,exports){
+},{"./hyphenate":168}],170:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -35018,7 +39142,7 @@ function instantiateReactComponent(node, parentCompositeType) {
 module.exports = instantiateReactComponent;
 
 }).call(this,require('_process'))
-},{"./Object.assign":59,"./ReactCompositeComponent":70,"./ReactEmptyComponent":92,"./ReactNativeComponent":106,"./invariant":168,"./warning":187,"_process":3}],168:[function(require,module,exports){
+},{"./Object.assign":62,"./ReactCompositeComponent":73,"./ReactEmptyComponent":95,"./ReactNativeComponent":109,"./invariant":171,"./warning":190,"_process":6}],171:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -35075,7 +39199,7 @@ var invariant = function(condition, format, a, b, c, d, e, f) {
 module.exports = invariant;
 
 }).call(this,require('_process'))
-},{"_process":3}],169:[function(require,module,exports){
+},{"_process":6}],172:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -35140,7 +39264,7 @@ function isEventSupported(eventNameSuffix, capture) {
 
 module.exports = isEventSupported;
 
-},{"./ExecutionEnvironment":53}],170:[function(require,module,exports){
+},{"./ExecutionEnvironment":56}],173:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -35167,7 +39291,7 @@ function isNode(object) {
 
 module.exports = isNode;
 
-},{}],171:[function(require,module,exports){
+},{}],174:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -35210,7 +39334,7 @@ function isTextInputElement(elem) {
 
 module.exports = isTextInputElement;
 
-},{}],172:[function(require,module,exports){
+},{}],175:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -35235,7 +39359,7 @@ function isTextNode(object) {
 
 module.exports = isTextNode;
 
-},{"./isNode":170}],173:[function(require,module,exports){
+},{"./isNode":173}],176:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -35290,7 +39414,7 @@ var keyMirror = function(obj) {
 module.exports = keyMirror;
 
 }).call(this,require('_process'))
-},{"./invariant":168,"_process":3}],174:[function(require,module,exports){
+},{"./invariant":171,"_process":6}],177:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -35326,7 +39450,7 @@ var keyOf = function(oneKeyObj) {
 
 module.exports = keyOf;
 
-},{}],175:[function(require,module,exports){
+},{}],178:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -35379,7 +39503,7 @@ function mapObject(object, callback, context) {
 
 module.exports = mapObject;
 
-},{}],176:[function(require,module,exports){
+},{}],179:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -35412,7 +39536,7 @@ function memoizeStringOnly(callback) {
 
 module.exports = memoizeStringOnly;
 
-},{}],177:[function(require,module,exports){
+},{}],180:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -35452,7 +39576,7 @@ function onlyChild(children) {
 module.exports = onlyChild;
 
 }).call(this,require('_process'))
-},{"./ReactElement":90,"./invariant":168,"_process":3}],178:[function(require,module,exports){
+},{"./ReactElement":93,"./invariant":171,"_process":6}],181:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -35480,7 +39604,7 @@ if (ExecutionEnvironment.canUseDOM) {
 
 module.exports = performance || {};
 
-},{"./ExecutionEnvironment":53}],179:[function(require,module,exports){
+},{"./ExecutionEnvironment":56}],182:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -35508,7 +39632,7 @@ var performanceNow = performance.now.bind(performance);
 
 module.exports = performanceNow;
 
-},{"./performance":178}],180:[function(require,module,exports){
+},{"./performance":181}],183:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -35536,7 +39660,7 @@ function quoteAttributeValueForBrowser(value) {
 
 module.exports = quoteAttributeValueForBrowser;
 
-},{"./escapeTextContentForBrowser":149}],181:[function(require,module,exports){
+},{"./escapeTextContentForBrowser":152}],184:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -35625,7 +39749,7 @@ if (ExecutionEnvironment.canUseDOM) {
 
 module.exports = setInnerHTML;
 
-},{"./ExecutionEnvironment":53}],182:[function(require,module,exports){
+},{"./ExecutionEnvironment":56}],185:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -35667,7 +39791,7 @@ if (ExecutionEnvironment.canUseDOM) {
 
 module.exports = setTextContent;
 
-},{"./ExecutionEnvironment":53,"./escapeTextContentForBrowser":149,"./setInnerHTML":181}],183:[function(require,module,exports){
+},{"./ExecutionEnvironment":56,"./escapeTextContentForBrowser":152,"./setInnerHTML":184}],186:[function(require,module,exports){
 /**
  * Copyright 2013-2015, Facebook, Inc.
  * All rights reserved.
@@ -35711,7 +39835,7 @@ function shallowEqual(objA, objB) {
 
 module.exports = shallowEqual;
 
-},{}],184:[function(require,module,exports){
+},{}],187:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -35815,7 +39939,7 @@ function shouldUpdateReactComponent(prevElement, nextElement) {
 module.exports = shouldUpdateReactComponent;
 
 }).call(this,require('_process'))
-},{"./warning":187,"_process":3}],185:[function(require,module,exports){
+},{"./warning":190,"_process":6}],188:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -35887,7 +40011,7 @@ function toArray(obj) {
 module.exports = toArray;
 
 }).call(this,require('_process'))
-},{"./invariant":168,"_process":3}],186:[function(require,module,exports){
+},{"./invariant":171,"_process":6}],189:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2013-2015, Facebook, Inc.
@@ -36140,7 +40264,7 @@ function traverseAllChildren(children, callback, traverseContext) {
 module.exports = traverseAllChildren;
 
 }).call(this,require('_process'))
-},{"./ReactElement":90,"./ReactFragment":96,"./ReactInstanceHandles":99,"./getIteratorFn":159,"./invariant":168,"./warning":187,"_process":3}],187:[function(require,module,exports){
+},{"./ReactElement":93,"./ReactFragment":99,"./ReactInstanceHandles":102,"./getIteratorFn":162,"./invariant":171,"./warning":190,"_process":6}],190:[function(require,module,exports){
 (function (process){
 /**
  * Copyright 2014-2015, Facebook, Inc.
@@ -36203,10 +40327,10 @@ if ("production" !== process.env.NODE_ENV) {
 module.exports = warning;
 
 }).call(this,require('_process'))
-},{"./emptyFunction":147,"_process":3}],188:[function(require,module,exports){
+},{"./emptyFunction":150,"_process":6}],191:[function(require,module,exports){
 module.exports = require('./lib/React');
 
-},{"./lib/React":61}],189:[function(require,module,exports){
+},{"./lib/React":64}],192:[function(require,module,exports){
 //     Underscore.js 1.8.3
 //     http://underscorejs.org
 //     (c) 2009-2015 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
@@ -37756,7 +41880,7 @@ module.exports = require('./lib/React');
   }
 }.call(this));
 
-},{}],190:[function(require,module,exports){
+},{}],193:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require('react');
 var Backbone = require('backbone');
@@ -37777,14 +41901,14 @@ var BaseView = Backbone.View.extend({
 });
 
 module.exports = BaseView;
-},{"backbone":1,"react":188}],191:[function(require,module,exports){
+},{"backbone":4,"react":191}],194:[function(require,module,exports){
 var React = require('react');
 var Backbone = require('backbone');
 var ReactBackbone = require('react.backbone');
 var ProfileList = Backbone.Collection.extend({
   model: Profile
 });
-},{"backbone":1,"react":188,"react.backbone":33}],192:[function(require,module,exports){
+},{"backbone":4,"react":191,"react.backbone":36}],195:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require('react');
 var Backbone = require('backbone');
@@ -37800,7 +41924,7 @@ module.exports =  React.createClass({
         );
     }
 });
-},{"backbone":1,"react":188,"react.backbone":33}],193:[function(require,module,exports){
+},{"backbone":4,"react":191,"react.backbone":36}],196:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require('react');
 var Backbone = require('backbone');
@@ -37816,7 +41940,7 @@ module.exports =  React.createClass({displayName: "exports",
     }
 })
 
-},{"./Element":192,"backbone":1,"react":188,"react.backbone":33}],194:[function(require,module,exports){
+},{"./Element":195,"backbone":4,"react":191,"react.backbone":36}],197:[function(require,module,exports){
 var $ = require('jquery');
 var drawKaleidoscope = require('./modules/kaleidoscope');
 
@@ -37912,7 +42036,7 @@ var app = {
 
 module.exports = app;
 
-},{"./modules/kaleidoscope":197,"jquery":4}],195:[function(require,module,exports){
+},{"./modules/kaleidoscope":200,"jquery":7}],198:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require('react');
 var Backbone = require('backbone');
@@ -38032,7 +42156,7 @@ var Kscope = React.createBackboneClass({
 
 module.exports = Kscope;
 
-},{"./app":194,"backbone":1,"jquery":4,"react":188,"react-canvas":21,"react.backbone":33}],196:[function(require,module,exports){
+},{"./app":197,"backbone":4,"jquery":7,"react":191,"react-canvas":24,"react.backbone":36}],199:[function(require,module,exports){
 var React = require('react');
 var Backbone = require('backbone');
 var ReactBackbone = require('react.backbone');
@@ -38047,7 +42171,7 @@ var Scope = {
 };
 
 module.exports = Scope;
-},{"../base-view":190,"./component":195,"backbone":1,"react":188,"react.backbone":33}],197:[function(require,module,exports){
+},{"../base-view":193,"./component":198,"backbone":4,"react":191,"react.backbone":36}],200:[function(require,module,exports){
 var drawKaleidoscope = function (ctx, img, imgX, imgY, mask) {
     try {
         console.log(ctx);
@@ -38171,7 +42295,7 @@ var drawKaleidoscope = function (ctx, img, imgX, imgY, mask) {
 
 module.exports = drawKaleidoscope;
 
-},{}],198:[function(require,module,exports){
+},{}],201:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require('react');
 var Backbone = require('backbone');
@@ -38228,7 +42352,7 @@ var KscopeVideo = React.createBackboneClass({
 });
 
 module.exports = KscopeVideo;
-},{"../app":194,"../component":195,"backbone":1,"react":188,"react-canvas":21,"react.backbone":33}],199:[function(require,module,exports){
+},{"../app":197,"../component":198,"backbone":4,"react":191,"react-canvas":24,"react.backbone":36}],202:[function(require,module,exports){
 var React = require('react');
 var Backbone = require('backbone');
 var ReactBackbone = require('react.backbone');
@@ -38243,7 +42367,176 @@ var Scope = {
 };
 
 module.exports = Scope;
-},{"./component":198,"backbone":1,"react":188,"react.backbone":33}],200:[function(require,module,exports){
+},{"./component":201,"backbone":4,"react":191,"react.backbone":36}],203:[function(require,module,exports){
+var Backbone = require('backbone');
+var Marionettee = require('backbone.marionette');
+var $ = require('jquery');
+var _ = require('underscore');
+
+  var MyApp = new Backbone.Marionette.Application();
+
+  MyApp.addRegions({
+    mainRegion: "#container"
+  });
+
+  AngryCat = Backbone.Model.extend({
+    defaults: {
+      votes: 0
+    },
+    addVote: function(){
+      this.set('votes', this.get('votes') + 1);
+    },
+    rankUp: function() {
+      this.set({rank: this.get('rank') - 1});
+    },
+    rankDown: function() {
+      this.set({rank: this.get('rank') + 1});
+    }
+  });
+
+  AngryCats = Backbone.Collection.extend({
+    model: AngryCat,
+    initialize: function(cats){
+      var self = this;
+      var rank = 1;
+      _.each(cats, function(cat) {
+        cat.set('rank', rank);
+        ++rank;
+      });
+
+      this.on('add', function(cat){
+        if( ! cat.get('rank') ) {
+          var error =  Error('Cat must have a rank defined before being added to the collection');
+          error.name = 'NoRankError';
+          throw error;
+        }
+      });
+
+      MyApp.on('rank:up', function(cat){
+        if (cat.get('rank') === 1) {
+          // can't increase rank of top-ranked cat
+          return true;
+        }
+        self.rankUp(cat);
+        self.sort();
+        self.trigger('reset');
+      });
+
+      MyApp.on('rank:down', function(cat){
+        if (cat.get('rank') === self.size()) {
+          // can't decrease rank of lowest ranked cat
+          return true;
+        }
+        self.rankDown(cat);
+        self.sort();
+        self.trigger('reset');
+      });
+
+      MyApp.on('cat:disqualify', function(cat){
+        var disqualifiedRank = cat.get('rank');
+        var catsToUprank = self.filter(
+          function(cat){ return cat.get('rank') > disqualifiedRank; }
+        );
+        catsToUprank.forEach(function(cat){
+          cat.rankUp();
+        });
+        self.trigger('reset');
+      });
+    },
+    comparator: function(cat) {
+      return cat.get('rank');
+    },
+
+    rankUp: function(cat) {
+     // find the cat we're going to swap ranks with
+     var rankToSwap = cat.get('rank') - 1;
+     var otherCat = this.at(rankToSwap - 1);
+
+     // swap ranks
+     cat.rankUp();
+     otherCat.rankDown();
+    },
+
+    rankDown: function(cat) {
+     // find the cat we're going to swap ranks with
+     var rankToSwap = cat.get('rank') + 1;
+     var otherCat = this.at(rankToSwap - 1);
+
+     // swap ranks
+     cat.rankDown();
+     otherCat.rankUp();
+    }
+  });
+
+  AngryCatView = Backbone.Marionette.ItemView.extend({
+    template: '#angry_cat-template',
+    tagName: 'tr',
+    className: 'angry_cat',
+    events: {
+      'click .rank_up img': 'rankUp',
+      'click .rank_down img': 'rankDown',
+      'click a.disqualify': 'disqualify'
+    },
+    initialize: function(){
+      this.listenTo(this.model, 'change:votes', this.render);
+    },
+    rankUp: function(){
+      this.model.addVote();
+      MyApp.trigger('rank:up', this.model);
+    },
+    rankDown: function(){
+      this.model.addVote();
+      MyApp.trigger('rank:down', this.model);
+    },
+    disqualify: function(){
+      MyApp.trigger('cat:disqualify', this.model);
+      this.model.destroy();
+    }
+  });
+
+  AngryCatsView = Backbone.Marionette.CompositeView.extend({
+    tagName: "table",
+    id: "angry_cats",
+    className: "table-striped table-bordered",
+    template: "#angry_cats-template",
+    childView: AngryCatView,
+    initialize: function(){
+      console.log('init');
+      this.listenTo(this.collection, 'sort', this.renderCollection);
+    },
+    attachHtml: function(collectionView, itemView){
+      console.log(collectionView);
+      console.log(itemView);
+      collectionView.$('tbody').append(itemView.el);
+    }
+  });
+
+  MyApp.addInitializer(function(options){
+    var angryCatsView = new AngryCatsView({
+      collection: options.cats
+    });
+    MyApp.mainRegion.show(angryCatsView);
+  });
+
+  $(document).ready(function(){
+    var cats = new AngryCats([
+      new AngryCat({name: 'Billy Cat', image_path: 'http://d29ci68ykuu27r.cloudfront.net/product/190X400/3595437.jpg'}),
+      new AngryCat({name: 'Scratchy Cat', image_path: 'http://d29ci68ykuu27r.cloudfront.net/product/190X400/3595437.jpg'}),
+      new AngryCat({name: 'Silly Cat', image_path: 'http://d29ci68ykuu27r.cloudfront.net/product/190X400/3595437.jpg'})
+    ]);
+
+    MyApp.start({cats: cats});
+
+    cats.add(new AngryCat({
+      name: 'Cranky Cat',
+      image_path: 'assets/images/cat4.jpg',
+      rank: cats.size() + 1
+    }));
+  });
+
+module.exports = MyApp;
+
+},{"backbone":4,"backbone.marionette":1,"jquery":7,"underscore":192}],204:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require('react');
 var Backbone = require('backbone');
@@ -38257,7 +42550,8 @@ var UsersIndexScreen = require('./users/component');
             "users": "users",
             "users/:id": "user",
             "kscope": "kscope",
-            "kscope/video": "kscopeVideo"
+            "kscope/video": "kscopeVideo",
+            "marionette": "marionette"
         },
         kscope: function() {
             var Kscope = require('./kaleidoscope');
@@ -38274,18 +42568,24 @@ var UsersIndexScreen = require('./users/component');
         user: function(id) {
             var UsersIndexView = require('./users');
             UsersIndexView.show(id);
-            
+
         },
         index: function() {
             var movies = require('./collections/movies');
             var List = require('./component/List');
             React.render(React.createElement(List, {movies: movies}), document.getElementById('container'));
+        },
+        marionette: function() {
+            var mTest = require('./mTest/');
+            //new mTest();
+            console.log('Kitty');
         }
     });
     new app;
     Backbone.history.start();
 })()
-},{"./collections/movies":191,"./component/List":193,"./kaleidoscope":196,"./kaleidoscope/video":199,"./users":203,"./users/component":202,"backbone":1,"react":188,"react.backbone":33}],201:[function(require,module,exports){
+
+},{"./collections/movies":194,"./component/List":196,"./kaleidoscope":199,"./kaleidoscope/video":202,"./mTest/":203,"./users":207,"./users/component":206,"backbone":4,"react":191,"react.backbone":36}],205:[function(require,module,exports){
 var React = require('react');
 var Backbone = require('backbone');
 var ReactBackbone = require('react.backbone');
@@ -38301,7 +42601,7 @@ module.exports = Users;
 
 
 
-},{"./model":204,"backbone":1,"react":188,"react.backbone":33}],202:[function(require,module,exports){
+},{"./model":208,"backbone":4,"react":191,"react.backbone":36}],206:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require('react');
 var Backbone = require('backbone');
@@ -38356,7 +42656,7 @@ var UsersIndexScreen = React.createBackboneClass({
 });
 
 module.exports = UsersIndexScreen;
-},{"./user-block":206,"backbone":1,"react":188,"react.backbone":33}],203:[function(require,module,exports){
+},{"./user-block":210,"backbone":4,"react":191,"react.backbone":36}],207:[function(require,module,exports){
 //var BaseView = require('../base-view');
 var React = require('react');
 var Backbone = require('backbone');
@@ -38399,7 +42699,7 @@ var UsersIndexView = {
 };
 
 module.exports = UsersIndexView;
-},{"./collection":201,"./component":202,"./show/component":205,"backbone":1,"react":188,"react.backbone":33}],204:[function(require,module,exports){
+},{"./collection":205,"./component":206,"./show/component":209,"backbone":4,"react":191,"react.backbone":36}],208:[function(require,module,exports){
 var React = require('react');
 var Backbone = require('backbone');
 var ReactBackbone = require('react.backbone');
@@ -38423,7 +42723,7 @@ var User = Backbone.Model.extend({
   },*/
 
 module.exports = User;
-},{"backbone":1,"react":188,"react.backbone":33}],205:[function(require,module,exports){
+},{"backbone":4,"react":191,"react.backbone":36}],209:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require('react');
 var Backbone = require('backbone');
@@ -38492,7 +42792,7 @@ var UserShowScreen = React.createBackboneClass({
 });
 
 module.exports = UserShowScreen;
-},{"../collection":201,"backbone":1,"react":188,"react.backbone":33}],206:[function(require,module,exports){
+},{"../collection":205,"backbone":4,"react":191,"react.backbone":36}],210:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require('react');
 var Backbone = require('backbone');
@@ -38518,4 +42818,4 @@ var UserBlock = React.createBackboneClass({
 });
 
 module.exports = UserBlock;
-},{"backbone":1,"react":188,"react.backbone":33}]},{},[190,200]);
+},{"backbone":4,"react":191,"react.backbone":36}]},{},[193,204]);

@@ -21,6 +21,7 @@
   "dependencies": {
     "react.backbone": "^0.6.0",
     "backbone": "^1.2.3",
+    "backbone.marionette": "",
     "react": "^0.13.3",
     "react-tools": "~0.8.0",
     "react-canvas": "",

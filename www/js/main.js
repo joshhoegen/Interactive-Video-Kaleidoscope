@@ -11,7 +11,8 @@ var UsersIndexScreen = require('./users/component');
             "users": "users",
             "users/:id": "user",
             "kscope": "kscope",
-            "kscope/video": "kscopeVideo"
+            "kscope/video": "kscopeVideo",
+            "marionette": "marionette"
         },
         kscope: function() {
             var Kscope = require('./kaleidoscope');
@@ -28,12 +29,17 @@ var UsersIndexScreen = require('./users/component');
         user: function(id) {
             var UsersIndexView = require('./users');
             UsersIndexView.show(id);
-            
+
         },
         index: function() {
             var movies = require('./collections/movies');
             var List = require('./component/List');
             React.render(<List movies={movies} />, document.getElementById('container'));
+        },
+        marionette: function() {
+            var mTest = require('./mTest/');
+            //new mTest();
+            console.log('Kitty');
         }
     });
     new app;
