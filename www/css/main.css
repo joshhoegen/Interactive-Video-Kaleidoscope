@@ -1,0 +1,166 @@
+body {
+    padding: 0;
+    margin: auto;
+    width: auto;
+    font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;
+    background: url("../image/bg.jpg") #000;
+    color: #fff;
+    text-shadow: 2px 1px 6px #000;
+    background-color: #333;
+    background-image: url("../image/bg.jpg"), -webkit-gradient(linear, left top, left bottom, from(#333), to(#666)); /* Saf4+, Chrome */
+    background-image: url("../image/bg.jpg"), -webkit-linear-gradient(top, #333, #666); /* Chrome 10+, Saf5.1+ */
+    background-image: url("../image/bg.jpg"),    -moz-linear-gradient(top, #333, #666); /* FF3.6+ */
+    background-image: url("../image/bg.jpg"),     -ms-linear-gradient(top, #333, #666); /* IE10 */
+    background-image: url("../image/bg.jpg"),      -o-linear-gradient(top, #333, #666); /* Opera 11.10+ */
+    background-image: url("../image/bg.jpg"),         linear-gradient(top, #333, #666); /* W3C */
+/*    animation: animatedBackground 400s linear infinite;
+    -ms-animation: animatedBackground 400s linear infinite;
+    -moz-animation: animatedBackground 400s linear infinite;
+    -webkit-animation: animatedBackground 400s linear infinite;*/
+}
+@keyframes animatedBackground {
+    from { background-position: 0 0; }
+    to { background-position: 100% 0; }
+}
+@-webkit-keyframes animatedBackground {
+    from { background-position: 0 0; }
+    to { background-position: 100% 0; }
+}
+@-ms-keyframes animatedBackground {
+    from { background-position: 0 0; }
+    to { background-position: 100% 0; }
+}
+@-moz-keyframes animatedBackground {
+    from { background-position: 0 0; }
+    to { background-position: 100% 0; }
+}
+.wrapper {
+    width: 1200px;
+    margin: 0 auto;
+}
+body.fullscreen {
+    overflow: hidden;
+}
+.fullscreen .wrapper {
+    width: auto;
+    max-width: none;
+    overflow: hidden;
+}
+.fullscreen form {
+
+}
+.fullscreen #sckscope {
+    width: auto;
+    max-width: none;
+    text-align: left;
+}
+.fullscreen .track-info {
+    display: none;
+}
+img.logo {
+    width: 30px;
+    float: left;
+    margin: 3px 10px 0 10px;
+}
+h1 {
+    margin: 10px 0 10px 0;
+}
+h3 {
+  margin: 0px 0px;
+}
+a {
+  color: #00b7ff;
+}
+#main {
+  clear: both;
+}
+.floatLeft {
+  float: left;
+}
+#sckscope {
+  position: relative;
+  text-align: center;
+  max-width: 1200px;
+  box-shadow: 0px 0px 100px #000;
+}
+#sckscope canvas {
+  margin-bottom: -3px;
+}
+.track-info {
+    display: none;
+    background: #000;
+    background: rgba(0, 0, 0, .6);
+    padding: 20px;
+    min-height: 100px;
+}
+.track-info img {
+    float: left;
+    margin: 0 20px 20px 0;
+    width: 100px;
+
+}
+.outlink {
+    margin: 10px;
+    display: block;
+    text-align: right;
+    color: #fff;
+    font-size: 10px;
+}
+.kMessages {
+  width: 300px;
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  margin-left: -150px;
+  background: #fff;
+  color: #333;
+  border: 1px solid #333;
+  border-radius: 4px;
+  opacity: 0.9;
+  padding: 10px;
+}
+form {
+  display: block;
+  margin: 0px;
+  background: #000;
+  background: rgba(0, 0, 0, .6);
+  padding: 10px;
+}
+form input[type=text] {
+    margin: 0px;
+    width: 400px;
+}
+input[type=submit],
+input[type=button] {
+  background: #fff;
+  color: #09f;
+  border: 1px solid #00b7ff;
+  border-radius: 4px;
+  padding: 4px 10px;
+}
+input[type=submit]:hover,
+input[type=button]:hover {
+  background: #fff;
+  color: #333;
+  border: 1px solid #333;
+  opacity: 0.9;
+}
+.no-support {
+    display: none;
+    margin: 20px auto;
+    width: 1000px;
+}
+.vid-img {
+
+}
+
+audio {
+    position: absolute;
+    right: 5px;
+    top: 5px;
+    z-index: 3;
+}
+
+body.flash audio {
+    display: none;
+}

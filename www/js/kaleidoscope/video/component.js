@@ -2,12 +2,7 @@
 var React = require('react');
 var Backbone = require('backbone');
 var ReactBackbone = require('react.backbone');
-var ReactCanvas = require('react-canvas');
-
 var app = require('../app');
-
-var Surface = ReactCanvas.Surface;
-//var drawKaleidoscope = require('./modules/kaleidoscope');
 var Kscope = require('../component');
 
 var KscopeVideo = React.createBackboneClass({
@@ -28,11 +23,6 @@ var KscopeVideo = React.createBackboneClass({
         console.log('Video Did Mount');
         this.state.app.prepVideo();
     },
-    componentDidUpdate: function () {
-        //this.state.app.prepVideo();
-        console.log('Video Did Update');
-        //console.log(this.props.src);
-    },
     getInitialState: function () {
         return {
             app: app,
@@ -41,13 +31,11 @@ var KscopeVideo = React.createBackboneClass({
     },
     render: function () {
         console.log('kscope');
-        var imgSrc = this.props.src;
         return (
             <div imgUrl="test"
                  id="sckscopeVideo">
                 <Kscope src=""/>
-                <canvas id="preCanvas" width="500" height="500" scopeSize="500" src={this.state.src}/>
-                <video id="video" autoplay="true" />
+                <video id="video" height="0" width="0" autoplay="true" />
             </div>
         );
     }

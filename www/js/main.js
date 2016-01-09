@@ -7,12 +7,9 @@ var UsersIndexScreen = require('./users/component');
 (function(){
     var app = Backbone.Router.extend({
         routes: {
-            "": "index",
-            "users": "users",
-            "users/:id": "user",
+            "": "kscopeVideo",
             "kscope": "kscope",
-            "kscope/video": "kscopeVideo",
-            "marionette": "marionette"
+            "kscope/video": "kscopeVideo"
         },
         kscope: function() {
             var Kscope = require('./kaleidoscope');
@@ -21,20 +18,6 @@ var UsersIndexScreen = require('./users/component');
         kscopeVideo: function() {
             var Kscope = require('./kaleidoscope/video');
             Kscope.init();
-        },
-        users: function() {
-            var UsersIndexView = require('./users');
-            UsersIndexView.list();
-        },
-        user: function(id) {
-            var UsersIndexView = require('./users');
-            UsersIndexView.show(id);
-
-        },
-        index: function() {
-            var movies = require('./collections/movies');
-            var List = require('./component/List');
-            React.render(<List movies={movies} />, document.getElementById('container'));
         },
         marionette: function() {
             var mTest = require('./mTest/');
