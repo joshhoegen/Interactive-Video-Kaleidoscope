@@ -3,12 +3,9 @@ var Backbone = require('backbone');
 var ReactBackbone = require('react.backbone');
 var User = require('./model');
 
-var Users = Backbone.Collection.extend({
+var pages = Backbone.Collection.extend({
    model: User,
-   url: '../../json/users.json'
+   url: '../../json/pages.json'
 });
 
-module.exports = Users;
-   
-
-
+module.exports = pages;

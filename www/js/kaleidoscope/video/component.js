@@ -2,7 +2,7 @@
 var React = require('react');
 var Backbone = require('backbone');
 var ReactBackbone = require('react.backbone');
-var app = require('../app');
+var kaleidoscope = require('../modules/kaleidoscope');
 var Kscope = require('../component');
 
 var KscopeVideo = React.createBackboneClass({
@@ -11,21 +11,20 @@ var KscopeVideo = React.createBackboneClass({
         this.setState({
             src: src
         });
-        //this.state.app.prepPage(src);
     },
     move: function (e) {
-        this.state.app.move(e.target.value, e.target.value);
+        this.state.kaleidoscope.move(e.target.value, e.target.value);
     },
     componentWillMount: function () {
-        this.state.app.listener = this;
+        this.state.kaleidoscope.listener = this;
     },
     componentDidMount: function () {
         console.log('Video Did Mount');
-        this.state.app.prepVideo();
+        this.state.kaleidoscope.prepVideo();
     },
     getInitialState: function () {
         return {
-            app: app,
+            kaleidoscope: kaleidoscope,
             src: ""
         }
     },
@@ -35,7 +34,7 @@ var KscopeVideo = React.createBackboneClass({
             <div imgUrl="test"
                  id="sckscopeVideo">
                 <Kscope src=""/>
-                <video id="video" height="0" width="0" autoplay="true" />
+                <video id="video" height="0" width="0" autoPlay="true" />
             </div>
         );
     }

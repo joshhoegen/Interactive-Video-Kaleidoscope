@@ -3,7 +3,7 @@ var React = require('react');
 var Backbone = require('backbone');
 var ReactBackbone = require('react.backbone');
 var $ = require('jquery');
-var app = require('./app');
+var kaleidoscope = require('./modules/kaleidoscope');
 
 var Kscope = React.createBackboneClass({
     update: function(e) {
@@ -11,36 +11,25 @@ var Kscope = React.createBackboneClass({
       this.setState({
         src: src
       });
-      //this.state.app.prepPage(src);
     },
     componentWillMount: function() {
-      this.state.app.listener = this;
+      this.state.kaleidoscope.listener = this;
     },
     componentDidMount: function() {
-      this.state.app.move(0, 0);
-      //console.log(this.state.app);
+      this.state.kaleidoscope.move(0, 0);
     },
     getInitialState: function() {
+      // Make src local.
       return {
-        app: app,
+        kaleidoscope: kaleidoscope,
         src: "https://scontent-iad3-1.cdninstagram.com/hphotos-xfa1/t51.2885-15/s640x640/sh0.08/e35/12331649_749127051897387_1820437710_n.jpg"
       }
     },
     render: function() {
-      console.log('kscope');
       var imgSrc = this.state.src;
-      // <div id="image-container">
-      //     <img id="preImg"
-      //          className="body-kscope img"
-      //          height={200}
-      //          width={200}
-      //          src={this.state.src}
-      //          style={style}
-      //          alt="kaleidoscope"/>
-      // </div>
       return (
         <div imgUrl="test" id="sckscope">
-          <Widget scopeSize={ this.state.app.scopeSize }
+          <Widget scopeSize={ this.state.kaleidoscope.scopeSize }
             src={ this.state.src }
             update={ this.update } />
           <CanvasKscope scopeSize="400" src={ this.state.src } />
@@ -51,15 +40,15 @@ var Kscope = React.createBackboneClass({
   CanvasKscope = React.createClass({
       getInitialState: function() {
         return {
-          app: app,
+          kaleidoscope: kaleidoscope,
           src: this.props.src
         }
       },
       componentDidMount: function() {
-        this.state.app.prepPage(this.props.src);
+        this.state.kaleidoscope.prepPage(this.props.src);
       },
       componentDidUpdate: function() {
-        this.state.app.prepPage(this.props.src);
+        this.state.kaleidoscope.prepPage(this.props.src);
       },
       render: function() {
         var specs = this.props;
@@ -67,7 +56,7 @@ var Kscope = React.createBackboneClass({
         var src = specs.src;
         var canvases = [];
         for (var i = 0; i < 6; i++) {
-          canvases.push( <canvas className = "kaleidoscopeCanvas"
+          canvases.push( <canvas key={'kaleidoscope' + i } className="kaleidoscopeCanvas"
             height = {size}
             width = {size} > </canvas>);
           }
@@ -78,31 +67,47 @@ var Kscope = React.createBackboneClass({
       getInitialState: function() {
         return {
           audio: false,
-          app: app
+          kaleidoscope: kaleidoscope
         };
       },
       move: function(e) {
-        this.state.app.move(e.target.value, e.target.value);
+        this.state.kaleidoscope.move(e.target.value, e.target.value);
       },
       moveToggle: function(e) {
         console.log(e.target.checked);
         if (e.target.checked) {
-          this.state.app.visualizeAudio();
+          this.state.kaleidoscope.visualizeAudio();
+          this.setState({
+            audio: true
+          });
         } else {
-          this.state.app.visualizeAudio(true);
+          this.state.kaleidoscope.visualizeAudio(true);
+          this.setState({
+            audio: false
+          });
         }
       },
       render: function() {
         var specs = this.props;
         var size = specs.scopeSize;
         var src = specs.src;
+        var checkbox = (
+          <span> Use Audio:
+            <input type="checkbox" className="" defaultChecked={this.state.audio} onChange={ this.moveToggle } />
+          </span>
+        );
+        var range = (
+          <span> Manual:
+            <input type="range" min="0" max="100" defaultValue="0" name="y-range" onChange={ this.move } className="static-range" />
+          </span>
+        );
+        // For SoundCloud and static images:
+        // <input onChange={ this.props.update } name="fieldImg" defaultValue="" />
         return (
           <div>
             <form>
-              Use Audio:
-              <input type="checkbox" className="" defaultChecked={this.state.audio} onChange={ this.moveToggle } />
-              <input onChange={ this.props.update } name="fieldImg" defaultValue="" /> Move:
-              <input type="range" min="0" max="100" defaultValue="0" name="y-range" onChange={ this.move } className="static-range" />
+              { checkbox }
+              { !this.state.audio ? range : null }
             </form>
           </div>
       )

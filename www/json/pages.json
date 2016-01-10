@@ -1,0 +1,39 @@
+[
+    {
+        "name": "Instagram",
+        "url": "http://instagram.com/joshhoegen",
+        "icon": "instagram",
+        "images": ["img/instagram.png"],
+        "modules": ["kaleidescope"],
+        "description": "Art and life in static images"
+    },
+    {
+        "name": "Flickr",
+        "url": "http://flickr.com/photos/joshhoegen",
+        "icon": "flickr",
+        "images": ["img/flickr.png"],
+        "modules": ["kaleidescope"],
+        "description": "Visual Art"
+    },
+    {
+        "name": "Git",
+        "url": "http://github.com/joshhoegen",
+        "icon": "github",
+        "images": ["img/github.png"],
+        "description": "Not as much stuff as I'd like, but it's there!"
+    },
+    {
+        "name": "Sound Cloud",
+        "url": "http://soundcloud.com/byutifu",
+        "icon": "soundcloud",
+        "images": ["img/soundcloud.png"],
+        "description": "Remix of Jazz and other Retro Artists"
+    },
+    {
+        "name": "LinkedIn",
+        "url": "http://linkedin.com/pub/josh-hoegen/b/a9/9b8",
+        "icon": "linkedin",
+        "images": ["img/linkedin.png"],
+        "description": "Professional profile"
+    }
+]
