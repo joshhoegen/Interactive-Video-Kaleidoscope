@@ -19,7 +19,6 @@ var KscopeVideo = React.createBackboneClass({
         this.state.kaleidoscope.listener = this;
     },
     componentDidMount: function () {
-        console.log('Video Did Mount');
         this.state.kaleidoscope.prepVideo();
     },
     getInitialState: function () {
@@ -29,7 +28,6 @@ var KscopeVideo = React.createBackboneClass({
         }
     },
     render: function () {
-        console.log('kscope');
         return (
             <div imgUrl="test"
                  id="sckscopeVideo">

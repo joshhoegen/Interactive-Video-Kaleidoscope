@@ -33019,11 +33019,10 @@ module.exports = drawKaleidoscope;
 
 },{}],166:[function(require,module,exports){
 window.module = window.module || {};
-require = typeof(require) == 'function' ? require : function(script) {
-  return;
-};
-var drawKaleidoscope = require('./drawKaleidoscope');
-var VisualAudioContext = require('./audio');
+if (typeof(require) == 'function') {
+  var drawKaleidoscope = require('./drawKaleidoscope');
+  var VisualAudioContext = require('./audio');
+}
 
 var app = {
   kScope: [],
@@ -33078,13 +33077,14 @@ var app = {
     }
   },
   prepPage: function(src) {
+    console.log('prepPage');
+    src = src || '';
     this.preCanvas.id = 'preCanvas';
     this.preCanvas.width = this.scopeSize;
     this.preCanvas.height = this.scopeSize;
     this.preCanvas.style.cssText = 'display: none';
-    document.body.appendChild(this.preCanvas);
-    src = src || '';
     this.canvas = this.canvas || document.getElementsByClassName('kaleidoscopeCanvas');
+    document.body.appendChild(this.preCanvas);
     for (i = 0; i < this.canvas.length; i++) {
       this.kScope[i] = {
         img: src,
@@ -33124,11 +33124,6 @@ var app = {
         //  image: preImage.attr('src')
         // }
         app.snapshot(video, canvas, ctx, mediaStream);
-        // Note: onloadedmetadata doesn't fire in Chrome when using it with getUserMedia.
-        // See crbug.com/110938.
-        video.onloadedmetadata = function(e) {
-          console.log('videLoaded');
-        };
       }, function(error) {
         console.log('Failed' + error);
       });
@@ -33183,7 +33178,6 @@ var KscopeVideo = React.createBackboneClass({
         this.state.kaleidoscope.listener = this;
     },
     componentDidMount: function () {
-        console.log('Video Did Mount');
         this.state.kaleidoscope.prepVideo();
     },
     getInitialState: function () {
@@ -33193,7 +33187,6 @@ var KscopeVideo = React.createBackboneClass({
         }
     },
     render: function () {
-        console.log('kscope');
         return (
             React.createElement("div", {imgUrl: "test", 
                  id: "sckscopeVideo"}, 
