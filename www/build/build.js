@@ -33247,7 +33247,8 @@ var pagesIndexScreen = React.createBackboneClass({
     return (
       React.createElement("div", {className: "pages-container"}, 
         "Follow me on social media to see more art and code!", 
-        React.createElement("br", null),  pageHtml 
+        React.createElement("br", null),  pageHtml, 
+        React.createElement("a", {className: "project-link", href: "https://github.com/joshhoegen/sckscope", target: "_blank"}, "This project is available on GitHub")
       )
     );
   }

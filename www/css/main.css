@@ -171,10 +171,20 @@ body.flash audio {
 }
 #external-links {
   margin: 20px auto;
+  width: 99%;
+  position: relative;
 }
 #external-links a {
   margin-right: 20px;
-  width: 99%;
+}
+#external-links .project-link {
+  margin: 0;
+  display: block;
+  position: absolute;
+  top: 0;
+  right: 1%;
+  color: #fff;
+  text-decoration: none;
 }
 @keyframes animatedBackground {
   from {
