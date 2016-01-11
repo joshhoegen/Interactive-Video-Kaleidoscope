@@ -32713,15 +32713,30 @@ var Kscope = React.createBackboneClass({
           kaleidoscope: kaleidoscope
         };
       },
+      fullscreenBrowser: function(body, requestMethod) {
+        if (requestMethod) {
+            requestMethod.call(body);
+        } else if (typeof window.ActiveXObject !== "undefined") { // Older IE.
+            var wscript = new ActiveXObject("WScript.Shell");
+            if (wscript !== null) {
+                wscript.SendKeys("{F11}");
+            }
+        }
+      },
       fullscreenToggle: function(e) {
-        var bodyClasses = document.body.className;
+        var body = document.body;
+        var bodyClasses = body.className;
         if (e.target.checked) {
-          document.body.className = bodyClasses + (bodyClasses ? ' ' : '') + 'fullscreen';
+          var requestMethod = body.requestFullScreen || body.webkitRequestFullScreen || body.mozRequestFullScreen || body.msRequestFullscreen;
+          this.fullscreenBrowser(body, requestMethod);
+          body.className = bodyClasses + (bodyClasses ? ' ' : '') + 'fullscreen';
           this.setState({
             fullscreen: true
           });
         } else {
-          document.body.className = document.body.className.replace(/ ?fullscreen/, '');
+          var requestMethod = document.cancelFullScreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.exitFullscreen;
+          this.fullscreenBrowser(document, requestMethod);
+          body.className = body.className.replace(/ ?fullscreen/, '');
           this.setState({
             fullscreen: false
           });
