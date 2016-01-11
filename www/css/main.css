@@ -63,7 +63,7 @@ body.fullscreen {
 img.logo {
   width: 30px;
   float: left;
-  margin: 13px 10px 0 10px;
+  margin: 4px 10px 0 3px;
 }
 h1 {
   margin: 10px 0 10px 0;
@@ -88,6 +88,12 @@ a {
 }
 #sckscope canvas {
   margin-bottom: -3px;
+}
+#sckscope canvas {
+  margin-bottom: -3px;
+}
+.mobile #sckscope canvas {
+  margin-bottom: 5px;
 }
 .track-info {
   display: none;
@@ -198,6 +204,9 @@ body.flash audio {
   width: 99%;
   margin: 10px auto;
   font-size: 12px;
+}
+.mobile #messages {
+  font-size: 14px;
 }
 @keyframes animatedBackground {
   from {
