@@ -29,40 +29,44 @@ var Kscope = React.createBackboneClass({
       var imgSrc = this.state.src;
       return (
         <div imgUrl="test" id="sckscope">
-          <Widget scopeSize={ this.state.kaleidoscope.scopeSize }
-            src={ this.state.src }
-            update={ this.update } />
-          <CanvasKscope scopeSize="400" src={ this.state.src } />
+          <Widget scopeSize={this.state.kaleidoscope.scopeSize}
+            src={this.state.src}
+            update={this.update} />
+          <CanvasKscope scopeSize="400" src={this.state.src} />
         </div>
       );
+    },
+    remove: function () {
+        this.state.kaleidoscope.stopStream();
+        Backbone.View.prototype.remove.apply(this, arguments);
     }
   }),
   CanvasKscope = React.createClass({
-      getInitialState: function() {
-        return {
-          kaleidoscope: kaleidoscope,
-          src: this.props.src
+    getInitialState: function() {
+      return {
+        kaleidoscope: kaleidoscope,
+        src: this.props.src
+      }
+    },
+    componentDidMount: function() {
+      this.state.kaleidoscope.prepPage(this.props.src);
+    },
+    componentDidUpdate: function() {
+      this.state.kaleidoscope.prepPage(this.props.src);
+    },
+    render: function() {
+      var specs = this.props;
+      var size = specs.scopeSize;
+      var src = specs.src;
+      var canvases = [];
+      for (var i = 0; i < 6; i++) {
+        canvases.push( <canvas key={'kaleidoscope' + i } className="kaleidoscopeCanvas"
+          height = {size}
+          width = {size} > </canvas>);
         }
-      },
-      componentDidMount: function() {
-        this.state.kaleidoscope.prepPage(this.props.src);
-      },
-      componentDidUpdate: function() {
-        this.state.kaleidoscope.prepPage(this.props.src);
-      },
-      render: function() {
-        var specs = this.props;
-        var size = specs.scopeSize;
-        var src = specs.src;
-        var canvases = [];
-        for (var i = 0; i < 6; i++) {
-          canvases.push( <canvas key={'kaleidoscope' + i } className="kaleidoscopeCanvas"
-            height = {size}
-            width = {size} > </canvas>);
-          }
-          return <div> {canvases} </div>;
-        }
-      }),
+        return <div> {canvases} </div>;
+      }
+    }),
     Widget = React.createClass({
       getInitialState: function() {
         return {
@@ -70,11 +74,24 @@ var Kscope = React.createBackboneClass({
           kaleidoscope: kaleidoscope
         };
       },
+      fullscreenToggle: function(e) {
+        var bodyClasses = document.body.className;
+        if (e.target.checked) {
+          document.body.className = bodyClasses + (bodyClasses ? ' ' : '') + 'fullscreen';
+          this.setState({
+            fullscreen: true
+          });
+        } else {
+          document.body.className = document.body.className.replace(/ ?fullscreen/, '');
+          this.setState({
+            fullscreen: false
+          });
+        }
+      },
       move: function(e) {
         this.state.kaleidoscope.move(e.target.value, e.target.value);
       },
       moveToggle: function(e) {
-        console.log(e.target.checked);
         if (e.target.checked) {
           this.state.kaleidoscope.visualizeAudio();
           this.setState({
@@ -83,7 +100,8 @@ var Kscope = React.createBackboneClass({
         } else {
           this.state.kaleidoscope.visualizeAudio(true);
           this.setState({
-            audio: false
+            audio: false,
+            fullscreen: false
           });
         }
       },
@@ -91,14 +109,19 @@ var Kscope = React.createBackboneClass({
         var specs = this.props;
         var size = specs.scopeSize;
         var src = specs.src;
-        var checkbox = (
+        var checkboxAudio = (
           <span> Use Audio:
             <input type="checkbox" className="" defaultChecked={this.state.audio} onChange={ this.moveToggle } />
           </span>
         );
+        var checkboxFullscreen = (
+          <span> Use Fullscreen:
+            <input type="checkbox" className="" defaultChecked={this.state.fullscreen} onChange={ this.fullscreenToggle } />
+          </span>
+        );
         var range = (
           <span> Manual:
-            <input type="range" min="0" max="100" defaultValue="0" name="y-range" onChange={ this.move } className="static-range" />
+            <input type="range" min="0" max="80" defaultValue="0" name="y-range" onChange={ this.move } className="static-range" />
           </span>
         );
         // For SoundCloud and static images:
@@ -106,7 +129,8 @@ var Kscope = React.createBackboneClass({
         return (
           <div>
             <form>
-              { checkbox }
+              { checkboxAudio }
+              { checkboxFullscreen }
               { !this.state.audio ? range : null }
             </form>
           </div>

@@ -32668,40 +32668,44 @@ var Kscope = React.createBackboneClass({
       var imgSrc = this.state.src;
       return (
         React.createElement("div", {imgUrl: "test", id: "sckscope"}, 
-          React.createElement(Widget, {scopeSize:  this.state.kaleidoscope.scopeSize, 
-            src:  this.state.src, 
-            update:  this.update}), 
-          React.createElement(CanvasKscope, {scopeSize: "400", src:  this.state.src})
+          React.createElement(Widget, {scopeSize: this.state.kaleidoscope.scopeSize, 
+            src: this.state.src, 
+            update: this.update}), 
+          React.createElement(CanvasKscope, {scopeSize: "400", src: this.state.src})
         )
       );
+    },
+    remove: function () {
+        this.state.kaleidoscope.stopStream();
+        Backbone.View.prototype.remove.apply(this, arguments);
     }
   }),
   CanvasKscope = React.createClass({displayName: "CanvasKscope",
-      getInitialState: function() {
-        return {
-          kaleidoscope: kaleidoscope,
-          src: this.props.src
+    getInitialState: function() {
+      return {
+        kaleidoscope: kaleidoscope,
+        src: this.props.src
+      }
+    },
+    componentDidMount: function() {
+      this.state.kaleidoscope.prepPage(this.props.src);
+    },
+    componentDidUpdate: function() {
+      this.state.kaleidoscope.prepPage(this.props.src);
+    },
+    render: function() {
+      var specs = this.props;
+      var size = specs.scopeSize;
+      var src = specs.src;
+      var canvases = [];
+      for (var i = 0; i < 6; i++) {
+        canvases.push( React.createElement("canvas", {key: 'kaleidoscope' + i, className: "kaleidoscopeCanvas", 
+          height: size, 
+          width: size}, " "));
         }
-      },
-      componentDidMount: function() {
-        this.state.kaleidoscope.prepPage(this.props.src);
-      },
-      componentDidUpdate: function() {
-        this.state.kaleidoscope.prepPage(this.props.src);
-      },
-      render: function() {
-        var specs = this.props;
-        var size = specs.scopeSize;
-        var src = specs.src;
-        var canvases = [];
-        for (var i = 0; i < 6; i++) {
-          canvases.push( React.createElement("canvas", {key: 'kaleidoscope' + i, className: "kaleidoscopeCanvas", 
-            height: size, 
-            width: size}, " "));
-          }
-          return React.createElement("div", null, " ", canvases, " ");
-        }
-      }),
+        return React.createElement("div", null, " ", canvases, " ");
+      }
+    }),
     Widget = React.createClass({displayName: "Widget",
       getInitialState: function() {
         return {
@@ -32709,11 +32713,24 @@ var Kscope = React.createBackboneClass({
           kaleidoscope: kaleidoscope
         };
       },
+      fullscreenToggle: function(e) {
+        var bodyClasses = document.body.className;
+        if (e.target.checked) {
+          document.body.className = bodyClasses + (bodyClasses ? ' ' : '') + 'fullscreen';
+          this.setState({
+            fullscreen: true
+          });
+        } else {
+          document.body.className = document.body.className.replace(/ ?fullscreen/, '');
+          this.setState({
+            fullscreen: false
+          });
+        }
+      },
       move: function(e) {
         this.state.kaleidoscope.move(e.target.value, e.target.value);
       },
       moveToggle: function(e) {
-        console.log(e.target.checked);
         if (e.target.checked) {
           this.state.kaleidoscope.visualizeAudio();
           this.setState({
@@ -32722,7 +32739,8 @@ var Kscope = React.createBackboneClass({
         } else {
           this.state.kaleidoscope.visualizeAudio(true);
           this.setState({
-            audio: false
+            audio: false,
+            fullscreen: false
           });
         }
       },
@@ -32730,14 +32748,19 @@ var Kscope = React.createBackboneClass({
         var specs = this.props;
         var size = specs.scopeSize;
         var src = specs.src;
-        var checkbox = (
+        var checkboxAudio = (
           React.createElement("span", null, " Use Audio:", 
             React.createElement("input", {type: "checkbox", className: "", defaultChecked: this.state.audio, onChange:  this.moveToggle})
           )
         );
+        var checkboxFullscreen = (
+          React.createElement("span", null, " Use Fullscreen:", 
+            React.createElement("input", {type: "checkbox", className: "", defaultChecked: this.state.fullscreen, onChange:  this.fullscreenToggle})
+          )
+        );
         var range = (
           React.createElement("span", null, " Manual:", 
-            React.createElement("input", {type: "range", min: "0", max: "100", defaultValue: "0", name: "y-range", onChange:  this.move, className: "static-range"})
+            React.createElement("input", {type: "range", min: "0", max: "80", defaultValue: "0", name: "y-range", onChange:  this.move, className: "static-range"})
           )
         );
         // For SoundCloud and static images:
@@ -32745,7 +32768,8 @@ var Kscope = React.createBackboneClass({
         return (
           React.createElement("div", null, 
             React.createElement("form", null, 
-               checkbox, 
+               checkboxAudio, 
+               checkboxFullscreen, 
                !this.state.audio ? range : null
             )
           )
@@ -32995,7 +33019,6 @@ module.exports = drawKaleidoscope;
 
 },{}],166:[function(require,module,exports){
 window.module = window.module || {};
-console.log(typeof(require));
 require = typeof(require) == 'function' ? require : function(script) {
   return;
 };
@@ -33009,10 +33032,11 @@ var app = {
   audio: {},
   listener: null,
   scopeSize: 400,
-  mediaStream: {},
-  audioActive: {},
-  vac: {},
+  mediaStream: null,
+  audioActive: null,
+  vac: null,
   audioCache: {},
+  video: null,
   coords: function() {
     var coord = this.scopeSize/4
     return [coord, coord];
@@ -33090,6 +33114,7 @@ var app = {
         video.muted = true;
         video.src = window.URL.createObjectURL(mediaStream);
         video.autoplay = true;
+        app.video = video;
         app.audioActive = video.src;
         app.mediaStream = mediaStream;
         app.vac = new VisualAudioContext(app.audioActive, app.mediaStream);
@@ -33112,7 +33137,17 @@ var app = {
       // Create a fallback to other video:
       // video.src = 'somevideo.webm';
     }
-
+  },
+  stopStream: function() {
+    if (this.video) {
+      this.video.pause();
+      this.video.src = '';
+      this.video.load();
+    }
+    if (this.mediaStream && this.mediaStream.stop) {
+      this.mediaStream.stop();
+    }
+    this.mediaStream = null;
   },
   snapshot: function(video, preCanvas, ctx, stream) {
     var center = this.scopeSize / 2;
@@ -33181,11 +33216,23 @@ var KscopeVideo = require('./component');
 
 var Scope = {
     init: function () {
+      navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia ||
+        navigator.mozGetUserMedia || navigator.msGetUserMedia;
+      if (navigator.getUserMedia) {
         React.render(React.createElement(KscopeVideo, {src: ""}), document.getElementById('container'));
+      } else {
+        React.render(
+          React.createElement("span", null, 
+            "Your browser does not support the features required to play" + ' ' +
+            "with the Kaleidoscope. Try using Chrome, FireFox, or Edge."
+          )
+          , document.getElementById('messages'));
+      }
     }
 };
 
 module.exports = Scope;
+
 },{"./component":167,"backbone":1,"react":159,"react.backbone":4}],169:[function(require,module,exports){
 /** @jsx React.DOM */
 var React = require('react');

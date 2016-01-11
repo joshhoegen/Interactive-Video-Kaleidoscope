@@ -1,5 +1,4 @@
 window.module = window.module || {};
-console.log(typeof(require));
 require = typeof(require) == 'function' ? require : function(script) {
   return;
 };
@@ -13,10 +12,11 @@ var app = {
   audio: {},
   listener: null,
   scopeSize: 400,
-  mediaStream: {},
-  audioActive: {},
-  vac: {},
+  mediaStream: null,
+  audioActive: null,
+  vac: null,
   audioCache: {},
+  video: null,
   coords: function() {
     var coord = this.scopeSize/4
     return [coord, coord];
@@ -94,6 +94,7 @@ var app = {
         video.muted = true;
         video.src = window.URL.createObjectURL(mediaStream);
         video.autoplay = true;
+        app.video = video;
         app.audioActive = video.src;
         app.mediaStream = mediaStream;
         app.vac = new VisualAudioContext(app.audioActive, app.mediaStream);
@@ -116,7 +117,17 @@ var app = {
       // Create a fallback to other video:
       // video.src = 'somevideo.webm';
     }
-
+  },
+  stopStream: function() {
+    if (this.video) {
+      this.video.pause();
+      this.video.src = '';
+      this.video.load();
+    }
+    if (this.mediaStream && this.mediaStream.stop) {
+      this.mediaStream.stop();
+    }
+    this.mediaStream = null;
   },
   snapshot: function(video, preCanvas, ctx, stream) {
     var center = this.scopeSize / 2;

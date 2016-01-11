@@ -44,14 +44,21 @@ body.fullscreen {
   max-width: none;
   overflow: hidden;
 }
-.fullscreen form {}
-.fullscreen #sckscope {
+.fullscreen #head, .fullscreen #external-links {
+  display: none;
+}
+.fullscreen #sckscope, .fullscreen #container {
   width: auto;
   max-width: none;
   text-align: left;
 }
 .fullscreen .track-info {
   display: none;
+}
+.fullscreen canvas {
+  margin-bottom: -3px;
+  width: 33%;
+  margin-left: -1px;
 }
 img.logo {
   width: 30px;
@@ -185,6 +192,12 @@ body.flash audio {
   right: 1%;
   color: #fff;
   text-decoration: none;
+}
+#messages {
+  text-align: left;
+  width: 99%;
+  margin: 10px auto;
+  font-size: 12px;
 }
 @keyframes animatedBackground {
   from {
