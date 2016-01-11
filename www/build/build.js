@@ -33071,7 +33071,7 @@ var app = {
     this.vac.javascriptNode.onaudioprocess = function(e) {
       app.vac.ch.analyser.getByteFrequencyData(ch);
       x = app.vac.getAverageVolume(ch) / 1.9; // < this.scopeSize ? average : (average * 2) + 100; //x = x < scopeSize ? x - 60 : scopeSize;
-      // if you want to split channels, use analyser2
+      // if we want to split channels, use analyser2
       y = x;
       app.move(x, y);
     }
