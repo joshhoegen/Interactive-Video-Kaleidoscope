@@ -9,7 +9,6 @@ var pagesIndexScreen = React.createBackboneClass({
     var pages = this.props.pages;
     var re = this;
       pageHtml = this.props.pages.map(function(page, i) {
-        console.log(i);
         return <PageLink key={page.name} page={page} />
       });
     return (

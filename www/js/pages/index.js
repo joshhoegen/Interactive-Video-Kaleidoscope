@@ -8,7 +8,6 @@ var pagesC = require('./collection');
 
 var pagesIndexView = {
   init: function () {
-    console.log('list()');
     var pages = new pagesC().fetch({
         error: function(c, r, o) {
           // collection, response, options

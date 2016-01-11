@@ -57,7 +57,6 @@ var app = {
     }
   },
   prepPage: function(src) {
-    console.log('prepPage');
     src = src || '';
     this.preCanvas.id = 'preCanvas';
     this.preCanvas.width = this.scopeSize;

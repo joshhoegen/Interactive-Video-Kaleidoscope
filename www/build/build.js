@@ -33077,7 +33077,6 @@ var app = {
     }
   },
   prepPage: function(src) {
-    console.log('prepPage');
     src = src || '';
     this.preCanvas.id = 'preCanvas';
     this.preCanvas.width = this.scopeSize;
@@ -33281,7 +33280,6 @@ var pagesIndexScreen = React.createBackboneClass({
     var pages = this.props.pages;
     var re = this;
       pageHtml = this.props.pages.map(function(page, i) {
-        console.log(i);
         return React.createElement(PageLink, {key: page.name, page: page})
       });
     return (
@@ -33307,7 +33305,6 @@ var pagesC = require('./collection');
 
 var pagesIndexView = {
   init: function () {
-    console.log('list()');
     var pages = new pagesC().fetch({
         error: function(c, r, o) {
           // collection, response, options
