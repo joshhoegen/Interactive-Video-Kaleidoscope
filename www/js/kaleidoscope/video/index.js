@@ -17,7 +17,7 @@ var Scope = {
       var body = document.body;
       var bodyClasses = body.className;
       if(window.mobileAndTabletcheck) {
-        body = bodyClasses + (bodyClasses ? ' ' : '') + 'mobile'
+        body.className = bodyClasses + (bodyClasses ? ' ' : '') + 'mobile'
       }
       if (navigator.getUserMedia) {
         React.render(<KscopeVideo src="" />, document.getElementById('container'));

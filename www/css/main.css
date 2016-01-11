@@ -89,11 +89,8 @@ a {
 #sckscope canvas {
   margin-bottom: -3px;
 }
-#sckscope canvas {
-  margin-bottom: -3px;
-}
 .mobile #sckscope canvas {
-  margin-bottom: 5px;
+  margin-bottom: -4px;
 }
 .track-info {
   display: none;
