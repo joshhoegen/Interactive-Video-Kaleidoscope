@@ -1,3 +1,7 @@
+#Interactive Kaleidoscope Toy in Javascript!
+##No Dependencies!
+###View simple setup here: /js/kaleidoscope/modules/
+
 #Template for backbone/react app
 
 ##Installation
