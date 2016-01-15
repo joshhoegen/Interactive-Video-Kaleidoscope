@@ -11,7 +11,9 @@
   "devDependencies": {
     "grunt-react": "",
     "grunt-browserify": "",
+    "grunt-contrib-uglify": "",
     "grunt-contrib-clean": "",
+    "grunt-contrib-cssmin": "",
     "grunt": "",
     "grunt-contrib-watch": "",
     "reactify": "",

@@ -60,11 +60,11 @@ var Kscope = React.createBackboneClass({
       var src = specs.src;
       var canvases = [];
       for (var i = 0; i < 6; i++) {
-        canvases.push( <canvas key={'kaleidoscope' + i } className="kaleidoscopeCanvas"
+        canvases.push(<canvas key={'kaleidoscope' + i } className="kaleidoscopeCanvas"
           height = {size}
-          width = {size} > </canvas>);
+          width = {size} ></canvas>);
         }
-        return <div> {canvases} </div>;
+        return <div>{canvases}</div>;
       }
     }),
     Widget = React.createClass({
