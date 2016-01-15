@@ -80,7 +80,7 @@ var app = {
   prepVideo: function() {
     window.URL = window.URL || window.webkitURL;
     navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia ||
-      navigator.mozGetUserMedia || navigator.msGetUserMedia;
+      navigator.mozGetUserMedia || navigator.msGetUserMedia || navigator.mediaDevices.getUserMedia;
     var preImage = document.createElement('img');
     var canvas = this.preCanvas;
     var ctx = canvas.getContext('2d');

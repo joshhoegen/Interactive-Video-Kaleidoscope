@@ -86,11 +86,16 @@ a {
   max-width: 1200px;
   box-shadow: 0px 0px 100px #000;
 }
+.mobile #sckscope {
+  margin-bottom: 24px;
+}
 #sckscope canvas {
   margin-bottom: -3px;
 }
 .mobile #sckscope canvas {
-  margin-bottom: -4px;
+  vertical-align: bottom;
+  margin-bottom: -3px;
+  line-height: 0px;
 }
 .track-info {
   display: none;
@@ -128,14 +133,73 @@ a {
   visibility: visible;
   opacity: 1;
 }
+.mobile form > span {
+  margin-right: 2%;
+  margin-bottom: 23px;
+}
+.mobile form span span {
+  font-size: 120%;
+  display: inline-block;
+}
+.mobile input[type=checkbox] {
+  /* Double-sized Checkboxes */
+  -ms-transform: scale(2); /* IE */
+  -moz-transform: scale(2); /* FF */
+  -webkit-transform: scale(2); /* Safari and Chrome */
+  -o-transform: scale(2); /* Opera */
+  transform: scale(2);
+  padding: 10px;
+}
+.mobile input[type=range] {
+  -ms-transform: scale(2); /* IE */
+  -moz-transform: scale(2); /* FF */
+  -webkit-transform: scale(2); /* Safari and Chrome */
+  -o-transform: scale(2); /* Opera */
+  transform: scale(2);
+  transform: scale(2);
+  display: inline-block;
+  margin-right: -50%;
+}
+.mobile.fullscreen input[type=range] {
+  -ms-transform: scale(1); /* IE */
+  -moz-transform: scale(1); /* FF */
+  -webkit-transform: scale(1); /* Safari and Chrome */
+  -o-transform: scale(1); /* Opera */
+  transform: scale(1);
+  transform: scale(1);
+  display: inline-block;
+  margin-right: -50%;
+}
+.wrapper:before {
+  content: "Hover over kaleidoscope for animation controls.";
+  width: 400px;
+  margin-left: -200px;
+  position: absolute;
+  z-index: 1;
+  top: 40%;
+  left: 50%;
+  text-align: center;
+  -webkit-animation: fadeOut 0.5s normal forwards;
+  -moz-animation: fadeOut 0.5s normal forwards;
+  animation: fadeOut 0.5s normal forwards;
+  -webkit-animation-delay: 4s;
+  -moz-animation-delay: 4s;
+  animation-delay: 4s;
+}
+
+.mobile .wrapper:before {
+  font-size: 16px;
+  content: "Touch kaleidoscope for animation controls.";
+  width: 320px;
+  margin-left: -160px;
+}
+
 form {
-  visibility: hidden;
+  visibility: visible;
   opacity: 0;
   transition: visibility 0s, opacity 0.5s linear;
   margin: 0px;
   position: absolute;
-  /*background: #000;
-  background: rgba(0, 0, 0, .6);*/
   padding: 10px;
 }
 form span {
@@ -196,44 +260,58 @@ body.flash audio {
   color: #fff;
   text-decoration: none;
 }
+.mobile #external-links .project-link {
+  position: relative;
+  font-size: 10px;
+  display: block;
+  margin: 10px 0;
+}
 #messages {
   text-align: left;
   width: 99%;
-  margin: 10px auto;
+  margin: 10px auto 24px auto;
   font-size: 12px;
 }
 .mobile #messages {
   font-size: 14px;
 }
-@keyframes animatedBackground {
+@keyframes fadeOut {
   from {
-    background-position: 0 0;
+    opacity: 100%;
+    visibility: visibile;
   }
   to {
-    background-position: 100% 0;
+    opacity: 0;
+    visibility: hidden;
   }
 }
-@-webkit-keyframes animatedBackground {
+@-webkit-keyframes fadeOut {
   from {
-    background-position: 0 0;
+    opacity: 100%;
+    visibility: visibile;
   }
   to {
-    background-position: 100% 0;
+    opacity: 0;
+    visibility: hidden;
   }
 }
-@-ms-keyframes animatedBackground {
+@-ms-keyframes fadeOut {
   from {
-    background-position: 0 0;
+    opacity: 100%;
+    visibility: visibile;
   }
   to {
-    background-position: 100% 0;
+    opacity: 0;
+    visibility: hidden;
   }
 }
-@-moz-keyframes animatedBackground {
+@-moz-keyframes fadeOut {
   from {
-    background-position: 0 0;
+    opacity: 100%;
+    visibility: visibile;
   }
   to {
-    background-position: 100% 0;
+    opacity: 0;
+    visibility: hidden;
   }
 }
