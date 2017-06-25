@@ -1,30 +1,61 @@
 {
-  "name": "react-backbone-browserify",
-  "version": "0.0.0",
-  "description": "React, backbone, browserify, grunt",
-  "main": "www/index.html",
+  "name": "react-es6-webpack-boilerplate",
+  "version": "5.0.0",
+  "description": "Boilerplate for kick starting a React Project with ES6 (Babel) and Hot reloader using Webpack.",
+  "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "webpack-dev-server --inline --hot --history-api-fallback --host localhost --port 5000",
+    "build": "cross-env BABEL_ENV=production ./node_modules/.bin/webpack --config webpack.config.production.js",
+    "lint": "eslint --cache --ignore-path .gitignore --format=node_modules/eslint-formatter-pretty . *.js",
+    "test": "npm run lint"
   },
-  "author": "Grankin Andrey",
-  "license": "ISC",
-  "devDependencies": {
-    "grunt-react": "",
-    "grunt-browserify": "",
-    "grunt-contrib-clean": "",
-    "grunt": "",
-    "grunt-contrib-watch": "",
-    "reactify": "",
-    "node-jsx": "",
-    "underscore": ""
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vasanthk/react-es6-webpack-boilerplate.git"
   },
+  "keywords": [
+    "react",
+    "es6",
+    "babel",
+    "webpack"
+  ],
+  "author": "Vasanth Krishnamoorthy (http://www.vasanthk.com)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/vasanthk/react-es6-webpack-boilerplate/issues"
+  },
+  "homepage": "https://github.com/vasanthk/react-es6-webpack-boilerplate",
   "dependencies": {
-    "react.backbone": "^0.6.0",
-    "backbone": "^1.2.3",
-    "backbone.marionette": "",
-    "react": "^0.13.3",
-    "react-tools": "~0.8.0",
-    "react-canvas": "",
-    "jquery": ""
+    "babel-runtime": "^6.20.0",
+    "react": "^15.4.1",
+    "react-dom": "^15.4.1"
+  },
+  "devDependencies": {
+    "babel-core": "^6.21.0",
+    "babel-eslint": "^7.1.1",
+    "babel-loader": "^6.2.10",
+    "babel-plugin-react-transform": "^2.0.2",
+    "babel-plugin-transform-runtime": "^6.15.0",
+    "babel-preset-es2015": "^6.18.0",
+    "babel-preset-react": "^6.16.0",
+    "babel-preset-stage-0": "^6.16.0",
+    "clean-webpack-plugin": "^0.1.16",
+    "cross-env": "^3.1.3",
+    "css-loader": "^0.28.4",
+    "eslint": "^3.12.2",
+    "eslint-config-airbnb": "^13.0.0",
+    "eslint-formatter-pretty": "^1.1.0",
+    "eslint-plugin-compat": "^0.1.1",
+    "eslint-plugin-import": "^2.2.0",
+    "eslint-plugin-jsx-a11y": "2.2.3",
+    "eslint-plugin-promise": "^3.4.0",
+    "eslint-plugin-react": "^6.8.0",
+    "extract-text-webpack-plugin": "^1.0.1",
+    "node-sass": "^4.3.0",
+    "react-transform-hmr": "^1.0.4",
+    "sass-loader": "^6.0.6",
+    "style-loader": "^0.18.2",
+    "webpack": "^1.14.0",
+    "webpack-dev-server": "^1.16.2"
   }
 }

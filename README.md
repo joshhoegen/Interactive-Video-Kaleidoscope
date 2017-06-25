@@ -1,24 +1,28 @@
-#Interactive Kaleidoscope Toy in Javascript!
+# React ES6 Webpack Boilerplate
 
-Video kaleidoscope
-- No Dependencies! View simple setup here: /js/kaleidoscope/modules/
-- SEE IT LIVE @ <a href="http://byutifu.com">http://byutifu.com</a>. Chrome requires https now, so try <a href="https://byutifu.com.s160341.gridserver.com/">here</a>. Sorry for the ugly cert (Shared hosting). 
-- Requires a browser that supports video, audio, html5.
-- Allow the site to use your camera.
-- Say "hi!"
+Boilerplate for kick starting a project with the following technologies:
+* [React](https://github.com/facebook/react)
+* [Babel 6](http://babeljs.io)
+* [Webpack](http://webpack.github.io) for bundling
+* [Webpack Dev Server](http://webpack.github.io/docs/webpack-dev-server.html)
+* [React Transform](https://github.com/gaearon/react-transform-hmr) for hot reloading React components in real time.
+
+The various webpack options used have been explained in detailed as comments in the config file. Should help with understanding the nitty-gritty :)
 
 
-SoundCloud kaleidoscope
-- Being rebuilt. Sorry!
+### Usage
 
-#Template for backbone/react app
-
-##Installation
-```shell
-bower update 
-npm update
+```
+npm install
+npm start
+Open http://localhost:5000
 ```
 
-grunt build – build project
+### Linting
 
-grunt – watch for changes and rebuild
+ESLint with React linting options have been enabled.
+
+```
+npm run lint
+```
+
