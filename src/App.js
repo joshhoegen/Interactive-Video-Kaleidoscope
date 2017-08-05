@@ -50,35 +50,6 @@ let Widget = React.createClass({
       kaleidoscope
     };
   },
-  fullscreenBrowser(body, requestMethod) {
-    if (requestMethod) {
-      requestMethod.call(body);
-    } else if (typeof window.ActiveXObject !== "undefined") { // Older IE.
-      const wscript = new ActiveXObject("WScript.Shell");
-      if (wscript !== null) {
-        wscript.SendKeys("{F11}");
-      }
-    }
-  },
-  fullscreenToggle(e) {
-    const body = document.body;
-    const bodyClasses = body.className;
-    if (e.target.checked) {
-      var requestMethod = body.requestFullScreen || body.webkitRequestFullScreen || body.mozRequestFullScreen || body.msRequestFullscreen;
-      this.fullscreenBrowser(body, requestMethod);
-      body.className = `${bodyClasses + (bodyClasses ? ' ' : '')}fullscreen`;
-      this.setState({
-        fullscreen: true
-      });
-    } else {
-      var requestMethod = document.cancelFullScreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.exitFullscreen;
-      this.fullscreenBrowser(document, requestMethod);
-      body.className = body.className.replace(/ ?fullscreen/, '');
-      this.setState({
-        fullscreen: false
-      });
-    }
-  },
   move(e) {
     this.state.kaleidoscope.move(e.target.value, e.target.value);
   },
@@ -112,17 +83,6 @@ let Widget = React.createClass({
           }
           onChange = {
             this.moveToggle
-          }
-        />
-        <label htmlFor="fullscreen">Fullscreen: </label>
-        <input type = "checkbox"
-          name="fullscreen"
-          className = ""
-          defaultChecked = {
-            this.state.fullscreen
-          }
-          onChange = {
-            this.fullscreenToggle
           }
         />
         <label

@@ -108,8 +108,6 @@ const app = {
       });
     } else {
       console.log('failed getUserMedia(). :( ');
-      // Create a fallback to other video:
-      // video.src = 'somevideo.webm';
     }
   },
   stopStream() {
@@ -128,11 +126,9 @@ const app = {
     ctx.drawImage(video, 0, 0, center, center);
     this.move(this.coords[0], this.coords[1]);
 
-    // window.requestAnimationFrame(app.snapshot(video, preCanvas, ctx, stream));
-
     window.requestAnimationFrame(() => {
       app.snapshot(video, preCanvas, ctx, stream);
-    }, 10);
+    });
   }
 };
 
