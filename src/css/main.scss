@@ -1,8 +1,9 @@
 body {
-  padding: 0;
-  margin: auto;
-  width: auto;
-  font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;
+  // padding: 0;
+  // margin: auto;
+  // width: auto;
+  font-family: Verdana;
+  font-size: 12px;
   // background: url("../image/bg.jpg") #000;
   color: #fff;
   text-shadow: 2px 1px 6px #000;
@@ -81,20 +82,20 @@ a {
   margin-bottom: -3px;
 }
 .controls {
+  display: table;
   z-index: 2;
   position: fixed;
   padding: 20px;
-  margin: 0 auto;
+  left: 0;
+  top: 0;
+  min-width: 30%;
   min-height: 40px;
-  text-align: left;
   .controls-wrapper {
+    display: table-cell;
+    vertical-align: middle;
     visibility: hidden;
     opacity: 0;
-    margin: 0px;
-    // position: absolute;
-    /*background: #000;
-    background: rgba(0, 0, 0, .6);*/
-    padding: 10px;
+    transition: visibility 1s, opacity 0.5s ease-in-out;
   }
   &:hover {
     .controls-wrapper {
@@ -104,12 +105,13 @@ a {
     }
   }
   label, span {
-    // float: left;
+    float: left;
     color: #fff;
-    margin: 0;
+    margin: 5px 2% 0 0;
   }
   input {
-    margin: 0 24px 0 0;
+    float: left;
+    margin: 7px 24px 0 0;
   }
   input.static-range {
     max-width: 25%;

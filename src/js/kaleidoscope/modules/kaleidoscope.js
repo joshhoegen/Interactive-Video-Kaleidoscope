@@ -4,6 +4,10 @@ import VisualAudioContext from './audio';
 const app = {
   kScope: [],
   canvas: document.getElementsByClassName('kaleidoscopeCanvas'),
+  bufferCanvas: document.createElement('canvas'),
+  bufferContext: function() {
+    return this.bufferCanvas.getContext('2d');
+  },
   canvasActive: 1,
   audio: {},
   listener: null,
@@ -20,9 +24,10 @@ const app = {
   preCanvas: document.createElement('canvas'),
   move(x, y) {
     // console.log('move');
+    // console.log(this.bufferContext());
     for(let i = 0; i < this.canvas.length; i++) {
       const ctx = app.canvas[i].getContext('2d');
-      const img = drawKaleidoscope(ctx, app.preCanvas, x, y, app.scopeSize);
+      const img = drawKaleidoscope(ctx, app.preCanvas, x, y, app.scopeSize, this.bufferCanvas, this.bufferContext());
       ctx.drawImage(img, 0, 0);
     }
     this.coords = [x, y];
@@ -84,6 +89,7 @@ const app = {
     const preImage = document.createElement('img');
     const canvas = this.preCanvas;
     const ctx = canvas.getContext('2d');
+    const center = this.scopeSize / 2;
     if (navigator.getUserMedia) {
       navigator.getUserMedia({
         video: true,
@@ -102,14 +108,12 @@ const app = {
         // audioCache[audioActive] = {
         //  image: preImage.attr('src')
         // }
-        app.snapshot(video, canvas, ctx, mediaStream);
+        app.snapshot(video, canvas, ctx, mediaStream, center);
       }, error => {
         console.log(`Failed${error}`);
       });
     } else {
       console.log('failed getUserMedia(). :( ');
-      // Create a fallback to other video:
-      // video.src = 'somevideo.webm';
     }
   },
   stopStream() {
@@ -123,16 +127,12 @@ const app = {
     }
     this.mediaStream = null;
   },
-  snapshot(video, preCanvas, ctx, stream) {
-    const center = this.scopeSize / 2;
+  snapshot(video, preCanvas, ctx, stream, center) {
+    window.requestAnimationFrame(() => {
+      app.snapshot(video, preCanvas, ctx, stream, center);
+    });
     ctx.drawImage(video, 0, 0, center, center);
     this.move(this.coords[0], this.coords[1]);
-
-    // window.requestAnimationFrame(app.snapshot(video, preCanvas, ctx, stream));
-
-    window.requestAnimationFrame(() => {
-      app.snapshot(video, preCanvas, ctx, stream);
-    }, 10);
   }
 };
 
