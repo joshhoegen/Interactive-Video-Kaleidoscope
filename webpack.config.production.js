@@ -45,6 +45,10 @@ module.exports = {
         // https://github.com/jtangelder/sass-loader
         test: /\.scss$/,
         loader: ExtractTextPlugin.extract('css!sass'),
+      },
+      {
+        test: /\.(jpe?g|gif|png)$/,
+        loader: 'file-loader?name=public/media[name].[ext]'
       }
     ]
   }

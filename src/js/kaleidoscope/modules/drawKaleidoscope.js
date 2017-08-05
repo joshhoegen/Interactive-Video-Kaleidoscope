@@ -1,39 +1,49 @@
-var drawKaleidoscope = function(ctx, img, imgX, imgY, mask) {
-  var maskSide = !mask ? 300 : mask;
-  var sqSide = maskSide / 2;
+var drawKaleidoscope = function(ctx, img, imgX, imgY, mask, bCan, bCon) {
+  var sqSide = mask / 2;
   var sqDiag = Math.sqrt(2 * sqSide * sqSide);
-  var c = maskSide / 2;
+  var c = mask / 2;
   var centerSide = 0;
-  var bufferCanvas = document.createElement('canvas');
-  var bufferContext = bufferCanvas.getContext('2d');
+  var bufferCanvas = bCan;
+  var bufferContext = bCon;
+  var maskSide = Math.abs(mask - sqDiag);
 
   bufferCanvas.height = mask;
   bufferCanvas.width = mask;
 
-  if (img.height < img.width) {
-    maskSide = Math.abs(mask - sqDiag);
-  } else {
-    maskSide = Math.abs(mask - sqDiag);
-  }
+  bufferContext.save();
+  bufferContext.translate(c, c);
+  bufferContext.rotate(-90 * (Math.PI / 180));
+  bufferContext.scale(-1, -1);
+  bufferContext.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
+  bufferContext.restore();
 
-  var scales = ['-1, -1', '1, -1', '1, 1', '-1, 1'];
-  var layerOne = function(scale) {
-    bufferContext.save();
-    bufferContext.translate(c, c);
-    bufferContext.rotate(-90 * (Math.PI / 180));
-    bufferContext.scale(scale[0], scale[1]);
-    bufferContext.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
-    bufferContext.restore();
-  }
-  var loopLayers = function(func) {
-    for (var i = 0; i < scales.length; i++) {
-      var scale = scales[i].split(', ');
-      func(scale, i);
-    }
-  }
+  bufferContext.save();
+  bufferContext.translate(c, c);
+  bufferContext.rotate(-90 * (Math.PI / 180));
+  bufferContext.scale(1, -1);
+  bufferContext.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
+  bufferContext.restore();
 
-  // TODO: Lookup matrix lib
-  loopLayers(layerOne);
+  bufferContext.save();
+  bufferContext.translate(c, c);
+  bufferContext.rotate(-90 * (Math.PI / 180));
+  bufferContext.scale(1, 1);
+  bufferContext.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
+  bufferContext.restore();
+
+  bufferContext.save();
+  bufferContext.translate(c, c);
+  bufferContext.rotate(-90 * (Math.PI / 180));
+  bufferContext.scale(-1, 1);
+  bufferContext.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
+  bufferContext.restore();
+
+  bufferContext.save();
+  bufferContext.translate(c, c);
+  bufferContext.rotate(-90 * (Math.PI / 180));
+  bufferContext.scale(-1, -1);
+  bufferContext.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, sqSide, sqSide);
+  bufferContext.restore();
 
   bufferContext.save();
   bufferContext.moveTo(c, c);
