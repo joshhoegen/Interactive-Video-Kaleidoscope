@@ -1,5 +1,6 @@
 import React from 'react';
 import './assets/main.scss';
+import PixelImage from './assets/pixels.png'
 
 export default class Header extends React.Component {
   constructor(props) {
@@ -13,7 +14,7 @@ export default class Header extends React.Component {
           <div className="jh-directions-text">
             Hover/tap over the top left and the bottom of the browser window for interactive controls and options.
           </div>
-          {/* <img src={PixelImage} alt="null" /> */}
+          <img className="jh-directions-pixels" src={PixelImage} alt="null" />
         </div>
         <div id="jh-header-ui">
           <div id="jh-header" className="data-scope">
