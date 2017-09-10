@@ -1,26 +1,36 @@
 .jh-directions {
   position: absolute;
-  top: -28px;
-  left: -5px;
+  top: -18px;
+  right: 0;
   z-index: 2;
+  width: 44%;
+  text-align: right;
   opacity: 0;
   visibility: hidden;
-  animation: fadeInOut 5.5s;
+  animation: fadeInOut 7.5s;
+
   .jh-directions-text {
     font: italic 1.2em/1.2em Arial, Helvetica, sans-serif;
     text-shadow: 0 0 3px #000;
     color: #fff;
     margin: 35px 10px;
-    width: 61%;
+    // width: 61%;
     z-index: 3;
   }
-   :before {
-    background: url("./pixels.png") no-repeat;
+
+  .jh-directions-pixels {
+    position: absolute;
+    top: 0;
+    left: 2px;
+    opacity: 0.6;
+  }
+
+  :before {
+    // background: url("./pixels.png") no-repeat;
     content: "";
     position: absolute;
     top: 0;
     left: 0;
-    width: 100%;
     height: 100%;
     width: 100%;
     opacity: 0.7;
@@ -28,12 +38,14 @@
     z-index: -1;
   }
 }
+
 #jh-header-ui {
   min-height: 50px;
   width: 100%;
   bottom: 0;
   position: absolute;
   z-index: 2;
+
   &:hover,
   .open {
     #jh-header {
@@ -42,6 +54,7 @@
       opacity: 1;
     }
   }
+
   #jh-header {
     visibility: hidden;
     opacity: 0;
@@ -57,6 +70,7 @@
     min-height: 16px;
     box-shadow: 0 4px 11px #000;
     color: #fff;
+    // animation: fadeInOut 7.5s;
     font: 14px "Lucida Grande",Helvetica,Arial,sans-serif;
     text-shadow: 2px 1px 6px #000;
     // animation: fadeInOut 5.5s;
@@ -66,6 +80,7 @@
       display: inline-block;
       font: lighter 1em Arial,Helvetica,"Lucida Grande",sans-serif;
     }
+
     .directions {
       position: absolute;
       top: 4px;
@@ -73,6 +88,7 @@
       font-size: 0.8em;
       opacity: 0.8;
     }
+
     ul.pages {
       text-align: left;
       list-style-type: none;
@@ -81,21 +97,25 @@
       position: absolute;
       top: -21px;
       left: 10px;
+
       li {
         display: inline-block;
         list-style-type: none;
         margin: 0 10px 0 0;
         padding: 0 10px 0 0;
         border-right: 1px solid #fff;
+
         &:last-child {
           border: none;
         }
+
         a,
         a:visited {
           display: block;
           color: #fff;
           text-decoration: none;
           font: bold 12px/16px Arial, Helvetica;
+
           span {
             font: normal 10px/10px Helvetica, Arial;
             color: #008FB0;
@@ -146,6 +166,7 @@
     //     }
     // }
   }
+
   .fadeIn {
     animation-name: fadeIn;
     -webkit-animation-name: fadeIn;
@@ -159,6 +180,7 @@
     0% {
       opacity: 0.0;
     }
+
     100% {
       opacity: 1;
       display: block;
@@ -168,6 +190,7 @@
     0% {
       opacity: 0.0;
     }
+
     100% {
       opacity: 1;
       display: block;
@@ -191,6 +214,7 @@
     0% {
       opacity: 1;
     }
+
     100% {
       opacity: 0;
       display: none;
@@ -200,6 +224,7 @@
     0% {
       opacity: 1;
     }
+
     100% {
       opacity: 0;
       display: none;
@@ -223,15 +248,19 @@
     0% {
       transform: scale(1.8);
     }
+
     50% {
       transform: scale(0.95);
     }
+
     80% {
       transform: scale(1.05);
     }
+
     90% {
       transform: scale(0.98);
     }
+
     100% {
       transform: scale(1);
     }
@@ -240,15 +269,19 @@
     0% {
       -webkit-transform: scale(1.8);
     }
+
     50% {
       -webkit-transform: scale(0.95);
     }
+
     80% {
       -webkit-transform: scale(1.05);
     }
+
     90% {
       -webkit-transform: scale(0.98);
     }
+
     100% {
       -webkit-transform: scale(1);
     }
@@ -259,14 +292,17 @@
     opacity: 0;
     visibility: hidden;
   }
+
   16% {
     opacity: 1;
     visibility: visible;
   }
+
   88% {
     opacity: 1;
     visibility: visible;
   }
+
   100% {
     opacity: 0;
     visibility: hidden;
@@ -278,15 +314,30 @@
     bottom: 5px;
     right: 5px;
   }
+
+  .jh-directions {
+    position: absolute;
+    top: 40%;
+    right: 0;
+    z-index: 2;
+    width: 100%;
+    text-align: center;
+    opacity: 0;
+    visibility: hidden;
+    animation: fadeInOut 7.5s;
+  }
+
   #jh-header-ui {
     #jh-header {
       height: 9%;
       background: none;
       box-shadow: none;
       width: 80%;
+
       .title {
         display: none;
       }
+
       .directions {
         position: absolute;
         top: 4px;
@@ -294,6 +345,7 @@
         font-size: 1em;
         opacity: 0.8;
       }
+
       ul.pages {
         display: none;
       }
