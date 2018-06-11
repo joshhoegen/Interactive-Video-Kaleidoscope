@@ -11,7 +11,10 @@ body {
 
 }
 #video {
-  display: none;
+  // display: none;
+  position: absolute;
+  z-index: 0;
+  top: 0;
 }
 #sckscope {
   width: 99%;
@@ -77,6 +80,8 @@ a {
 }
 #sckscope canvas {
   margin: 0px -1px -1px;
+  position: relative;
+  z-index: 1;
 }
 .mobile #sckscope canvas {
   margin-bottom: -3px;

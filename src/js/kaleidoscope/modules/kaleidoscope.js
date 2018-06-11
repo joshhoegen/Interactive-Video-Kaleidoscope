@@ -83,24 +83,31 @@ const app = {
     this.move(this.coords[0], this.coords[1]);
   },
   prepVideo() {
+    console.log('prep vid');
     window.URL = window.URL || window.webkitURL;
-    navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia ||
-      navigator.mozGetUserMedia || navigator.msGetUserMedia;
+    // navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia ||
+    //   navigator.mozGetUserMedia || navigator.msGetUserMedia;
     const preImage = document.createElement('img');
     const canvas = this.preCanvas;
     const ctx = canvas.getContext('2d');
     const center = this.scopeSize / 2;
+    const mediaSource = new MediaSource();
     if (navigator.getUserMedia) {
-      navigator.getUserMedia({
+      navigator.mediaDevices.getUserMedia({
         video: true,
         audio: true
-      }, mediaStream => {
+      }).then((mediaStream) => {
         const video = document.getElementById('video');
         video.muted = true;
-        video.src = window.URL.createObjectURL(mediaStream);
+        const mediaSource = new MediaSource();
+        try {
+          video.srcObject = mediaStream;
+        } catch (error) {
+          video.src = window.URL.createObjectURL(mediaStream);
+        }
         video.autoplay = true;
         app.video = video;
-        app.audioActive = video.src;
+        app.audioActive = video.srcObject;
         app.mediaStream = mediaStream;
         app.vac = new VisualAudioContext(app.audioActive, app.mediaStream);
         // For SoundCloud.
@@ -109,8 +116,6 @@ const app = {
         //  image: preImage.attr('src')
         // }
         app.snapshot(video, canvas, ctx, mediaStream, center);
-      }, error => {
-        console.log(`Failed${error}`);
       });
     } else {
       console.log('failed getUserMedia(). :( ');
