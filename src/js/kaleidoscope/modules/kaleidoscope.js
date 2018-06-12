@@ -91,7 +91,7 @@ const app = {
     const canvas = this.preCanvas;
     const ctx = canvas.getContext('2d');
     const center = this.scopeSize / 2;
-    const mediaSource = new MediaSource();
+    // const mediaSource = new MediaSource();
     if (navigator.getUserMedia) {
       navigator.mediaDevices.getUserMedia({
         video: true,
@@ -99,7 +99,7 @@ const app = {
       }).then((mediaStream) => {
         const video = document.getElementById('video');
         video.muted = true;
-        const mediaSource = new MediaSource();
+        // const mediaSource = new MediaSource();
         try {
           video.srcObject = mediaStream;
         } catch (error) {
