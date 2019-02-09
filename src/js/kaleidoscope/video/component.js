@@ -29,7 +29,7 @@ var KscopeVideo = React.createBackboneClass({
     },
     render: function () {
         return (
-            <div imgUrl="test"
+            <div img-url="test"
                  id="sckscopeVideo">
                 <Kscope src=""/>
                 <video id="video" height="0" width="0" autoPlay="true" />
