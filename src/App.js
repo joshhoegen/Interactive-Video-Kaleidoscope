@@ -5,21 +5,21 @@ import Header from './js/jhHeader'
 import './css/main.scss';
 
 let canvasCount = 6;
-let CanvasKscope = React.createClass({
-
-  getInitialState() {
-    return {
+// let CanvasKscope = React.createClass({
+class CanvasKscope extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
       // kaleidoscope,
       src: this.props.src
-    }
-  },
+    };
+  }
   componentDidMount() {
     kaleidoscope.prepPage(this.props.src);
-
-  },
+  }
   componentDidUpdate() {
     kaleidoscope.prepPage(this.props.src);
-  },
+  }
   render() {
     const specs = this.props;
     const size = specs.scopeSize;
@@ -41,18 +41,21 @@ let CanvasKscope = React.createClass({
         canvases
       } </div>;
     }
-  });
 
-let Widget = React.createClass({
-  getInitialState() {
-    return {
+}
+
+// let Widget = React.createClass({
+class Widget extends React.Component {
+  constructor() {
+    super();
+    this.state = {
       audio: false,
       kaleidoscope
     };
-  },
+  }
   move(e) {
     this.state.kaleidoscope.move(e.target.value, e.target.value);
-  },
+  }
   moveToggle(e) {
     if (e.target.checked) {
       this.state.kaleidoscope.visualizeAudio();
@@ -66,7 +69,7 @@ let Widget = React.createClass({
         fullscreen: false
       });
     }
-  },
+  }
   render() {
     const specs = this.props;
     const size = specs.scopeSize;
@@ -100,7 +103,7 @@ let Widget = React.createClass({
        </form> </div>
     )
   }
-});
+}
 
 export default class App extends React.Component {
   constructor() {
@@ -152,7 +155,7 @@ export default class App extends React.Component {
   render() {
     const imgSrc = this.state.src;
     return (
-      <div data-imgUrl="test" id="sckscope">
+      <div data-img-url="test" id="sckscope">
         <Widget scopeSize={kaleidoscope.scopeSize}
           src={this.state.src}
         />
@@ -161,7 +164,7 @@ export default class App extends React.Component {
           <img className="logo" src="./static/media/jh-logo-80.png" alt="Art by Josh Hoegen" />
         </a>
         <Header directions="&#8598; Hover over the top left corner to use controls. Check 'Use Audio' with your favorite song!" />
-        <video id="video" height={this.state.size + 100} width={this.state.size + 100} autoPlay="true" />
+        <video id="video" height={this.state.size + 100} width={this.state.size + 100} autoPlay={true} />
       </div>
     );
   }
