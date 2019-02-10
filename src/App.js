@@ -1,34 +1,34 @@
-import React from "react";
-import PropTypes from "prop-types";
+import React from 'react'
+import PropTypes from 'prop-types'
 
-import kaleidoscope from "./js/kaleidoscope/modules/kaleidoscope";
-import Header from "./js/jhHeader";
+import kaleidoscope from './js/kaleidoscope/modules/kaleidoscope'
+import Header from './js/jhHeader'
 
-import "./css/main.scss";
+import './css/main.scss'
 
-let canvasCount = 6;
+let canvasCount = 6
 
 class CanvasKscope extends React.Component {
   constructor(props) {
-    super(props);
+    super(props)
     this.state = {
       // kaleidoscope,
-      src: this.props.src
-    };
+      src: this.props.src,
+    }
   }
 
   componentDidMount() {
-    kaleidoscope.prepPage(this.props.src);
+    kaleidoscope.prepPage(this.props.src)
   }
 
   componentDidUpdate() {
-    kaleidoscope.prepPage(this.props.src);
+    kaleidoscope.prepPage(this.props.src)
   }
 
   render() {
-    const specs = this.props;
-    const size = specs.scopeSize;
-    const canvases = [];
+    const specs = this.props
+    const size = specs.scopeSize
+    const canvases = []
 
     for (let i = 0; i < canvasCount; i += 1) {
       canvases.push(
@@ -37,41 +37,41 @@ class CanvasKscope extends React.Component {
           className="kaleidoscopeCanvas"
           height={size}
           width={size}
-        />
-      );
+        />,
+      )
     }
-    return <div> {canvases} </div>;
+    return <div> {canvases} </div>
   }
 }
 
 class Widget extends React.Component {
   state = {
     audio: false,
-    kaleidoscope
-  };
+    kaleidoscope,
+  }
 
   move(e) {
-    this.state.kaleidoscope.move(e.target.value, e.target.value);
+    this.state.kaleidoscope.move(e.target.value, e.target.value)
   }
 
   moveToggle(e) {
     if (e.target.checked) {
-      this.state.kaleidoscope.visualizeAudio();
+      this.state.kaleidoscope.visualizeAudio()
       this.setState({
-        audio: true
-      });
+        audio: true,
+      })
     } else {
-      this.state.kaleidoscope.visualizeAudio(true);
+      this.state.kaleidoscope.visualizeAudio(true)
       this.setState({
         audio: false,
-        fullscreen: false
-      });
+        fullscreen: false,
+      })
     }
   }
 
   render() {
-    const specs = this.props;
-    const size = specs.scopeSize;
+    const specs = this.props
+    const size = specs.scopeSize
 
     return (
       <div className="controls">
@@ -86,9 +86,9 @@ class Widget extends React.Component {
           />
           <label
             htmlFor="y-range"
-            className={`static-range ${!this.state.audio ? "show" : "hidden"}`}
+            className={`static-range ${!this.state.audio ? 'show' : 'hidden'}`}
           >
-            Manual:{" "}
+            Manual:{' '}
           </label>
           <input
             type="range"
@@ -97,61 +97,61 @@ class Widget extends React.Component {
             defaultValue="0"
             name="y-range"
             onChange={this.move.bind(this)}
-            className={`static-range ${!this.state.audio ? "show" : "hidden"}`}
+            className={`static-range ${!this.state.audio ? 'show' : 'hidden'}`}
           />
-        </form>{" "}
+        </form>{' '}
       </div>
-    );
+    )
   }
 }
 
 export default class App extends React.Component {
   constructor() {
-    super();
-    this.resizeTimer;
+    super()
+    this.resizeTimer
     this.state = {
       // kaleidoscope,
       src:
-        "https://scontent-iad3-1.cdninstagram.com/hphotos-xfa1/t51.2885-15/s640x640/sh0.08/e35/12331649_749127051897387_1820437710_n.jpg",
-      size: App.calculateWidth()
-    };
-    kaleidoscope.scopeSize = this.state.size;
-    kaleidoscope.prepPage();
+        'https://scontent-iad3-1.cdninstagram.com/hphotos-xfa1/t51.2885-15/s640x640/sh0.08/e35/12331649_749127051897387_1820437710_n.jpg',
+      size: App.calculateWidth(),
+    }
+    kaleidoscope.scopeSize = this.state.size
+    kaleidoscope.prepPage()
   }
 
   static calculateWidth() {
-    let rowCount = 3;
+    let rowCount = 3
 
-    canvasCount = 6;
+    canvasCount = 6
     if (window.outerWidth < 1160) {
-      rowCount = 2;
+      rowCount = 2
     }
     if (window.outerWidth < 600) {
-      rowCount = 1;
-      canvasCount = 2;
+      rowCount = 1
+      canvasCount = 2
     }
-    return 2 * Math.floor(window.innerWidth / rowCount / 2);
+    return 2 * Math.floor(window.innerWidth / rowCount / 2)
   }
 
   // componentDidUpdate() {
-  //   window.addEventListener("resize", this.updateDimensions.bind(this));
+  //   window.addEventListener("resize", this.updateDimensions.bind(this))
   // }
 
   updateDimensions() {
-    clearTimeout(this.resizeTimer);
+    clearTimeout(this.resizeTimer)
     this.resizeTimer = setTimeout(() => {
       this.setState({
-        size: App.calculateWidth()
-      });
-      kaleidoscope.scopeSize = this.state.size;
-      kaleidoscope.prepPage();
-    }, 500);
+        size: App.calculateWidth(),
+      })
+      kaleidoscope.scopeSize = this.state.size
+      kaleidoscope.prepPage()
+    }, 500)
   }
 
   componentDidMount() {
-    window.addEventListener("resize", this.updateDimensions.bind(this));
-    kaleidoscope.prepVideo();
-    kaleidoscope.move(0, 0);
+    window.addEventListener('resize', this.updateDimensions.bind(this))
+    kaleidoscope.prepVideo()
+    kaleidoscope.move(0, 0)
   }
 
   render() {
@@ -160,24 +160,15 @@ export default class App extends React.Component {
         <Widget scopeSize={kaleidoscope.scopeSize} src={this.state.src} />
         <CanvasKscope scopeSize={this.state.size} src={this.state.src} />
         <a href="http://joshhoegen.com">
-          <img
-            className="logo"
-            src="./static/media/jh-logo-80.png"
-            alt="Art by Josh Hoegen"
-          />
+          <img className="logo" src="./static/media/jh-logo-80.png" alt="Art by Josh Hoegen" />
         </a>
-        <Header directions="&#8598; Hover over the top left corner to use controls. Check 'Use Audio' with your favorite song!" />
-        <video
-          id="video"
-          height={this.state.size + 100}
-          width={this.state.size + 100}
-          autoPlay
-        />
+        <Header directions="&#8598 Hover over the top left corner to use controls. Check 'Use Audio' with your favorite song!" />
+        <video id="video" height={this.state.size + 100} width={this.state.size + 100} autoPlay />
       </div>
-    );
+    )
   }
 }
 
 CanvasKscope.propTypes = {
-  src: PropTypes.string
-};
+  src: PropTypes.string,
+}

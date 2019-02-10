@@ -1,7 +1,7 @@
-import React from "react";
+import React from 'react'
 
-import "./assets/main.scss";
-import PixelImage from "./assets/pixels.png";
+import './assets/main.scss'
+import PixelImage from './assets/pixels.png'
 
 export default class Header extends React.Component {
   render() {
@@ -10,19 +10,15 @@ export default class Header extends React.Component {
       <div>
         <div className="jh-directions">
           <div className="jh-directions-text">
-            Hover/tap over the top left and the bottom of the browser window for
-            interactive controls and options.
+            Hover/tap over the top left and the bottom of the browser window for interactive
+            controls and options.
           </div>
           <img className="jh-directions-pixels" src={PixelImage} alt="null" />
         </div>
         <div id="jh-header-ui">
           <div id="jh-header" className="data-scope">
             <div id="jh-nav" className="data-scope">
-              <ul
-                data-controller="pagesList"
-                data-show="showMenu"
-                className="pages data-scope"
-              >
+              <ul data-controller="pagesList" data-show="showMenu" className="pages data-scope">
                 <li className="pages-listing data-scope">
                   <a href="http://instagram.com/joshhoegen">
                     <i className="fa fa-instagram" /> Instagram
@@ -31,22 +27,19 @@ export default class Header extends React.Component {
                 </li>
                 <li className="pages-listing data-scope">
                   <a href="https://byutifu.com/">
-                    <i className="fa fa-globe" /> Js + Video = Trails{" "}
-                    <span>- Interactive art</span>
+                    <i className="fa fa-globe" /> Js + Video = Trails <span>- Interactive art</span>
                   </a>
                 </li>
                 <li className="pages-listing data-scope">
                   <a href="https://byutifu.com/kaleidoscope">
-                    <i className="fa fa-globe" /> Js + Video = Kaleidoscope{" "}
+                    <i className="fa fa-globe" /> Js + Video = Kaleidoscope{' '}
                     <span>- Interactive art</span>
                   </a>
                 </li>
                 <li className="pages-listing data-scope">
                   <a href="http://github.com/joshhoegen">
                     <i className="fa fa-github" /> Git
-                    <span>
-                      - Not as much stuff as I'd like, but it's there!
-                    </span>
+                    <span>- Not as much stuff as I'd like, but it's there!</span>
                   </a>
                 </li>
                 <li className="pages-listing data-scope">
@@ -79,6 +72,6 @@ export default class Header extends React.Component {
           </div>
         </div>
       </div>
-    );
+    )
   }
 }
