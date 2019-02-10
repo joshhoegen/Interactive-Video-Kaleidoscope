@@ -1,11 +1,13 @@
-import React from 'react';
-import kaleidoscope from './js/kaleidoscope/modules/kaleidoscope';
-import Header from './js/jhHeader'
+import React from "react";
+import PropTypes from "prop-types";
 
-import './css/main.scss';
+import kaleidoscope from "./js/kaleidoscope/modules/kaleidoscope";
+import Header from "./js/jhHeader";
+
+import "./css/main.scss";
 
 let canvasCount = 6;
-// let CanvasKscope = React.createClass({
+
 class CanvasKscope extends React.Component {
   constructor(props) {
     super(props);
@@ -14,48 +16,44 @@ class CanvasKscope extends React.Component {
       src: this.props.src
     };
   }
+
   componentDidMount() {
     kaleidoscope.prepPage(this.props.src);
   }
+
   componentDidUpdate() {
     kaleidoscope.prepPage(this.props.src);
   }
+
   render() {
     const specs = this.props;
     const size = specs.scopeSize;
-    const src = this.state.size;
     const canvases = [];
-    for (let i = 0; i < canvasCount; i++) {
-      canvases.push( <canvas key = {
-          `kaleidoscope${i}`
-        }
-        className = "kaleidoscopeCanvas"
-        height = {
-          size
-        }
-        width = {
-          size
-        }> </canvas>);
-      }
-      return <div > {
-        canvases
-      } </div>;
-    }
 
+    for (let i = 0; i < canvasCount; i += 1) {
+      canvases.push(
+        <canvas
+          key={`kaleidoscope${i}`}
+          className="kaleidoscopeCanvas"
+          height={size}
+          width={size}
+        />
+      );
+    }
+    return <div> {canvases} </div>;
+  }
 }
 
-// let Widget = React.createClass({
 class Widget extends React.Component {
-  constructor() {
-    super();
-    this.state = {
-      audio: false,
-      kaleidoscope
-    };
-  }
+  state = {
+    audio: false,
+    kaleidoscope
+  };
+
   move(e) {
     this.state.kaleidoscope.move(e.target.value, e.target.value);
   }
+
   moveToggle(e) {
     if (e.target.checked) {
       this.state.kaleidoscope.visualizeAudio();
@@ -70,38 +68,40 @@ class Widget extends React.Component {
       });
     }
   }
+
   render() {
     const specs = this.props;
     const size = specs.scopeSize;
-    const src = specs.src;
 
-    return ( <div className="controls">
-      <form className="controls-wrapper">
-        <label htmlFor="audio">Use Audio: </label>
-        <input type = "checkbox"
-          name="audio"
-          className = ""
-          defaultChecked = {
-            this.state.audio
-          }
-          onChange = {
-            this.moveToggle
-          }
-        />
-        <label
-          htmlFor="y-range"
-          className = {'static-range ' + (!this.state.audio ? 'show' : 'hidden')}>Manual: </label>
-          <input type = "range"
-            min = "0"
-            max = {size/5}
-            defaultValue = "0"
-            name = "y-range"
-            onChange = {
-              this.move
-            }
-            className = {'static-range ' + (!this.state.audio ? 'show' : 'hidden')} />
-       </form> </div>
-    )
+    return (
+      <div className="controls">
+        <form className="controls-wrapper">
+          <label htmlFor="audio">Use Audio: </label>
+          <input
+            type="checkbox"
+            name="audio"
+            className=""
+            defaultChecked={this.state.audio}
+            onChange={this.moveToggle.bind(this)}
+          />
+          <label
+            htmlFor="y-range"
+            className={`static-range ${!this.state.audio ? "show" : "hidden"}`}
+          >
+            Manual:{" "}
+          </label>
+          <input
+            type="range"
+            min="0"
+            max={size / 5}
+            defaultValue="0"
+            name="y-range"
+            onChange={this.move.bind(this)}
+            className={`static-range ${!this.state.audio ? "show" : "hidden"}`}
+          />
+        </form>{" "}
+      </div>
+    );
   }
 }
 
@@ -111,15 +111,17 @@ export default class App extends React.Component {
     this.resizeTimer;
     this.state = {
       // kaleidoscope,
-      src: "https://scontent-iad3-1.cdninstagram.com/hphotos-xfa1/t51.2885-15/s640x640/sh0.08/e35/12331649_749127051897387_1820437710_n.jpg",
-      size: this.calculateWidth()
+      src:
+        "https://scontent-iad3-1.cdninstagram.com/hphotos-xfa1/t51.2885-15/s640x640/sh0.08/e35/12331649_749127051897387_1820437710_n.jpg",
+      size: App.calculateWidth()
     };
     kaleidoscope.scopeSize = this.state.size;
     kaleidoscope.prepPage();
   }
 
-  calculateWidth() {
+  static calculateWidth() {
     let rowCount = 3;
+
     canvasCount = 6;
     if (window.outerWidth < 1160) {
       rowCount = 2;
@@ -128,7 +130,7 @@ export default class App extends React.Component {
       rowCount = 1;
       canvasCount = 2;
     }
-    return 2 * Math.floor((window.innerWidth / rowCount) / 2);
+    return 2 * Math.floor(window.innerWidth / rowCount / 2);
   }
 
   // componentDidUpdate() {
@@ -139,7 +141,7 @@ export default class App extends React.Component {
     clearTimeout(this.resizeTimer);
     this.resizeTimer = setTimeout(() => {
       this.setState({
-        size: this.calculateWidth()
+        size: App.calculateWidth()
       });
       kaleidoscope.scopeSize = this.state.size;
       kaleidoscope.prepPage();
@@ -153,19 +155,29 @@ export default class App extends React.Component {
   }
 
   render() {
-    const imgSrc = this.state.src;
     return (
       <div data-img-url="test" id="sckscope">
-        <Widget scopeSize={kaleidoscope.scopeSize}
-          src={this.state.src}
-        />
+        <Widget scopeSize={kaleidoscope.scopeSize} src={this.state.src} />
         <CanvasKscope scopeSize={this.state.size} src={this.state.src} />
         <a href="http://joshhoegen.com">
-          <img className="logo" src="./static/media/jh-logo-80.png" alt="Art by Josh Hoegen" />
+          <img
+            className="logo"
+            src="./static/media/jh-logo-80.png"
+            alt="Art by Josh Hoegen"
+          />
         </a>
         <Header directions="&#8598; Hover over the top left corner to use controls. Check 'Use Audio' with your favorite song!" />
-        <video id="video" height={this.state.size + 100} width={this.state.size + 100} autoPlay={true} />
+        <video
+          id="video"
+          height={this.state.size + 100}
+          width={this.state.size + 100}
+          autoPlay
+        />
       </div>
     );
   }
 }
+
+CanvasKscope.propTypes = {
+  src: PropTypes.string
+};
