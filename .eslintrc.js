@@ -37,6 +37,7 @@ module.exports = {
     'react/prop-types': 'off',
     'react/no-unescaped-entities': 'off',
     'react/no-access-state-in-setstate': 'off',
+    'semi': [2, 'never'],
     'no-unused-expressions': [
       1,
       {
