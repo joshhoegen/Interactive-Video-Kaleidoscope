@@ -47,26 +47,45 @@ class CanvasKscope extends React.Component {
 class Widget extends React.Component {
   state = {
     audio: false,
-    kaleidoscope,
+    cameras: [],
+  }
+
+  componentDidMount() {
+    kaleidoscope.cameraList.then(list => {
+      this.setState({
+        cameras: list,
+      })
+    })
   }
 
   move(e) {
-    this.state.kaleidoscope.move(e.target.value, e.target.value)
+    kaleidoscope.move(e.target.value, e.target.value)
   }
 
   moveToggle(e) {
     if (e.target.checked) {
-      this.state.kaleidoscope.visualizeAudio()
+      kaleidoscope.visualizeAudio()
       this.setState({
         audio: true,
       })
     } else {
-      this.state.kaleidoscope.visualizeAudio(true)
+      kaleidoscope.visualizeAudio(true)
       this.setState({
         audio: false,
         fullscreen: false,
       })
     }
+  }
+
+  changeCamera(event) {
+    const camera = event.target.value
+
+    kaleidoscope.prepVideo(camera)
+    kaleidoscope.move(0, 0)
+    this.setState({
+      audio: false,
+      fullscreen: false,
+    })
   }
 
   render() {
@@ -81,7 +100,7 @@ class Widget extends React.Component {
             type="checkbox"
             name="audio"
             className=""
-            defaultChecked={this.state.audio}
+            checked={this.state.audio}
             onChange={this.moveToggle.bind(this)}
           />
           <label
@@ -99,6 +118,16 @@ class Widget extends React.Component {
             onChange={this.move.bind(this)}
             className={`static-range ${!this.state.audio ? 'show' : 'hidden'}`}
           />
+          <label htmlFor="camera-list">Camera: </label>
+          <select name="camera-list" onChange={this.changeCamera.bind(this)}>
+            {this.state.cameras.map((c, i) => (
+              // console.log(c);
+              <option key={`camera_${i}`} value={i}>
+                {' '}
+                {c.label}{' '}
+              </option>
+            ))}
+          </select>
         </form>{' '}
       </div>
     )
