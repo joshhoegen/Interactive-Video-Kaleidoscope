@@ -194,37 +194,3 @@ body.flash audio {
 .mobile #messages {
   font-size: 14px;
 }
-
-@media (max-width: 600px) {
-  .controls {
-    display: block;
-    z-index: 3;
-    position: fixed;
-    padding: 20px;
-    left: 0;
-    top: 0;
-    min-width: auto;
-  }
-  .controls-wrapper {
-    width: 100%;
-  }
-  .controls .color-picker {
-    display: block;
-    float: none;
-    position: absolute;
-    right: 0px;
-  }
-  .controls label {
-    display: block;
-    width: 25%;
-    height: 30px;
-    margin-top: 20px;
-  }
-
-  .controls input,
-  .controls select {
-    margin-right: 50%;
-    margin-top: 20px;
-    height: 30px;
-  }
-}

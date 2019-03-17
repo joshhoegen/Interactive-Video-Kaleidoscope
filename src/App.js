@@ -48,7 +48,6 @@ class Widget extends React.Component {
   state = {
     audio: false,
     cameras: [],
-    kaleidoscope,
   }
 
   componentDidMount() {
@@ -60,17 +59,17 @@ class Widget extends React.Component {
   }
 
   move(e) {
-    this.state.kaleidoscope.move(e.target.value, e.target.value)
+    kaleidoscope.move(e.target.value, e.target.value)
   }
 
   moveToggle(e) {
     if (e.target.checked) {
-      this.state.kaleidoscope.visualizeAudio()
+      kaleidoscope.visualizeAudio()
       this.setState({
         audio: true,
       })
     } else {
-      this.state.kaleidoscope.visualizeAudio(true)
+      kaleidoscope.visualizeAudio(true)
       this.setState({
         audio: false,
         fullscreen: false,
@@ -83,6 +82,10 @@ class Widget extends React.Component {
 
     kaleidoscope.prepVideo(camera)
     kaleidoscope.move(0, 0)
+    this.setState({
+      audio: false,
+      fullscreen: false,
+    })
   }
 
   render() {
@@ -97,7 +100,7 @@ class Widget extends React.Component {
             type="checkbox"
             name="audio"
             className=""
-            defaultChecked={this.state.audio}
+            checked={this.state.audio}
             onChange={this.moveToggle.bind(this)}
           />
           <label
