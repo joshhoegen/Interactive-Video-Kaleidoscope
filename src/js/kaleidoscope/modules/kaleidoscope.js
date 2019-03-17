@@ -5,6 +5,7 @@ import VisualAudioContext from './audio'
 
 const app = {
   kScope: [],
+  cameraList: LiveVideo.listCameras(),
   canvas: document.getElementsByClassName('kaleidoscopeCanvas'),
   bufferCanvas: document.createElement('canvas'),
   bufferContext() {
@@ -87,7 +88,7 @@ const app = {
     this.move(this.coords[0], this.coords[1])
   },
 
-  prepVideo() {
+  prepVideo(camera = 0) {
     console.log('prep vid')
     window.URL = window.URL || window.webkitURL
     // navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia ||
@@ -97,11 +98,11 @@ const app = {
     const ctx = canvas.getContext('2d')
     const center = this.scopeSize / 2
     const video = document.getElementById('video')
-    const videoLive = new LiveVideo({ video })
+    const videoLive = new LiveVideo({ video, audio: true, camera })
 
     videoLive
       .play()
-      .then(() => {
+      .then(instance => {
         video.muted = true
         const mediaStream = video.srcObject
 

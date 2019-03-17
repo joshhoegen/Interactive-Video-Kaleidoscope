@@ -47,7 +47,16 @@ class CanvasKscope extends React.Component {
 class Widget extends React.Component {
   state = {
     audio: false,
+    cameras: [],
     kaleidoscope,
+  }
+
+  componentDidMount() {
+    kaleidoscope.cameraList.then(list => {
+      this.setState({
+        cameras: list,
+      })
+    })
   }
 
   move(e) {
@@ -67,6 +76,13 @@ class Widget extends React.Component {
         fullscreen: false,
       })
     }
+  }
+
+  changeCamera(event) {
+    const camera = event.target.value
+
+    kaleidoscope.prepVideo(camera)
+    kaleidoscope.move(0, 0)
   }
 
   render() {
@@ -99,6 +115,16 @@ class Widget extends React.Component {
             onChange={this.move.bind(this)}
             className={`static-range ${!this.state.audio ? 'show' : 'hidden'}`}
           />
+          <label htmlFor="camera-list">Camera: </label>
+          <select name="camera-list" onChange={this.changeCamera.bind(this)}>
+            {this.state.cameras.map((c, i) => (
+              // console.log(c);
+              <option key={`camera_${i}`} value={i}>
+                {' '}
+                {c.label}{' '}
+              </option>
+            ))}
+          </select>
         </form>{' '}
       </div>
     )
