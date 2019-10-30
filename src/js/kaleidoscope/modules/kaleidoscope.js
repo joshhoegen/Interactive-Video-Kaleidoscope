@@ -89,7 +89,6 @@ const app = {
   },
 
   prepVideo(camera = 0) {
-    console.log('prep vid')
     window.URL = window.URL || window.webkitURL
     // navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia ||
     //   navigator.mozGetUserMedia || navigator.msGetUserMedia;

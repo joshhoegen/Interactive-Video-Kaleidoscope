@@ -1,3 +1,4 @@
+/* eslint-disable class-methods-use-this */
 import React from 'react'
 import PropTypes from 'prop-types'
 
@@ -5,8 +6,6 @@ import kaleidoscope from './js/kaleidoscope/modules/kaleidoscope'
 import Header from './js/jhHeader'
 
 import './css/main.scss'
-
-let canvasCount = 6
 
 class CanvasKscope extends React.Component {
   constructor(props) {
@@ -30,7 +29,7 @@ class CanvasKscope extends React.Component {
     const size = specs.scopeSize
     const canvases = []
 
-    for (let i = 0; i < canvasCount; i += 1) {
+    for (let i = 0; i < this.props.canvasCount; i += 1) {
       canvases.push(
         <canvas
           key={`kaleidoscope${i}`}
@@ -45,9 +44,13 @@ class CanvasKscope extends React.Component {
 }
 
 class Widget extends React.Component {
-  state = {
-    audio: false,
-    cameras: [],
+  constructor(props) {
+    super(props)
+    this.state = {
+      audio: false,
+      cameras: [],
+      canvasCount: 6,
+    }
   }
 
   componentDidMount() {
@@ -88,6 +91,14 @@ class Widget extends React.Component {
     })
   }
 
+  changeCount(e) {
+    console.log(e.target.value)
+    // this.setState({
+    //   canvasCount: e.target.value,
+    // })
+    this.props.handleChangeCountValue(e.target.value)
+  }
+
   render() {
     const specs = this.props
     const size = specs.scopeSize
@@ -118,6 +129,22 @@ class Widget extends React.Component {
             onChange={this.move.bind(this)}
             className={`static-range ${!this.state.audio ? 'show' : 'hidden'}`}
           />
+          <label
+            htmlFor="count-range"
+            className={`static-range ${!this.state.audio ? 'show' : 'hidden'}`}
+          >
+            Change Count:{' '}
+          </label>
+          <input
+            type="range"
+            min="6"
+            max="12"
+            step="2"
+            defaultValue="0"
+            name="count-range"
+            onChange={this.changeCount.bind(this)}
+            className="static-range"
+          />
           <label htmlFor="camera-list">Camera: </label>
           <select name="camera-list" onChange={this.changeCamera.bind(this)}>
             {this.state.cameras.map((c, i) => (
@@ -143,6 +170,7 @@ export default class App extends React.Component {
       src:
         'https://scontent-iad3-1.cdninstagram.com/hphotos-xfa1/t51.2885-15/s640x640/sh0.08/e35/12331649_749127051897387_1820437710_n.jpg',
       size: App.calculateWidth(),
+      canvasCount: 6,
     }
     kaleidoscope.scopeSize = this.state.size
     kaleidoscope.prepPage()
@@ -151,13 +179,12 @@ export default class App extends React.Component {
   static calculateWidth() {
     let rowCount = 3
 
-    canvasCount = 6
     if (window.outerWidth < 1160) {
       rowCount = 2
     }
     if (window.outerWidth < 600) {
       rowCount = 1
-      canvasCount = 2
+      this.state.canvasCount = 2
     }
     return 2 * Math.floor(window.innerWidth / rowCount / 2)
   }
@@ -183,11 +210,32 @@ export default class App extends React.Component {
     kaleidoscope.move(0, 0)
   }
 
+  handleChangeCountValue(newCanvasCount) {
+    const count = parseInt(newCanvasCount)
+    console.log(count)
+    console.log(this)
+    console.log(0.6666666667 * count * 100)
+    this.setState({
+      canvasCount: count,
+    })
+    // 0.67 * newCanvasCount * 100
+    kaleidoscope.scopeSize = 0.67 * count * 100
+  }
+
   render() {
     return (
       <div data-img-url="test" id="sckscope">
-        <Widget scopeSize={kaleidoscope.scopeSize} src={this.state.src} />
-        <CanvasKscope scopeSize={this.state.size} src={this.state.src} />
+        <Widget
+          scopeSize={kaleidoscope.scopeSize}
+          src={this.state.src}
+          // eslint-disable-next-line react/jsx-no-bind
+          handleChangeCountValue={this.handleChangeCountValue.bind(this)}
+        />
+        <CanvasKscope
+          canvasCount={this.state.canvasCount}
+          scopeSize={this.state.size}
+          src={this.state.src}
+        />
         <a href="http://joshhoegen.com">
           <img className="logo" src="./static/media/jh-logo-80.png" alt="Art by Josh Hoegen" />
         </a>
