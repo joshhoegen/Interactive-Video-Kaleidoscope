@@ -1,3 +1,4 @@
+/* eslint-disable react/jsx-no-bind */
 import React from 'react'
 import PropTypes from 'prop-types'
 
@@ -45,10 +46,17 @@ class CanvasKscope extends React.Component {
 }
 
 class Widget extends React.Component {
-  state = {
-    audio: false,
-    kaleidoscope,
+  constructor(props) {
+    super(props)
+    this.state = {
+      audio: false,
+      kaleidoscope,
+    }
   }
+  // state = {
+  //   audio: false,
+  //   kaleidoscope,
+  // }
 
   move(e) {
     this.state.kaleidoscope.move(e.target.value, e.target.value)
@@ -67,6 +75,10 @@ class Widget extends React.Component {
         fullscreen: false,
       })
     }
+  }
+
+  changeCount(e) {
+    this.props.handleCanvasCount(e.target.value)
   }
 
   render() {
@@ -99,6 +111,19 @@ class Widget extends React.Component {
             onChange={this.move.bind(this)}
             className={`static-range ${!this.state.audio ? 'show' : 'hidden'}`}
           />
+          <label htmlFor="count-range" className="static-range">
+            Recursion:{' '}
+          </label>
+          <input
+            type="range"
+            min="6"
+            max="12"
+            step="2"
+            defaultValue={canvasCount}
+            name="count-range"
+            onChange={this.changeCount.bind(this)}
+            className="static-range"
+          />
         </form>{' '}
       </div>
     )
@@ -111,37 +136,43 @@ export default class App extends React.Component {
     this.resizeTimer
     this.state = {
       // kaleidoscope,
-      src:
-        'https://scontent-iad3-1.cdninstagram.com/hphotos-xfa1/t51.2885-15/s640x640/sh0.08/e35/12331649_749127051897387_1820437710_n.jpg',
+      src: 'https://live.staticflickr.com/7420/9125709547_0a1fb3235c_c.jpg',
       size: App.calculateWidth(),
     }
     kaleidoscope.scopeSize = this.state.size
     kaleidoscope.prepPage()
   }
 
-  static calculateWidth() {
-    let rowCount = 3
+  static calculateWidth(count) {
+    let rowCount = count / 2 || 3
+    // if adding more, need to figure out a scale... eg. Greater than 12 need 2.5ish
+    const multiplier = count <= 12 ? 2 : 1.5
 
-    canvasCount = 6
-    if (window.outerWidth < 1160) {
-      rowCount = 2
-    }
+    canvasCount = count * multiplier || 6
+    // if (window.outerWidth < 1160) {
+    //   rowCount = 2
+    // }
     if (window.outerWidth < 600) {
       rowCount = 1
       canvasCount = 2
     }
-    return 2 * Math.floor(window.innerWidth / rowCount / 2)
+    return 2 * Math.ceil(window.innerWidth / rowCount / 2)
   }
 
   // componentDidUpdate() {
-  //   window.addEventListener("resize", this.updateDimensions.bind(this))
+  //   window.addEventListener('resize', this.updateDimensions.bind(this))
   // }
 
-  updateDimensions() {
+  updateDimensions(count) {
+    // this.setState({ size: count })
+    const finalCount = count || canvasCount
+
+    console.log(count, canvasCount)
+
     clearTimeout(this.resizeTimer)
     this.resizeTimer = setTimeout(() => {
       this.setState({
-        size: App.calculateWidth(),
+        size: App.calculateWidth(finalCount),
       })
       kaleidoscope.scopeSize = this.state.size
       kaleidoscope.prepPage()
@@ -157,7 +188,11 @@ export default class App extends React.Component {
   render() {
     return (
       <div data-img-url="test" id="sckscope">
-        <Widget scopeSize={kaleidoscope.scopeSize} src={this.state.src} />
+        <Widget 
+          handleCanvasCount={this.updateDimensions.bind(this)} 
+          scopeSize={kaleidoscope.scopeSize}
+          src={this.state.src}
+        />
         <CanvasKscope scopeSize={this.state.size} src={this.state.src} />
         <a href="http://joshhoegen.com">
           <img className="logo" src="./static/media/jh-logo-80.png" alt="Art by Josh Hoegen" />
