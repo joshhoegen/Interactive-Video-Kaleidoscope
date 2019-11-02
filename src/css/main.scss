@@ -8,7 +8,6 @@ body {
   color: #fff;
   text-shadow: 2px 1px 6px #000;
   background-color: #333;
-
 }
 #video {
   // display: none;
@@ -29,10 +28,12 @@ body.fullscreen {
   max-width: none;
   overflow: hidden;
 }
-.fullscreen #head, .fullscreen #external-links {
+.fullscreen #head,
+.fullscreen #external-links {
   display: none;
 }
-.fullscreen #sckscope, .fullscreen #container {
+.fullscreen #sckscope,
+.fullscreen #container {
   width: auto;
   max-width: none;
   text-align: left;
@@ -110,7 +111,8 @@ a {
       transition: visibility 0s, opacity 0.5s ease-in-out;
     }
   }
-  label, span {
+  label,
+  span {
     float: left;
     color: #fff;
     margin: 5px 2% 0 0;
@@ -124,6 +126,9 @@ a {
     display: inline-block;
     top: -1px;
     position: relative;
+  }
+  select {
+    margin-top: 4px;
   }
 }
 .hidden {
@@ -162,5 +167,40 @@ a {
   100% {
     opacity: 0;
     visibility: hidden;
+  }
+}
+
+@media (max-width: 600px) {
+  .controls {
+    display: block;
+    z-index: 3;
+    position: fixed;
+    padding: 20px;
+    left: 0;
+    top: 0;
+    min-width: auto;
+  }
+  .controls-wrapper {
+    width: 100%;
+  }
+  .controls .color-picker {
+    display: block;
+    float: none;
+    position: absolute;
+    right: 0px;
+  }
+  .controls label {
+    display: block;
+    clear: both;
+    width: 25%;
+    height: 30px;
+    margin-top: 20px;
+  }
+
+  .controls input,
+  .controls select {
+    margin-right: 50%;
+    margin-top: 20px;
+    height: 30px;
   }
 }

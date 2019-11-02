@@ -2,12 +2,11 @@ body {
   padding: 0;
   margin: auto;
   width: auto;
-  font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;
-  background: url("../image/bg.jpg") #000;
+  font: 14px 'Lucida Grande', Helvetica, Arial, sans-serif;
+  background: url('../image/bg.jpg') #000;
   color: #fff;
   text-shadow: 2px 1px 6px #000;
   background-color: #333;
-  
 }
 
 #container {
@@ -29,10 +28,12 @@ body.fullscreen {
   max-width: none;
   overflow: hidden;
 }
-.fullscreen #head, .fullscreen #external-links {
+.fullscreen #head,
+.fullscreen #external-links {
   display: none;
 }
-.fullscreen #sckscope, .fullscreen #container {
+.fullscreen #sckscope,
+.fullscreen #container {
   width: auto;
   max-width: none;
   text-align: left;
@@ -80,7 +81,7 @@ a {
 .track-info {
   display: none;
   background: #000;
-  background: rgba(0, 0, 0, .6);
+  background: rgba(0, 0, 0, 0.6);
   padding: 20px;
   min-height: 100px;
 }
@@ -129,18 +130,20 @@ form span {
   float: left;
   margin: 0 10px 0 0;
 }
-form input[type=text] {
+form input[type='text'] {
   margin: 0px;
   width: 400px;
 }
-input[type=submit], input[type=button] {
+input[type='submit'],
+input[type='button'] {
   background: #fff;
   color: #09f;
   border: 1px solid #00b7ff;
   border-radius: 4px;
   padding: 4px 10px;
 }
-input[type=submit]:hover, input[type=button]:hover {
+input[type='submit']:hover,
+input[type='button']:hover {
   background: #fff;
   color: #333;
   border: 1px solid #333;
@@ -154,7 +157,8 @@ input[type=submit]:hover, input[type=button]:hover {
 #video {
   position: absolute;
 }
-.vid-img {}
+.vid-img {
+}
 audio {
   position: absolute;
   right: 5px;

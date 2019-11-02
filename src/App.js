@@ -46,12 +46,26 @@ class CanvasKscope extends React.Component {
 }
 
 class Widget extends React.Component {
+<<<<<<< HEAD
   constructor(props) {
     super(props)
     this.state = {
       audio: false,
       kaleidoscope,
     }
+=======
+  state = {
+    audio: false,
+    cameras: [],
+  }
+
+  componentDidMount() {
+    kaleidoscope.cameraList.then(list => {
+      this.setState({
+        cameras: list,
+      })
+    })
+>>>>>>> 22823e396513b5590a966bfac6de7b7264f09a1f
   }
   // state = {
   //   audio: false,
@@ -59,17 +73,17 @@ class Widget extends React.Component {
   // }
 
   move(e) {
-    this.state.kaleidoscope.move(e.target.value, e.target.value)
+    kaleidoscope.move(e.target.value, e.target.value)
   }
 
   moveToggle(e) {
     if (e.target.checked) {
-      this.state.kaleidoscope.visualizeAudio()
+      kaleidoscope.visualizeAudio()
       this.setState({
         audio: true,
       })
     } else {
-      this.state.kaleidoscope.visualizeAudio(true)
+      kaleidoscope.visualizeAudio(true)
       this.setState({
         audio: false,
         fullscreen: false,
@@ -77,8 +91,20 @@ class Widget extends React.Component {
     }
   }
 
+<<<<<<< HEAD
   changeCount(e) {
     this.props.handleCanvasCount(e.target.value)
+=======
+  changeCamera(event) {
+    const camera = event.target.value
+
+    kaleidoscope.prepVideo(camera)
+    kaleidoscope.move(0, 0)
+    this.setState({
+      audio: false,
+      fullscreen: false,
+    })
+>>>>>>> 22823e396513b5590a966bfac6de7b7264f09a1f
   }
 
   render() {
@@ -93,7 +119,7 @@ class Widget extends React.Component {
             type="checkbox"
             name="audio"
             className=""
-            defaultChecked={this.state.audio}
+            checked={this.state.audio}
             onChange={this.moveToggle.bind(this)}
           />
           <label
@@ -111,6 +137,7 @@ class Widget extends React.Component {
             onChange={this.move.bind(this)}
             className={`static-range ${!this.state.audio ? 'show' : 'hidden'}`}
           />
+<<<<<<< HEAD
           <label htmlFor="count-range" className="static-range">
             Recursion:{' '}
           </label>
@@ -124,6 +151,18 @@ class Widget extends React.Component {
             onChange={this.changeCount.bind(this)}
             className="static-range"
           />
+=======
+          <label htmlFor="camera-list">Camera: </label>
+          <select name="camera-list" onChange={this.changeCamera.bind(this)}>
+            {this.state.cameras.map((c, i) => (
+              // console.log(c);
+              <option key={`camera_${i}`} value={i}>
+                {' '}
+                {c.label}{' '}
+              </option>
+            ))}
+          </select>
+>>>>>>> 22823e396513b5590a966bfac6de7b7264f09a1f
         </form>{' '}
       </div>
     )
