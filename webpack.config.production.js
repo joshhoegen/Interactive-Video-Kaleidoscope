@@ -1,7 +1,7 @@
 const webpack = require('webpack')
 const path = require('path')
 const CleanWebpackPlugin = require('clean-webpack-plugin')
-const ExtractTextPlugin = require('extract-text-webpack-plugin')
+const MiniCssExtractPlugin = require('mini-css-extract-plugin')
 
 module.exports = {
   mode: 'production',
@@ -12,11 +12,11 @@ module.exports = {
     publicPath: '/',
   },
   resolve: {
-    extensions: ['', '.js'],
+    extensions: ['.js'],
   },
   devtool: 'source-map',
   plugins: [
-    new webpack.optimize.OccurenceOrderPlugin(),
+    // new webpack.optimize.OccurenceOrderPlugin(),
     // new webpack.DefinePlugin({
     //   'process.env': {
     //     NODE_ENV: JSON.stringify('production'),
@@ -32,7 +32,14 @@ module.exports = {
       verbose: true,
       dry: false, // true for simulation
     }),
-    new ExtractTextPlugin('css/main.css'),
+    // new ExtractTextPlugin('css/main.css'),
+    new MiniCssExtractPlugin({
+      // Options similar to the same options in webpackOptions.output
+      // all options are optional
+      filename: 'css/[name].css',
+      chunkFilename: '[id].css',
+      ignoreOrder: false, // Enable to remove warnings about conflicting order
+    }),
   ],
   module: {
     rules: [
@@ -42,9 +49,18 @@ module.exports = {
         include: path.join(__dirname, 'src'),
       },
       {
-        // https://github.com/jtangelder/sass-loader
-        test: /\.scss$/,
-        loader: ExtractTextPlugin.extract('css!sass'),
+        test: /\.(sa|sc|c)ss$/,
+        use: [
+          {
+            loader: MiniCssExtractPlugin.loader,
+            options: {
+              hmr: process.env.NODE_ENV === 'development',
+            },
+          },
+          'css-loader',
+          // 'postcss-loader',
+          'sass-loader',
+        ],
       },
       {
         test: /\.(jpe?g|gif|png)$/,
