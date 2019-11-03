@@ -89,7 +89,6 @@ const app = {
   },
 
   prepVideo(camera = 0) {
-    console.log('prep vid')
     window.URL = window.URL || window.webkitURL
     // navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia ||
     //   navigator.mozGetUserMedia || navigator.msGetUserMedia;
@@ -102,7 +101,7 @@ const app = {
 
     videoLive
       .play()
-      .then(instance => {
+      .then(() => {
         video.muted = true
         const mediaStream = video.srcObject
 
@@ -115,6 +114,7 @@ const app = {
         app.snapshot(video, canvas, ctx, mediaStream, center)
       })
       .catch(e => {
+        // eslint-disable-next-line no-console
         console.log(e)
       })
   },
