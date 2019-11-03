@@ -1,3 +1,4 @@
+/* eslint-disable func-names */
 const drawKaleidoscope = function(ctx, img, imgX, imgY, mask, bCan, bCon) {
   const sqSide = mask / 2
   const sqDiag = Math.sqrt(2 * sqSide * sqSide)

@@ -8,6 +8,7 @@ import Header from './js/jhHeader'
 import './css/main.scss'
 
 let canvasCount = 6
+let recursionCount = 6
 
 class CanvasKscope extends React.Component {
   constructor(props) {
@@ -46,26 +47,12 @@ class CanvasKscope extends React.Component {
 }
 
 class Widget extends React.Component {
-<<<<<<< HEAD
   constructor(props) {
     super(props)
     this.state = {
       audio: false,
       kaleidoscope,
     }
-=======
-  state = {
-    audio: false,
-    cameras: [],
-  }
-
-  componentDidMount() {
-    kaleidoscope.cameraList.then(list => {
-      this.setState({
-        cameras: list,
-      })
-    })
->>>>>>> 22823e396513b5590a966bfac6de7b7264f09a1f
   }
   // state = {
   //   audio: false,
@@ -73,17 +60,17 @@ class Widget extends React.Component {
   // }
 
   move(e) {
-    kaleidoscope.move(e.target.value, e.target.value)
+    this.state.kaleidoscope.move(e.target.value, e.target.value)
   }
 
   moveToggle(e) {
     if (e.target.checked) {
-      kaleidoscope.visualizeAudio()
+      this.state.kaleidoscope.visualizeAudio()
       this.setState({
         audio: true,
       })
     } else {
-      kaleidoscope.visualizeAudio(true)
+      this.state.kaleidoscope.visualizeAudio(true)
       this.setState({
         audio: false,
         fullscreen: false,
@@ -91,25 +78,36 @@ class Widget extends React.Component {
     }
   }
 
-<<<<<<< HEAD
   changeCount(e) {
-    this.props.handleCanvasCount(e.target.value)
-=======
-  changeCamera(event) {
-    const camera = event.target.value
+    const val = e.target.value
 
-    kaleidoscope.prepVideo(camera)
-    kaleidoscope.move(0, 0)
-    this.setState({
-      audio: false,
-      fullscreen: false,
-    })
->>>>>>> 22823e396513b5590a966bfac6de7b7264f09a1f
+    recursionCount = val
+    this.props.handleCanvasCount(val)
   }
 
   render() {
     const specs = this.props
     const size = specs.scopeSize
+    const recursionInput =
+      window.outerWidth > 600 ? (
+        <span>
+          <label htmlFor="count-range" className="static-range">
+            Recursion:{' '}
+          </label>
+          <input
+            type="range"
+            min="6"
+            max="12"
+            step="2"
+            defaultValue={recursionCount}
+            name="count-range"
+            onChange={this.changeCount.bind(this)}
+            className="static-range"
+          />
+        </span>
+      ) : (
+        ''
+      )
 
     return (
       <div className="controls">
@@ -119,7 +117,7 @@ class Widget extends React.Component {
             type="checkbox"
             name="audio"
             className=""
-            checked={this.state.audio}
+            defaultChecked={this.state.audio}
             onChange={this.moveToggle.bind(this)}
           />
           <label
@@ -137,32 +135,7 @@ class Widget extends React.Component {
             onChange={this.move.bind(this)}
             className={`static-range ${!this.state.audio ? 'show' : 'hidden'}`}
           />
-<<<<<<< HEAD
-          <label htmlFor="count-range" className="static-range">
-            Recursion:{' '}
-          </label>
-          <input
-            type="range"
-            min="6"
-            max="12"
-            step="2"
-            defaultValue={canvasCount}
-            name="count-range"
-            onChange={this.changeCount.bind(this)}
-            className="static-range"
-          />
-=======
-          <label htmlFor="camera-list">Camera: </label>
-          <select name="camera-list" onChange={this.changeCamera.bind(this)}>
-            {this.state.cameras.map((c, i) => (
-              // console.log(c);
-              <option key={`camera_${i}`} value={i}>
-                {' '}
-                {c.label}{' '}
-              </option>
-            ))}
-          </select>
->>>>>>> 22823e396513b5590a966bfac6de7b7264f09a1f
+          {recursionInput}
         </form>{' '}
       </div>
     )
@@ -172,46 +145,40 @@ class Widget extends React.Component {
 export default class App extends React.Component {
   constructor() {
     super()
-    this.resizeTimer
+    this.resizeTimer = null
     this.state = {
       // kaleidoscope,
       src: 'https://live.staticflickr.com/7420/9125709547_0a1fb3235c_c.jpg',
       size: App.calculateWidth(),
+      listenerFunc: this.updateDimensions.bind(this),
     }
     kaleidoscope.scopeSize = this.state.size
     kaleidoscope.prepPage()
   }
 
   static calculateWidth(count) {
-    let rowCount = count / 2 || 3
+    let activeCount = count || recursionCount
+    let rowCount = activeCount / 2 || 3
     // if adding more, need to figure out a scale... eg. Greater than 12 need 2.5ish
-    const multiplier = count <= 12 ? 2 : 1.5
+    const multiplier = activeCount <= 12 ? 2 : 1.5
 
-    canvasCount = count * multiplier || 6
-    // if (window.outerWidth < 1160) {
-    //   rowCount = 2
-    // }
     if (window.outerWidth < 600) {
       rowCount = 1
-      canvasCount = 2
+      // recursionCount = 2
+      activeCount = 2
     }
-    return 2 * Math.ceil(window.innerWidth / rowCount / 2)
+
+    canvasCount = activeCount * multiplier
+    // The canvases are tweaked to handle a hairline mismatch with exact calculations,
+    // Therefore, we add 1px
+    return Math.ceil(2 * (window.innerWidth / rowCount / 2))
   }
 
-  // componentDidUpdate() {
-  //   window.addEventListener('resize', this.updateDimensions.bind(this))
-  // }
-
-  updateDimensions(count) {
-    // this.setState({ size: count })
-    const finalCount = count || canvasCount
-
-    console.log(count, canvasCount)
-
+  updateDimensions() {
     clearTimeout(this.resizeTimer)
     this.resizeTimer = setTimeout(() => {
       this.setState({
-        size: App.calculateWidth(finalCount),
+        size: App.calculateWidth(),
       })
       kaleidoscope.scopeSize = this.state.size
       kaleidoscope.prepPage()
@@ -219,16 +186,20 @@ export default class App extends React.Component {
   }
 
   componentDidMount() {
-    window.addEventListener('resize', this.updateDimensions.bind(this))
+    window.addEventListener('resize', this.state.listenerFunc)
     kaleidoscope.prepVideo()
     kaleidoscope.move(0, 0)
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener('resize', this.state.listenerFunc, true)
   }
 
   render() {
     return (
       <div data-img-url="test" id="sckscope">
-        <Widget 
-          handleCanvasCount={this.updateDimensions.bind(this)} 
+        <Widget
+          handleCanvasCount={this.updateDimensions.bind(this)}
           scopeSize={kaleidoscope.scopeSize}
           src={this.state.src}
         />
