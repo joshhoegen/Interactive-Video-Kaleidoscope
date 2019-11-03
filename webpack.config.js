@@ -1,54 +1,55 @@
-const webpack = require('webpack');
-const path = require('path');
-var CleanWebpackPlugin = require('clean-webpack-plugin');
+const webpack = require('webpack')
+const path = require('path')
+const CleanWebpackPlugin = require('clean-webpack-plugin')
 
-var app_root = 'src';
+// const app_root = 'src'
 
 module.exports = {
-  app_root: app_root,
+  mode: 'development',
+  // app_root,
   entry: [
     'webpack-dev-server/client?http://localhost:5000',
     'webpack/hot/dev-server',
-    './src/index'
+    './src/index',
   ],
   output: {
     path: __dirname,
     filename: 'bundle.js',
-    publicPath: '/static/'
+    publicPath: '/static/',
   },
   resolve: {
-    extensions: ['', '.js']
+    extensions: ['.js'],
   },
   devtool: 'eval-source-map',
   plugins: [
     new webpack.HotModuleReplacementPlugin(),
-    new webpack.NoErrorsPlugin(),
+    // new webpack.NoEmitOnErrorsPlugin(),
     new CleanWebpackPlugin(['css/main.css', 'js/bundle.js'], {
-      root: __dirname + '/static',
+      root: `${__dirname}/static`,
       verbose: true,
       dry: false, // true for simulation
     }),
   ],
   module: {
-    loaders: [
+    rules: [
       {
         test: /\.jsx?$/,
-        loaders: ['babel'],
-        include: path.join(__dirname, 'src')
+        loaders: ['babel-loader'],
+        include: path.join(__dirname, 'src'),
       },
       {
         // https://github.com/jtangelder/sass-loader
         test: /\.scss$/,
-        loaders: ['style', 'css', 'sass'],
+        loaders: ['style-loader', 'css-loader', 'sass-loader'],
       },
       {
         test: /\.css$/,
-        loaders: ['style', 'css'],
+        loaders: ['style-loader', 'css-loader'],
       },
       {
         test: /\.(jpe?g|gif|png)$/,
-        loader: 'file-loader?name=public/media[name].[ext]'
-      }
-    ]
-  }
-};
+        loader: 'file-loader?name=public/media[name].[ext]',
+      },
+    ],
+  },
+}
