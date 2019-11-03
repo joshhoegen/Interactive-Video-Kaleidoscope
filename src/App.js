@@ -90,7 +90,7 @@ class Widget extends React.Component {
     const size = specs.scopeSize
     const recursionInput =
       window.outerWidth > 600 ? (
-        <span>
+        <span className="reset-span">
           <label htmlFor="count-range" className="static-range">
             Recursion:{' '}
           </label>
