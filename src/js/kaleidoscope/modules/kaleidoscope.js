@@ -12,6 +12,7 @@ const app = {
     return this.bufferCanvas.getContext('2d')
   },
   canvasActive: 1,
+  rotate: null,
   audio: {},
   listener: null,
   scopeSize: 400,
@@ -30,15 +31,16 @@ const app = {
 
   move(x, y) {
     for (let i = 0; i < this.canvas.length; i += 1) {
-      const ctx = app.canvas[i].getContext('2d')
+      const ctx = this.canvas[i].getContext('2d')
       const img = drawKaleidoscope(
         ctx,
         app.preCanvas,
         x,
         y,
-        app.scopeSize,
+        this.scopeSize,
         this.bufferCanvas,
         this.bufferContext(),
+        this.rotate,
       )
 
       ctx.drawImage(img, 0, 0)
@@ -48,7 +50,9 @@ const app = {
 
   visualizeAudio(off) {
     const ch = new Uint8Array(this.vac.ch.analyser.frequencyBinCount)
+
     let x
+
     let y
 
     if (off) {
@@ -71,7 +75,7 @@ const app = {
     this.preCanvas.id = 'preCanvas'
     this.preCanvas.width = this.scopeSize
     this.preCanvas.height = this.scopeSize
-    this.preCanvas.style.cssText = 'display: none'
+    // this.preCanvas.style.cssText = 'display: none'
     this.canvas = this.canvas || document.getElementsByClassName('kaleidoscopeCanvas')
     document.body.appendChild(this.preCanvas)
     for (i = 0; i < this.canvas.length; i += 1) {

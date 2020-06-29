@@ -8,6 +8,7 @@ import Header from './js/jhHeader'
 import './css/main.scss'
 
 let canvasCount = 6
+
 let recursionCount = 6
 
 class CanvasKscope extends React.Component {
@@ -51,6 +52,7 @@ class Widget extends React.Component {
     super(props)
     this.state = {
       audio: false,
+      rotate: false,
       kaleidoscope,
     }
   }
@@ -75,6 +77,22 @@ class Widget extends React.Component {
         audio: false,
         fullscreen: false,
       })
+    }
+  }
+
+  rotateToggle(e) {
+    if (e.target.checked) {
+      // this.state.kaleidoscope.visualizeAudio()
+      this.setState({
+        rotate: true,
+      })
+      kaleidoscope.rotate = 0.001
+    } else {
+      // this.state.kaleidoscope.visualizeAudio(true)
+      this.setState({
+        rotate: false,
+      })
+      kaleidoscope.rotate = null
     }
   }
 
@@ -120,6 +138,14 @@ class Widget extends React.Component {
             defaultChecked={this.state.audio}
             onChange={this.moveToggle.bind(this)}
           />
+          <label htmlFor="audio">Rotate: </label>
+          <input
+            type="checkbox"
+            name="rotate"
+            className=""
+            defaultChecked={this.state.rotate}
+            onChange={this.rotateToggle.bind(this)}
+          />
           <label
             htmlFor="y-range"
             className={`static-range ${!this.state.audio ? 'show' : 'hidden'}`}
@@ -158,6 +184,7 @@ export default class App extends React.Component {
 
   static calculateWidth(count) {
     let activeCount = count || recursionCount
+
     let rowCount = activeCount / 2 || 3
     // if adding more, need to figure out a scale... eg. Greater than 12 need 2.5ish
     const multiplier = activeCount <= 12 ? 2 : 1.5
