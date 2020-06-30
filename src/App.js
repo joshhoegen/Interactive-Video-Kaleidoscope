@@ -81,18 +81,20 @@ class Widget extends React.Component {
   }
 
   rotateToggle(e) {
-    if (e.target.checked) {
+    const val = e.target.value
+
+    if (val > 0) {
       // this.state.kaleidoscope.visualizeAudio()
       this.setState({
-        rotate: true,
+        rotate: val,
       })
-      kaleidoscope.rotate = 0.001
+      kaleidoscope.rotate = val
     } else {
       // this.state.kaleidoscope.visualizeAudio(true)
       this.setState({
-        rotate: false,
+        rotate: 0,
       })
-      kaleidoscope.rotate = null
+      kaleidoscope.rotate = 0
     }
   }
 
@@ -140,12 +142,16 @@ class Widget extends React.Component {
           />
           <label htmlFor="audio">Rotate: </label>
           <input
-            type="checkbox"
+            type="range"
+            min={0.0}
+            max={0.01}
+            step={0.0001}
             name="rotate"
             className=""
-            defaultChecked={this.state.rotate}
+            defaultValue={0}
             onChange={this.rotateToggle.bind(this)}
           />
+          {recursionInput}
           <label
             htmlFor="y-range"
             className={`static-range ${!this.state.audio ? 'show' : 'hidden'}`}
@@ -161,7 +167,6 @@ class Widget extends React.Component {
             onChange={this.move.bind(this)}
             className={`static-range ${!this.state.audio ? 'show' : 'hidden'}`}
           />
-          {recursionInput}
         </form>{' '}
       </div>
     )
