@@ -1,9 +1,8 @@
 /* eslint-disable func-names */
 const drawKaleidoscope = function(ctx, img, imgX, imgY, mask, bCan, bCon, isRotate) {
   // TODO: USE: // bufferContext.setTransform(1, 0, 0, 1, 0, 0)
-  const sqSide = mask / 2
-  const sqDiag = Math.sqrt(2 * sqSide * sqSide)
   const c = mask / 2
+  const sqDiag = Math.sqrt(2 * c * c)
   const centerSide = 0
   const bufferCanvas = bCan
   const bufferContext = bCon
@@ -21,17 +20,7 @@ const drawKaleidoscope = function(ctx, img, imgX, imgY, mask, bCan, bCon, isRota
 
   function drawImg() {
     // console.log(time)
-    bufferContext.drawImage(
-      img,
-      imgX,
-      imgY,
-      maskSide,
-      maskSide,
-      centerSide,
-      centerSide,
-      sqSide,
-      sqSide,
-    )
+    bufferContext.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, c, c)
   }
 
   bufferCanvas.height = mask
@@ -93,7 +82,7 @@ const drawKaleidoscope = function(ctx, img, imgX, imgY, mask, bCan, bCon, isRota
   bufferContext.save()
   bufferContext.moveTo(c, c)
   bufferContext.lineTo(c + c, c)
-  bufferContext.lineTo(c + c, c + sqSide)
+  bufferContext.lineTo(c + c, c + c)
   bufferContext.lineTo(c, c)
   bufferContext.clip()
   bufferContext.translate(c, c)

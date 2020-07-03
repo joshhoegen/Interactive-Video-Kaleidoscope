@@ -34,7 +34,7 @@ const app = {
       const ctx = this.canvas[i].getContext('2d')
       const img = drawKaleidoscope(
         ctx,
-        app.preCanvas,
+        this.preCanvas,
         x,
         y,
         this.scopeSize,
@@ -61,11 +61,11 @@ const app = {
     }
     this.vac.resume()
     this.vac.javascriptNode.onaudioprocess = () => {
-      app.vac.ch.analyser.getByteFrequencyData(ch)
-      x = app.vac.getAverageVolume(ch) / 1.9 // < this.scopeSize ? average : (average * 2) + 100; //x = x < scopeSize ? x - 60 : scopeSize;
+      this.vac.ch.analyser.getByteFrequencyData(ch)
+      x = this.vac.getAverageVolume(ch) / 1.9 // < this.scopeSize ? average : (average * 2) + 100; //x = x < scopeSize ? x - 60 : scopeSize;
       // if we want to split channels, use analyser2
       y = x
-      app.move(x, y)
+      this.move(x, y)
     }
   },
 
@@ -110,12 +110,12 @@ const app = {
         const mediaStream = video.srcObject
 
         video.autoplay = true
-        app.video = video
-        app.audioActive = mediaStream
-        app.mediaStream = mediaStream
-        app.vac = new VisualAudioContext(mediaStream, mediaStream)
+        this.video = video
+        this.audioActive = mediaStream
+        this.mediaStream = mediaStream
+        this.vac = new VisualAudioContext(mediaStream, mediaStream)
 
-        app.snapshot(video, canvas, ctx, mediaStream, center)
+        this.snapshot(video, canvas, ctx, mediaStream, center)
       })
       .catch(e => {
         // eslint-disable-next-line no-console
@@ -136,11 +136,11 @@ const app = {
   },
 
   snapshot(video, preCanvas, ctx, stream, center) {
-    window.requestAnimationFrame(() => {
-      app.snapshot(video, preCanvas, ctx, stream, center)
-    })
     ctx.drawImage(video, 0, 0, center, center)
     this.move(this.coords[0], this.coords[1])
+    window.requestAnimationFrame(() => {
+      this.snapshot(video, preCanvas, ctx, stream, center)
+    })
   },
 }
 

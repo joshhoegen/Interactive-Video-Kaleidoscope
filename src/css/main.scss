@@ -80,6 +80,10 @@ a {
   // -o-transform: scale(-1, 1);
   // transform: scale(-1, 1);
 }
+#preCanvas {
+  display: none;
+}
+
 #sckscope canvas {
   margin: 0px -1px -1px;
   position: relative;
