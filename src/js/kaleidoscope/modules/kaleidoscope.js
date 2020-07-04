@@ -1,6 +1,6 @@
 import LiveVideo from 'live-video'
 
-import drawKaleidoscope from './drawKaleidoscope'
+import Kaleidoscope from './drawKaleidoscope'
 import VisualAudioContext from './audio'
 
 const app = {
@@ -21,6 +21,7 @@ const app = {
   vac: null,
   audioCache: {},
   video: null,
+  Kaleidoscope: null,
   coords() {
     const coord = this.scopeSize / 4
 
@@ -32,16 +33,7 @@ const app = {
   move(x, y) {
     for (let i = 0; i < this.canvas.length; i += 1) {
       const ctx = this.canvas[i].getContext('2d')
-      const img = drawKaleidoscope(
-        ctx,
-        this.preCanvas,
-        x,
-        y,
-        this.scopeSize,
-        this.bufferCanvas,
-        this.bufferContext(),
-        this.rotate,
-      )
+      const img = this.Kaleidoscope.drawKaleidoscope(x, y, this.rotate)
 
       ctx.drawImage(img, 0, 0)
     }
@@ -88,6 +80,14 @@ const app = {
         imgLoaded: true,
       }
     }
+
+    this.Kaleidoscope = new Kaleidoscope(
+      this.preCanvas,
+      this.scopeSize,
+      this.bufferCanvas,
+      this.bufferContext(),
+      this.rotate,
+    )
 
     this.move(this.coords[0], this.coords[1])
   },

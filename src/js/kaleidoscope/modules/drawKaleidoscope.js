@@ -1,111 +1,125 @@
-/* eslint-disable func-names */
-const drawKaleidoscope = function(ctx, img, imgX, imgY, mask, bCan, bCon, isRotate) {
-  // TODO: USE: // bufferContext.setTransform(1, 0, 0, 1, 0, 0)
-  const c = mask / 2
-  const sqDiag = Math.sqrt(2 * c * c)
-  const centerSide = 0
-  const bufferCanvas = bCan
-  const bufferContext = bCon
-  const maskSide = Math.abs(mask - sqDiag)
-
-  if (isRotate) {
-    const rotateContext = img.getContext('2d')
-
-    rotateContext.translate(c / 2, c / 2)
-    rotateContext.rotate(isRotate)
-    rotateContext.translate(-c / 2, -c / 2)
+export default class Kaleidoscope {
+  constructor(img, mask, bCan, bCon) {
+    this.img = img
+    this.imgX = 0
+    this.imgY = 0
+    this.mask = mask
+    this.c = this.mask / 2
+    this.sqDiag = Math.sqrt(2 * this.c * this.c)
+    this.centerSide = 0
+    this.bufferCanvas = bCan
+    this.bufferContext = bCon
+    this.maskSide = Math.abs(this.mask - this.sqDiag)
+    this.rotateContext = img.getContext('2d')
   }
 
-  // console.log(Math.floor(((time / 10000) % 60) * 6))
-
-  function drawImg() {
+  drawImg() {
     // console.log(time)
-    bufferContext.drawImage(img, imgX, imgY, maskSide, maskSide, centerSide, centerSide, c, c)
+    this.bufferContext.drawImage(
+      this.img,
+      this.imgX,
+      this.imgY,
+      this.maskSide,
+      this.maskSide,
+      this.centerSide,
+      this.centerSide,
+      this.c,
+      this.c,
+    )
   }
 
-  bufferCanvas.height = mask
-  bufferCanvas.width = mask
+  drawKaleidoscope(x, y, isRotate) {
+    const { bufferCanvas, bufferContext, c } = this
 
-  bufferContext.save()
+    this.imgX = x
+    this.imgY = y
 
-  // console.log(bufferContext)
+    if (isRotate) {
+      this.rotateContext.translate(this.c / 2, this.c / 2)
+      this.rotateContext.rotate(isRotate)
+      this.rotateContext.translate(-this.c / 2, -this.c / 2)
+    }
 
-  bufferContext.setTransform(-1, 0, 0, -1, c, c)
-  bufferContext.rotate(-90 * (Math.PI / 180))
-  // bufferContext.scale(-1, -1)
-  drawImg()
+    this.bufferCanvas.height = this.mask
+    this.bufferCanvas.width = this.mask
 
-  bufferContext.setTransform(1, 0, 0, -1, c, c)
-  bufferContext.rotate(-90 * (Math.PI / 180))
-  // bufferContext.scale(1, -1)
-  drawImg()
+    bufferContext.save()
 
-  bufferContext.setTransform(1, 0, 0, 1, c, c)
-  bufferContext.rotate(-90 * (Math.PI / 180))
-  // bufferContext.scale(1, 1)
-  drawImg()
+    bufferContext.setTransform(-1, 0, 0, -1, c, c)
+    bufferContext.rotate(-90 * (Math.PI / 180))
+    // bufferContext.scale(-1, -1)
+    this.drawImg()
 
-  bufferContext.setTransform(-1, 0, 0, 1, c, c)
-  bufferContext.rotate(-90 * (Math.PI / 180))
-  // bufferContext.scale(-1, 1)
-  drawImg()
+    bufferContext.setTransform(1, 0, 0, -1, c, c)
+    bufferContext.rotate(-90 * (Math.PI / 180))
+    // bufferContext.scale(1, -1)
+    this.drawImg()
 
-  bufferContext.setTransform(-1, 0, 0, -1, c, c)
-  bufferContext.rotate(-90 * (Math.PI / 180))
-  // bufferContext.scale(-1, -1)
-  drawImg()
+    bufferContext.setTransform(1, 0, 0, 1, c, c)
+    bufferContext.rotate(-90 * (Math.PI / 180))
+    // bufferContext.scale(1, 1)
+    this.drawImg()
 
-  bufferContext.restore()
+    bufferContext.setTransform(-1, 0, 0, 1, c, c)
+    bufferContext.rotate(-90 * (Math.PI / 180))
+    // bufferContext.scale(-1, 1)
+    this.drawImg()
 
-  bufferContext.save()
-  bufferContext.moveTo(c, c)
-  bufferContext.lineTo(0, c)
-  bufferContext.lineTo(0, 0)
-  bufferContext.lineTo(c, c)
-  bufferContext.clip()
-  bufferContext.translate(c, c)
-  bufferContext.scale(-1, -1)
-  drawImg()
-  bufferContext.restore()
+    bufferContext.setTransform(-1, 0, 0, -1, c, c)
+    bufferContext.rotate(-90 * (Math.PI / 180))
+    // bufferContext.scale(-1, -1)
+    this.drawImg()
 
-  bufferContext.save()
-  bufferContext.moveTo(c, c)
-  bufferContext.lineTo(c + c, 0)
-  bufferContext.lineTo(c + c, c)
-  bufferContext.lineTo(c, c)
-  bufferContext.clip()
-  bufferContext.translate(c, c)
-  bufferContext.scale(1, -1)
-  drawImg()
-  bufferContext.restore()
+    bufferContext.restore()
 
-  bufferContext.save()
-  bufferContext.moveTo(c, c)
-  bufferContext.lineTo(c + c, c)
-  bufferContext.lineTo(c + c, c + c)
-  bufferContext.lineTo(c, c)
-  bufferContext.clip()
-  bufferContext.translate(c, c)
-  bufferContext.scale(1, 1)
-  drawImg()
-  bufferContext.restore()
+    bufferContext.save()
+    bufferContext.moveTo(c, c)
+    bufferContext.lineTo(0, c)
+    bufferContext.lineTo(0, 0)
+    bufferContext.lineTo(c, c)
+    bufferContext.clip()
+    // bufferContext.translate(c, c)
+    // bufferContext.scale(-1, -1)
+    bufferContext.setTransform(-1, 0, 0, -1, c, c)
+    this.drawImg()
+    bufferContext.restore()
 
-  bufferContext.save()
-  bufferContext.moveTo(c, c)
-  bufferContext.lineTo(0, c + c)
-  bufferContext.lineTo(0, c)
-  bufferContext.lineTo(c, c)
-  bufferContext.clip()
-  bufferContext.translate(c, c)
-  bufferContext.scale(-1, 1)
-  drawImg()
-  bufferContext.restore()
+    bufferContext.save()
+    bufferContext.moveTo(c, c)
+    bufferContext.lineTo(c + c, 0)
+    bufferContext.lineTo(c + c, c)
+    bufferContext.lineTo(c, c)
+    bufferContext.clip()
+    // bufferContext.translate(c, c)
+    // bufferContext.scale(1, -1)
+    bufferContext.setTransform(1, 0, 0, -1, c, c)
+    this.drawImg()
+    bufferContext.restore()
 
-  // ctx.drawImage(bufferCanvas, 0, 0)
+    bufferContext.save()
+    bufferContext.moveTo(c, c)
+    bufferContext.lineTo(c + c, c)
+    bufferContext.lineTo(c + c, c + c)
+    bufferContext.lineTo(c, c)
+    bufferContext.clip()
+    // bufferContext.translate(c, c)
+    // bufferContext.scale(1, 1)
+    bufferContext.setTransform(1, 0, 0, 1, c, c)
+    this.drawImg()
+    bufferContext.restore()
 
-  // console.log(ctx.drawImage(bufferCanvas, 0, 0))
+    bufferContext.save()
+    bufferContext.moveTo(c, c)
+    bufferContext.lineTo(0, c + c)
+    bufferContext.lineTo(0, c)
+    bufferContext.lineTo(c, c)
+    bufferContext.clip()
+    // bufferContext.translate(c, c)
+    // bufferContext.scale(-1, 1)
+    bufferContext.setTransform(-1, 0, 0, 1, c, c)
+    this.drawImg()
+    bufferContext.restore()
 
-  return bufferCanvas
+    return bufferCanvas
+  }
 }
-
-export default drawKaleidoscope
