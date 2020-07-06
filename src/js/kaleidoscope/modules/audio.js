@@ -4,111 +4,112 @@
 // Diabling until refactor
 /* eslint-disable */
 function VisualAudioContext(url, mediaStream, audioTag) {
-  const vac = this;
+  const vac = this
+  const AudioContext = window.AudioContext || window.webkitAudioContext
 
-  const context = new AudioContext();
+  const context = new AudioContext()
 
-  let connected = false;
-  let bufferActive;
-  let javascriptNode;
-  let sourceNode;
-  let splitter;
-  let analyser;
-  let analyser2;
-  let channels;
-  let mediaStreamNode;
-  let mediaStreamSource;
-  let streamRecorder;
-  let gainNode;
+  let connected = false
+  // let bufferActive
+  let javascriptNode
+  let sourceNode
+  let splitter
+  let analyser
+  let analyser2
+  let channels
+  let mediaStreamNode
+  // let mediaStreamSource
+  // let streamRecorder
+  let gainNode
 
   const init = vol => {
-    (gainNode = context.createGain()),
+    ;(gainNode = context.createGain()),
       (splitter = context.createChannelSplitter()),
       (analyser = context.createAnalyser()),
       (analyser2 = context.createAnalyser()),
       (channels = {
         analyser,
-        analyser2
-      });
+        analyser2,
+      })
 
-    javascriptNode.connect(context.destination);
+    javascriptNode.connect(context.destination)
 
-    analyser.smoothingTimeConstant = 0.3;
-    analyser.fftSize = 1024;
-    analyser2.smoothingTimeConstant = 0.0;
-    analyser2.fftSize = 1024;
+    analyser.smoothingTimeConstant = 0.3
+    analyser.fftSize = 1024
+    analyser2.smoothingTimeConstant = 0.0
+    analyser2.fftSize = 1024
 
     // connect the source to the analyser and the splitter
-    sourceNode.connect(splitter);
+    sourceNode.connect(splitter)
 
-    splitter.connect(analyser, 0, 0);
-    splitter.connect(analyser2, 1, 0);
+    splitter.connect(analyser, 0, 0)
+    splitter.connect(analyser2, 1, 0)
 
-    sourceNode.connect(gainNode);
-    gainNode.gain.value = vol;
+    sourceNode.connect(gainNode)
+    gainNode.gain.value = vol
 
     // NEED FOR SoundCloud VERSION!!!!!!!!!
     // sourceNode.connect(context.destination);
-    if (bufferActive) {
-      sourceNode.buffer = bufferActive;
-    }
+    // if (bufferActive) {
+    //   sourceNode.buffer = bufferActive
+    // }
 
-    connected = true;
-    vac.javascriptNode = javascriptNode;
-    vac.sourceNode = sourceNode;
-    vac.gainNode = gainNode;
-    context.suspend();
+    connected = true
+    vac.javascriptNode = javascriptNode
+    vac.sourceNode = sourceNode
+    vac.gainNode = gainNode
+    context.suspend()
 
-    if (typeof callback === "function") {
-      callback();
+    if (typeof callback === 'function') {
+      callback()
     }
-  };
+  }
 
   const setupMicNodes = () => {
-    mediaStreamNode = context.createMediaStreamSource(mediaStream);
-    javascriptNode = context.createScriptProcessor(2048, 1, 1);
-    sourceNode = mediaStreamNode;
-    init(0);
-  };
+    mediaStreamNode = context.createMediaStreamSource(mediaStream)
+    javascriptNode = context.createScriptProcessor(2048, 1, 1)
+    sourceNode = mediaStreamNode
+    init(0)
+  }
 
   const setupAudioNodes = () => {
-    javascriptNode = context.createScriptProcessor(2048, 1, 1);
-    sourceNode = audioTag;
-    init(0.5);
-  };
+    javascriptNode = context.createScriptProcessor(2048, 1, 1)
+    sourceNode = audioTag
+    init(0.5)
+  }
 
   if (!mediaStream) {
-    setupAudioNodes();
+    setupAudioNodes()
   } else {
-    setupMicNodes();
+    setupMicNodes()
   }
 
   this.getAverageVolume = array => {
-    let values = 0;
-    const length = array.length;
-    let average;
+    let values = 0
+    const length = array.length
+    let average
     // get all the frequency amplitudes
 
     for (let i = 0; i < length; i++) {
-      values += array[i];
+      values += array[i]
     }
-    average = values / length;
-    return average;
-  };
-  this.ch = channels;
-  this.javascriptNode = javascriptNode;
-  this.sourceNode = sourceNode;
-  this.gainNode = gainNode;
-  (this.resume = function() {
-    this.gainNode.gain.value = 0.2;
-    this.sourceNode.connect(this.gainNode.gain);
-    context.resume();
+    average = values / length
+    return average
+  }
+  this.ch = channels
+  this.javascriptNode = javascriptNode
+  this.sourceNode = sourceNode
+  this.gainNode = gainNode
+  ;(this.resume = function() {
+    this.gainNode.gain.value = 0.2
+    this.sourceNode.connect(this.gainNode.gain)
+    context.resume()
   }),
     (this.close = function() {
-      this.gainNode.gain.value = 0;
-      this.sourceNode.connect(this.gainNode.gain);
-      context.suspend();
-    });
+      this.gainNode.gain.value = 0
+      this.sourceNode.connect(this.gainNode.gain)
+      context.suspend()
+    })
 }
 
-export default VisualAudioContext;
+export default VisualAudioContext
