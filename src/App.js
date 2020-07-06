@@ -54,7 +54,14 @@ class Widget extends React.Component {
       audio: false,
       rotate: false,
       kaleidoscope,
+      activeCamera: 0,
+      cameraList: [],
     }
+    kaleidoscope.cameraList.then(cs => {
+      this.setState({
+        cameraList: cs,
+      })
+    })
   }
   // state = {
   //   audio: false,
@@ -105,6 +112,38 @@ class Widget extends React.Component {
     this.props.handleCanvasCount(val)
   }
 
+  changeCamera(event) {
+    const camera = event.target.value
+
+    this.setState({
+      camera,
+    })
+
+    kaleidoscope.prepVideo(camera)
+
+    kaleidoscope.camera = camera
+  }
+
+  cameras() {
+    if (this.state.cameraList.length > 1) {
+      return (
+        <React.Fragment>
+          <label htmlFor="cameraList">Cameras</label>
+          <select onChange={this.changeCamera.bind(this)}>
+            {this.state.cameraList.map((c, i) => (
+              // console.log(c);
+              <option key={`camera_${i}`} value={i}>
+                {' '}
+                {c.label}{' '}
+              </option>
+            ))}
+          </select>
+        </React.Fragment>
+      )
+    }
+    return null
+  }
+
   render() {
     const specs = this.props
     const size = specs.scopeSize
@@ -140,7 +179,7 @@ class Widget extends React.Component {
             defaultChecked={this.state.audio}
             onChange={this.moveToggle.bind(this)}
           />
-          <label htmlFor="audio">Rotate: </label>
+          <label htmlFor="rotate">Rotate: </label>
           <input
             type="range"
             min={0.0}
@@ -152,6 +191,7 @@ class Widget extends React.Component {
             onChange={this.rotateToggle.bind(this)}
           />
           {recursionInput}
+          {this.cameras()}
           <label
             htmlFor="y-range"
             className={`static-range ${!this.state.audio ? 'show' : 'hidden'}`}
@@ -229,7 +269,7 @@ export default class App extends React.Component {
       }, 50)
     }
     window.addEventListener('resize', this.state.listenerFunc)
-    kaleidoscope.prepVideo()
+    kaleidoscope.prepVideo(this.state.camera)
     kaleidoscope.move(0, 0)
   }
 

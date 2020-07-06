@@ -5,7 +5,8 @@ import VisualAudioContext from './audio'
 
 const app = {
   kScope: [],
-  cameraList: LiveVideo.listCameras(),
+  cameraList: [],
+  camera: 0,
   canvas: document.getElementsByClassName('kaleidoscopeCanvas'),
   bufferCanvas: document.createElement('canvas'),
   bufferContext() {
@@ -64,6 +65,7 @@ const app = {
   prepPage(src) {
     let i
 
+    this.cameraList = LiveVideo.listCameras()
     this.preCanvas.id = 'preCanvas'
     this.preCanvas.width = this.scopeSize
     this.preCanvas.height = this.scopeSize

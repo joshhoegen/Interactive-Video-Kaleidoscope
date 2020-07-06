@@ -93,21 +93,22 @@ a {
   margin-bottom: -3px;
 }
 .controls {
-  display: table;
+  // display: table;
   z-index: 2;
   position: fixed;
   padding: 20px;
   left: 0;
   top: 0;
-  min-width: 100%;
+  min-width: 50%;
   min-height: 40px;
   .controls-wrapper {
-    display: table-cell;
+    // display: table-cell;
     vertical-align: middle;
     visibility: hidden;
     opacity: 0;
     transition: visibility 1s, opacity 0.5s ease-in-out;
     animation: fadeInOut 9.5s;
+    text-align: left;
   }
   &:hover {
     .controls-wrapper {
@@ -118,9 +119,12 @@ a {
   }
   label,
   span {
-    float: left;
+    // float: left;
+    clear: both;
+    text-align: left;
     color: #fff;
     margin: 5px 2% 0 0;
+    display: block;
   }
   .reset-span {
     float: none;
@@ -128,17 +132,26 @@ a {
     margin: 0;
   }
   input {
-    float: left;
+    // float: left;
     margin: 7px 24px 0 0;
+    display: block;
+  }
+  label[for='audio'] {
+    display: inline-block;
+    text-align: left;
+  }
+  input[type='checkbox'] {
+    display: inline-block;
   }
   input.static-range {
     max-width: 25%;
-    display: inline-block;
     top: -1px;
     position: relative;
+    display: block;
   }
   select {
     margin-top: 4px;
+    display: block;
   }
 }
 .hidden {
