@@ -218,13 +218,23 @@ export default class App extends React.Component {
   }
 
   componentDidMount() {
+    const ua = navigator.userAgent.toLowerCase()
+    const is_safari = ua.indexOf('safari/') > -1 && ua.indexOf('chrome') < 0
+
+    if (is_safari) {
+      const video = document.getElementById('video')
+
+      setTimeout(() => {
+        video.play()
+      }, 50)
+    }
     window.addEventListener('resize', this.state.listenerFunc)
     kaleidoscope.prepVideo()
     kaleidoscope.move(0, 0)
   }
 
   componentWillUnmount() {
-    window.removeEventListener('resize', this.state.listenerFunc, true)
+    window.removeEventListener('resize', this.state.listenerFunc)
   }
 
   render() {

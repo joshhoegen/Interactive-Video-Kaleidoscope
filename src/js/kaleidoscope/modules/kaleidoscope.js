@@ -32,7 +32,7 @@ const app = {
 
   move(x, y) {
     for (let i = 0; i < this.canvas.length; i += 1) {
-      const ctx = this.canvas[i].getContext('2d')
+      const { ctx } = this.kScope[i]
       const img = this.Kaleidoscope.drawKaleidoscope(x, y, this.rotate)
 
       ctx.drawImage(img, 0, 0)
