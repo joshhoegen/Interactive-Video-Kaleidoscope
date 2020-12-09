@@ -269,8 +269,16 @@ export default class App extends React.Component {
       }, 50)
     }
     window.addEventListener('resize', this.state.listenerFunc)
-    kaleidoscope.prepVideo(this.state.camera)
-    kaleidoscope.move(0, 0)
+
+    const audioContext = new AudioContext()
+
+    document.getElementById('play-all').addEventListener('click', () => {
+      document.getElementById('play-instructions').classList.toggle('fadeOut')
+      document.getElementById('body-bg').classList.toggle('hidden')
+      audioContext.resume()
+      kaleidoscope.prepVideo(this.state.camera, audioContext)
+      kaleidoscope.move(0, 0)
+    })
   }
 
   componentWillUnmount() {
@@ -280,6 +288,17 @@ export default class App extends React.Component {
   render() {
     return (
       <div data-img-url="test" id="sckscope">
+        <div id="body-bg" />
+
+        <div id="play-instructions">
+          <div className="play-all-wrapper">
+            <button id="play-all">▶</button>
+          </div>
+          <div className="play-text-wrapper">
+            Hit play to enjoy a psychedelic toy! The app will ask to use your camera.{' '}
+            <strong>No data is recorded or transmitted by this app.</strong>
+          </div>
+        </div>
         <Widget
           handleCanvasCount={this.updateDimensions.bind(this)}
           scopeSize={kaleidoscope.scopeSize}
