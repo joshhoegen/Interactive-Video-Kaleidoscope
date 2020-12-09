@@ -3,16 +3,16 @@
 // Original code from: http://www.smartjava.org/content/exploring-html5-web-audio-visualizing-sound
 // Diabling until refactor
 /* eslint-disable */
-function VisualAudioContext(url, mediaStream, audioTag) {
+function VisualAudioContext(mediaStream, audioContext) {
   const vac = this
   const AudioContext = window.AudioContext || window.webkitAudioContext
 
-  const context = new AudioContext()
+  const context = audioContext || new AudioContext()
 
   let connected = false
   // let bufferActive
   let javascriptNode
-  let sourceNode
+  let sourceNode = mediaStream
   let splitter
   let analyser
   let analyser2
@@ -74,7 +74,7 @@ function VisualAudioContext(url, mediaStream, audioTag) {
 
   const setupAudioNodes = () => {
     javascriptNode = context.createScriptProcessor(2048, 1, 1)
-    sourceNode = audioTag
+    sourceNode = undefined
     init(0.5)
   }
 

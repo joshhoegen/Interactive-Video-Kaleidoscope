@@ -9,6 +9,26 @@ body {
   text-shadow: 2px 1px 6px #000;
   background-color: #333;
 }
+#body-bg {
+  min-height: 100%; 
+  background: url("/static/public/kaleidoscope-demo-1.gif");
+  opacity: 0.4;
+  box-shadow: 0px 0px 25px 25px rgba(0,253,51, 1);
+}
+#body-bg:before {
+  content: "";
+  display: inline-block;
+  width: 100%;
+  height: 100%;
+  background-image: linear-gradient(
+    // Fade over the entire image - not great.
+    rgba(0, 0, 0, 0.0) 0%,
+    rgba(0, 0, 0, 1.0) 100%
+  );
+}
+#body-bg.hidden {
+  display: none;
+}
 #video {
   display: none;
   position: absolute;
@@ -174,6 +194,66 @@ a {
   text-decoration: none;
   cursor: pointer;
 }
+#play-instructions {
+
+  text-align: center;
+
+  &.fadeOut {
+    animation: fadeOut 0.7s;
+    opacity: 0
+  }
+
+  .play-text-wrapper {
+    position: absolute;
+    top: 40%;
+    z-index: 9;
+    left: 50%;
+    width: 300px;
+    margin-left: -150px;
+  }
+
+  .play-all-wrapper {
+    position: absolute;
+    top: 50%;
+    z-index: 9;
+    left: 50%;
+    width: 100px;
+    height: 100px;
+    margin-left: -50px;
+
+    #play-all {
+      cursor: pointer;
+      padding: 18px 35px;
+      font-size: 28px;
+      color: #333;
+      border: 2px solid #232323;
+      border-radius: 10%;
+
+      &:hover {
+        opacity: 0.7;
+      }
+    
+      &.paused {
+        border-style: double;
+        border-width: 0px 0 0px 60px;
+      }
+    }
+  }
+}
+
+@keyframes fadeOut {
+  0% {
+    opacity: 1;
+    visibility: visible;
+  }
+  100% {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+
+
 @keyframes fadeInOut {
   0% {
     opacity: 0;

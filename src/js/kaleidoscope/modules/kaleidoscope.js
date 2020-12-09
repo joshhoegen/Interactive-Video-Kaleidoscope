@@ -94,7 +94,7 @@ const app = {
     this.move(this.coords[0], this.coords[1])
   },
 
-  prepVideo(camera = 0) {
+  prepVideo(camera = 0, audioContext) {
     window.URL = window.URL || window.webkitURL
     // navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia ||
     //   navigator.mozGetUserMedia || navigator.msGetUserMedia;
@@ -115,7 +115,7 @@ const app = {
         this.video = video
         this.audioActive = mediaStream
         this.mediaStream = mediaStream
-        this.vac = new VisualAudioContext(mediaStream, mediaStream)
+        this.vac = new VisualAudioContext(mediaStream, audioContext)
 
         this.snapshot(video, canvas, ctx, mediaStream, center)
       })
