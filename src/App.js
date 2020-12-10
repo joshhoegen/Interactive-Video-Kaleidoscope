@@ -7,9 +7,7 @@ import Header from './js/jhHeader'
 
 import './css/main.scss'
 
-let canvasCount = 6
-
-let recursionCount = 6
+let recursionCount = 3
 
 class CanvasKscope extends React.Component {
   constructor(props) {
@@ -21,29 +19,22 @@ class CanvasKscope extends React.Component {
   }
 
   componentDidMount() {
-    kaleidoscope.prepPage(this.props.src)
+    kaleidoscope.prepPage(recursionCount, this.props.src)
   }
 
   componentDidUpdate() {
-    kaleidoscope.prepPage(this.props.src)
+    kaleidoscope.prepPage(recursionCount, this.props.src)
   }
 
   render() {
-    const specs = this.props
-    const size = specs.scopeSize
-    const canvases = []
-
-    for (let i = 0; i < canvasCount; i += 1) {
-      canvases.push(
-        <canvas
-          key={`kaleidoscope${i}`}
-          className="kaleidoscopeCanvas"
-          height={size}
-          width={size}
-        />,
-      )
-    }
-    return <div> {canvases} </div>
+    return (
+      <canvas
+        key="kaleidoscope"
+        className="kaleidoscopeCanvas"
+        height={`${window.innerHeight}px`}
+        width={`${window.innerWidth}px`}
+      />
+    )
   }
 }
 
@@ -63,10 +54,6 @@ class Widget extends React.Component {
       })
     })
   }
-  // state = {
-  //   audio: false,
-  //   kaleidoscope,
-  // }
 
   move(e) {
     this.state.kaleidoscope.move(e.target.value, e.target.value)
@@ -91,13 +78,11 @@ class Widget extends React.Component {
     const val = e.target.value
 
     if (val > 0) {
-      // this.state.kaleidoscope.visualizeAudio()
       this.setState({
         rotate: val,
       })
       kaleidoscope.rotate = val
     } else {
-      // this.state.kaleidoscope.visualizeAudio(true)
       this.setState({
         rotate: 0,
       })
@@ -155,7 +140,7 @@ class Widget extends React.Component {
           </label>
           <input
             type="range"
-            min="6"
+            min="2"
             max="12"
             step="2"
             defaultValue={recursionCount}
@@ -224,7 +209,7 @@ export default class App extends React.Component {
       listenerFunc: this.updateDimensions.bind(this),
     }
     kaleidoscope.scopeSize = this.state.size
-    kaleidoscope.prepPage()
+    kaleidoscope.prepPage(recursionCount)
   }
 
   static calculateWidth(count) {
@@ -232,7 +217,7 @@ export default class App extends React.Component {
 
     let rowCount = activeCount / 2 || 3
     // if adding more, need to figure out a scale... eg. Greater than 12 need 2.5ish
-    const multiplier = activeCount <= 12 ? 2 : 1.5
+    // const multiplier = activeCount <= 12 ? 2 : 1.5
 
     if (window.outerWidth < 600) {
       rowCount = 1
@@ -240,7 +225,7 @@ export default class App extends React.Component {
       activeCount = 2
     }
 
-    canvasCount = activeCount * multiplier
+    // canvasCount = activeCount * multiplier
     // The canvases are tweaked to handle a hairline mismatch with exact calculations,
     // Therefore, we add 1px
     return Math.ceil(2 * (window.innerWidth / rowCount / 2))
@@ -253,7 +238,7 @@ export default class App extends React.Component {
         size: App.calculateWidth(),
       })
       kaleidoscope.scopeSize = this.state.size
-      kaleidoscope.prepPage()
+      kaleidoscope.prepPage(recursionCount)
     }, 500)
   }
 
