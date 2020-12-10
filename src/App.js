@@ -169,7 +169,7 @@ class Widget extends React.Component {
       )
 
     return (
-      <div className="controls">
+      <div className="controls hidden">
         <form className="controls-wrapper">
           <label htmlFor="audio">Use Audio: </label>
           <input
@@ -275,9 +275,22 @@ export default class App extends React.Component {
     document.getElementById('play-all').addEventListener('click', () => {
       document.getElementById('play-instructions').classList.toggle('fadeOut')
       document.getElementById('body-bg').classList.toggle('hidden')
+      document.querySelector('.controls').classList.toggle('hidden')
       audioContext.resume()
       kaleidoscope.prepVideo(this.state.camera, audioContext)
       kaleidoscope.move(0, 0)
+    })
+
+    document.getElementById('play-record').addEventListener('click', () => {
+      document.getElementById('play-instructions').classList.toggle('fadeOut')
+      document.getElementById('body-bg').classList.toggle('hidden')
+      document.querySelector('.controls').classList.toggle('hidden')
+      audioContext.resume()
+      kaleidoscope.prepVideo(this.state.camera, audioContext)
+      kaleidoscope.move(0, 0)
+      setTimeout(() => {
+        kaleidoscope.record()
+      }, 500)
     })
   }
 
@@ -293,10 +306,23 @@ export default class App extends React.Component {
         <div id="play-instructions">
           <div className="play-all-wrapper">
             <button id="play-all">▶</button>
+            <br />
+            <br />
+            <div>
+              {' '}
+              Record it! <br />
+              <br />
+            </div>
+            <button id="play-record" title="Record 10 Seconds">
+              ● 10s
+            </button>
           </div>
           <div className="play-text-wrapper">
-            Hit play to enjoy a psychedelic toy! The app will ask to use your camera.{' '}
-            <strong>No data is recorded or transmitted by this app.</strong>
+            Hit play to enjoy a psychedelic toy! The app will ask to use your camera. <br />
+            <br />
+            <strong>
+              No data is transmitted by this app. All recordings happen locally, in-browser.
+            </strong>
           </div>
         </div>
         <Widget

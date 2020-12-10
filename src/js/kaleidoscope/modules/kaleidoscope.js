@@ -14,6 +14,7 @@ const app = {
   },
   canvasActive: 1,
   rotate: null,
+  recording: false,
   audio: {},
   listener: null,
   scopeSize: 400,
@@ -37,8 +38,56 @@ const app = {
       const img = this.Kaleidoscope.drawKaleidoscope(x, y, this.rotate)
 
       ctx.drawImage(img, 0, 0)
+      if (this.recording && i === 0) {
+        ctx.fillText('@joshhoegen', 10, 10)
+      }
     }
     this.coords = [x, y]
+  },
+
+  download(recordedChunks) {
+    const blob = new Blob(recordedChunks, {
+      type: 'video/mp4', // webm
+    })
+
+    const url = URL.createObjectURL(blob)
+
+    const a = document.createElement('a')
+
+    document.body.appendChild(a)
+    a.style = 'display: none'
+    a.href = url
+    a.download = 'joshhoegen-kaleidoscope.mp4'
+    a.click()
+    window.URL.revokeObjectURL(url)
+    this.recording = false
+    window.location.reload()
+  },
+
+  record() {
+    this.recording = true
+    const videoStream = this.canvas[0].captureStream(30)
+
+    const mediaRecorder = new MediaRecorder(videoStream)
+
+    let chunks = []
+
+    mediaRecorder.ondataavailable = e => {
+      chunks.push(e.data)
+    }
+
+    mediaRecorder.onstop = () => {
+      this.download(chunks)
+      chunks = []
+    }
+    mediaRecorder.ondataavailable = e => {
+      chunks.push(e.data)
+    }
+
+    mediaRecorder.start()
+    setTimeout(() => {
+      mediaRecorder.stop()
+    }, 10 * 1000)
   },
 
   visualizeAudio(off) {

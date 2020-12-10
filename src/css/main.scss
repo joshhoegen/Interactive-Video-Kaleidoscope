@@ -121,6 +121,9 @@ a {
   top: 0;
   min-width: 50%;
   min-height: 40px;
+  &.hidden {
+    display: none;
+  }
   .controls-wrapper {
     // display: table-cell;
     vertical-align: middle;
@@ -205,7 +208,7 @@ a {
 
   .play-text-wrapper {
     position: absolute;
-    top: 40%;
+    top: 20%;
     z-index: 9;
     left: 50%;
     width: 300px;
@@ -221,6 +224,10 @@ a {
     height: 100px;
     margin-left: -50px;
 
+    #play-record {
+      cursor: pointer;
+    }
+
     #play-all {
       cursor: pointer;
       padding: 18px 35px;
@@ -228,6 +235,7 @@ a {
       color: #333;
       border: 2px solid #232323;
       border-radius: 10%;
+      margin-bottom: 20px;
 
       &:hover {
         opacity: 0.7;
