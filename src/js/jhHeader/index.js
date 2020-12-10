@@ -9,10 +9,7 @@ export default class Header extends React.Component {
     return (
       <div>
         <div className="jh-directions">
-          <div className="jh-directions-text">
-            Hover/tap over the top left and the bottom of the browser window for interactive
-            controls and options.
-          </div>
+          <div className="jh-directions-text">Press play!</div>
           <img className="jh-directions-pixels" src={PixelImage} alt="null" />
         </div>
         <div id="jh-header-ui">
