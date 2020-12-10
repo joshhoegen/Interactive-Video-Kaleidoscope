@@ -12,7 +12,6 @@ const app = {
   bufferContext() {
     return this.bufferCanvas.getContext('2d')
   },
-  canvasActive: 1,
   rotate: null,
   recording: false,
   audio: {},
@@ -33,16 +32,22 @@ const app = {
   preCanvas: document.createElement('canvas'),
 
   move(x, y) {
-    for (let i = 0; i < this.canvas.length; i += 1) {
-      const { ctx } = this.kScope[i]
+    if (this.kScope.length) {
+      const { ctx } = this.kScope[0]
       const img = this.Kaleidoscope.drawKaleidoscope(x, y, this.rotate)
 
-      ctx.drawImage(img, 0, 0)
-      if (this.recording && i === 0) {
+      for (let j = 0; j < this.rowCount; j += 1) {
+        for (let i = 0; i < this.recursionCount; i += 1) {
+          ctx.drawImage(img, (this.kScope[0].width - 1) * i, (this.kScope[0].height - 2) * j)
+        }
+      }
+
+      if (this.recording) {
         ctx.fillText('@joshhoegen', 10, 10)
       }
+
+      this.coords = [x, y]
     }
-    this.coords = [x, y]
   },
 
   download(recordedChunks) {
@@ -111,16 +116,25 @@ const app = {
     }
   },
 
-  prepPage(src) {
+  prepPage(recursionCount = 3, src) {
     let i
 
     this.cameraList = LiveVideo.listCameras()
     this.preCanvas.id = 'preCanvas'
+    this.innerHeight = window.innerHeight
+    this.innerWidth = window.innerWidth
+    this.recursionCount = recursionCount
+    // const dimensions = this.innerWidth / this.recursionCount
+    this.scopeSize = Math.ceil(this.innerWidth / this.recursionCount)
     this.preCanvas.width = this.scopeSize
     this.preCanvas.height = this.scopeSize
+    this.rowCount = this.innerHeight / this.scopeSize
+
     // this.preCanvas.style.cssText = 'display: none'
     this.canvas = this.canvas || document.getElementsByClassName('kaleidoscopeCanvas')
+
     document.body.appendChild(this.preCanvas)
+
     for (i = 0; i < this.canvas.length; i += 1) {
       this.kScope[i] = {
         img: src || '',
@@ -145,9 +159,7 @@ const app = {
 
   prepVideo(camera = 0, audioContext) {
     window.URL = window.URL || window.webkitURL
-    // navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia ||
-    //   navigator.mozGetUserMedia || navigator.msGetUserMedia;
-    // const preImage = document.createElement("img");
+
     const canvas = this.preCanvas
     const ctx = canvas.getContext('2d')
     const center = this.scopeSize / 2
