@@ -27,7 +27,7 @@
   "homepage": "https://github.com/vasanthk/react-es6-webpack-boilerplate",
   "dependencies": {
     "@babel/runtime-corejs2": "^7.0.0",
-    "live-video": "^1.1.1",
+    "live-video": "^1.1.2",
     "prop-types": "^15.7.2",
     "react": "^16.11.0",
     "react-dom": "^16.11.0"
