@@ -19,11 +19,11 @@ const LiveVideo = class {
     this.vidVal = this.video ? this.getCamera() : true
   }
 
-  static listCameras() {
+  static async listCameras() {
     const cameras = []
     const getDevices = navigator.mediaDevices.enumerateDevices()
 
-    return getDevices
+    await getDevices
       .then(info => {
         for (let i = 0; i < info.length; i += 1) {
           if (info[i].kind === 'videoinput') {
@@ -41,8 +41,6 @@ const LiveVideo = class {
       camera: this.camera,
     })
 
-    console.log('GET CAM')
-
     return LiveVideo.listCameras()
       .then(arr => ({
         deviceId: {
@@ -59,12 +57,14 @@ const LiveVideo = class {
     return this.vidVal
       .then(v => {
         if (video && navigator.mediaDevices) {
+          console.log(navigator.mediaDevices)
           return navigator.mediaDevices
             .getUserMedia({
               video: v,
               audio,
             })
             .then(stream => {
+              console.log(stream)
               try {
                 video.srcObject = stream
               } catch (error) {
