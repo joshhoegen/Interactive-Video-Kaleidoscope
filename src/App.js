@@ -48,10 +48,11 @@ class Widget extends React.Component {
       activeCamera: 0,
       cameraList: [],
     }
-    kaleidoscope.cameraList.then(cs => {
-      this.setState({
-        cameraList: cs,
-      })
+  }
+
+  componentDidMount() {
+    this.setState({
+      cameraList: kaleidoscope.cameraList,
     })
   }
 

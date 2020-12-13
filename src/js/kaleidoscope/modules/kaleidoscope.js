@@ -1,4 +1,4 @@
-import LiveVideo from 'live-video'
+import LiveVideo from '../../testVideo'
 
 import Kaleidoscope from './drawKaleidoscope'
 import VisualAudioContext from './audio'
@@ -116,10 +116,10 @@ const app = {
     }
   },
 
-  prepPage(recursionCount = 3, src) {
+  async prepPage(recursionCount = 3, src) {
     let i
 
-    this.cameraList = LiveVideo.listCameras()
+    this.cameraList = await LiveVideo.listCameras()
     this.preCanvas.id = 'preCanvas'
     this.innerHeight = window.innerHeight
     this.innerWidth = window.innerWidth

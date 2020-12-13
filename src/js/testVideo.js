@@ -42,12 +42,14 @@ const LiveVideo = class {
     })
 
     return LiveVideo.listCameras()
-      .then(arr => ({
-        deviceId: {
-          exact: arr[this.camera].deviceId,
-          label: arr[this.camera].label,
-        },
-      }))
+      .then(arr => {
+        return {
+          deviceId: {
+            exact: arr[this.camera].deviceId,
+            label: arr[this.camera].label,
+          },
+        }
+      })
       .catch(() => true)
   }
 
@@ -57,14 +59,12 @@ const LiveVideo = class {
     return this.vidVal
       .then(v => {
         if (video && navigator.mediaDevices) {
-          console.log(navigator.mediaDevices)
           return navigator.mediaDevices
             .getUserMedia({
               video: v,
               audio,
             })
             .then(stream => {
-              console.log(stream)
               try {
                 video.srcObject = stream
               } catch (error) {
