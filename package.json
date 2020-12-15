@@ -28,7 +28,7 @@
   "dependencies": {
     "@babel/runtime-corejs2": "^7.0.0",
     "core-js": "^3.8.1",
-    "live-video": "1.1.0",
+    "live-video": "1.2.0",
     "prop-types": "^15.7.2",
     "react": "^16.11.0",
     "react-dom": "^16.11.0",

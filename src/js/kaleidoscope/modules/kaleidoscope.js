@@ -1,4 +1,4 @@
-import LiveVideo from '../../testVideo'
+import LiveVideo from 'live-video'
 
 import Kaleidoscope from './drawKaleidoscope'
 import VisualAudioContext from './audio'
