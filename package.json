@@ -74,7 +74,7 @@
     "eslint-plugin-react": "^7.11.0",
     "file-loader": "^4.2.0",
     "mini-css-extract-plugin": "^0.8.0",
-    "node-sass": "^4.3.0",
+    "node-sass": "^7.0.0",
     "prettier": "^1.15.3",
     "prettier-eslint-cli": "^4.7.1",
     "pretty-quick": "^1.6.0",
