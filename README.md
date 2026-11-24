@@ -1,4 +1,6 @@
-# Interactive Video Kaleidescope
+## Interactive Video Kaleidescope
+
+# Inspired by Phong 2015
 
 > [!WARNING]
 > This project has been moved to a private repo where it combines the tech for all video experiments. Checkout [joshhoegen.com](https://joshhoegen.com/) for the new and improved interactive art!
